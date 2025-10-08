@@ -3,8 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { BookOpen, MessageSquare, FileText, Star } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import chapterFilledBg from '@/assets/chapter-filled-bg.png';
-import chapterUnfilledBg from '@/assets/chapter-unfilled-bg.png';
+import chapterPattern from '@/assets/chapter-pattern.png';
 
 interface Chapter {
   id: number;
@@ -130,13 +129,23 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
           return (
             <Card 
               key={chapter.id}
-              className="relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer bg-card border-none"
+              className="relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer border-none"
               style={{
-                backgroundImage: `url(${hasContent ? chapterFilledBg : chapterUnfilledBg})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
+                background: hasContent 
+                  ? 'linear-gradient(to right, #FFFFFF, #FDE6E6)' 
+                  : '#E0E0E0',
               }}
             >
+              {/* Pattern overlay */}
+              <div 
+                className="absolute inset-0 opacity-30"
+                style={{
+                  backgroundImage: `url(${chapterPattern})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+              />
+              
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-3">
                   {hasContent && (
