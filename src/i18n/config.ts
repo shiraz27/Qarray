@@ -28,7 +28,8 @@ const resources = {
       deleteAccountConfirm: "Are you sure you want to delete your account? This action cannot be undone.",
       cancel: "Cancel",
       delete: "Delete",
-      accountDeleted: "Account deleted successfully"
+      accountDeleted: "Account deleted successfully",
+      verifyEmail: "Please check your email to verify your account before signing in."
     }
   },
   fr: {
@@ -57,7 +58,8 @@ const resources = {
       deleteAccountConfirm: "Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.",
       cancel: "Annuler",
       delete: "Supprimer",
-      accountDeleted: "Compte supprimé avec succès"
+      accountDeleted: "Compte supprimé avec succès",
+      verifyEmail: "Veuillez vérifier votre e-mail pour activer votre compte avant de vous connecter."
     }
   },
   ar: {
@@ -86,7 +88,8 @@ const resources = {
       deleteAccountConfirm: "هل أنت متأكد من رغبتك في حذف حسابك؟ هذا الإجراء لا يمكن التراجع عنه.",
       cancel: "إلغاء",
       delete: "حذف",
-      accountDeleted: "تم حذف الحساب بنجاح"
+      accountDeleted: "تم حذف الحساب بنجاح",
+      verifyEmail: "يرجى التحقق من بريدك الإلكتروني لتفعيل حسابك قبل تسجيل الدخول."
     }
   }
 };

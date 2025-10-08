@@ -36,7 +36,7 @@ const Login: React.FC = () => {
 
         toast({
           title: t('success'),
-          description: t('accountCreated'),
+          description: t('verifyEmail'),
         });
         setIsSignUp(false);
       } else {
