@@ -1,42 +1,24 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Home, Bookmark, User } from 'lucide-react';
 
-interface NavigationItem {
-  id: string;
-  label: string;
-  isActive?: boolean;
+interface BottomNavigationProps {
+  onTabChange: (tab: string) => void;
+  activeTab: string;
 }
 
-const navigationItems: NavigationItem[] = [
-  {
-    id: 'subjects',
-    label: 'Subjects',
-    isActive: true
-  },
-  {
-    id: 'bookmarks',
-    label: 'Bookmarks'
-  },
-  {
-    id: 'profile',
-    label: 'Profile'
-  }
-];
-
-export const BottomNavigation: React.FC = () => {
-  const [activeItem, setActiveItem] = useState('subjects');
-
-  const handleNavigationClick = (itemId: string) => {
-    setActiveItem(itemId);
-    console.log(`Navigated to: ${itemId}`);
-  };
+export const BottomNavigation: React.FC<BottomNavigationProps> = ({ onTabChange, activeTab }) => {
+  const navigationItems = [
+    { id: 'subjects', label: 'Subjects', Icon: Home },
+    { id: 'bookmarks', label: 'Bookmarks', Icon: Bookmark },
+    { id: 'profile', label: 'Profile', Icon: User }
+  ];
 
   return (
     <footer className="bg-white w-full border-t border-gray-100 shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
       <nav className="flex w-full items-center text-xs font-medium whitespace-nowrap text-center justify-around px-4 py-3" aria-label="Main navigation">
         {navigationItems.map((item) => {
-          const isActive = activeItem === item.id;
-          const Icon = item.id === 'subjects' ? Home : item.id === 'bookmarks' ? Bookmark : User;
+          const isActive = activeTab === item.id;
+          const Icon = item.Icon;
           return (
             <button
               key={item.id}
@@ -45,7 +27,7 @@ export const BottomNavigation: React.FC = () => {
                   ? 'text-[#38a6ff]' 
                   : 'text-[#9E9E9E] hover:text-[#38a6ff] hover:bg-gray-50'
               }`}
-              onClick={() => handleNavigationClick(item.id)}
+              onClick={() => onTabChange(item.id)}
               aria-pressed={isActive}
               aria-label={`Navigate to ${item.label}`}
             >
