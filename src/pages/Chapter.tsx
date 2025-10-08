@@ -4,13 +4,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, FileText, ArrowLeft, Bookmark, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { MessageSquare, FileText, ArrowLeft, Bookmark, ThumbsUp, ThumbsDown, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { ContentSkeleton } from '@/components/LoadingSkeleton';
 import { EmptyState } from '@/components/EmptyState';
+import { AskQuestionForm } from '@/components/AskQuestionForm';
+import { AddResourceForm } from '@/components/AddResourceForm';
 
 interface ChapterData {
   id: number;
@@ -70,6 +73,9 @@ export default function Chapter() {
   const [selectedDevoirFilters, setSelectedDevoirFilters] = useState<number[]>([]);
   const [showWithCorrectionOnly, setShowWithCorrectionOnly] = useState(false);
   const [activeTab, setActiveTab] = useState('subjects');
+  const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
+  const [isResourceDialogOpen, setIsResourceDialogOpen] = useState(false);
+  const [subjectId, setSubjectId] = useState<number | null>(null);
 
   const handleTabChange = (tab: string) => {
     if (tab === 'subjects') {
@@ -132,12 +138,14 @@ export default function Chapter() {
         // Fetch chapter details
         const { data: chapterData, error: chapterError } = await supabase
           .from('chapters')
-          .select('id, name')
+          .select('id, name, subject_id')
           .eq('id', chapterId)
           .eq('deleted', false)
           .single();
 
         if (chapterError) throw chapterError;
+
+        setSubjectId(chapterData.subject_id);
 
         // Count questions
         const { count: questionCount } = await supabase
@@ -651,6 +659,78 @@ export default function Chapter() {
           </div>
 
           <TabsContent value="questions" className="space-y-3">
+            <Dialog open={isQuestionDialogOpen} onOpenChange={setIsQuestionDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full mb-4">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Ask a Question
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Ask a Question</DialogTitle>
+                </DialogHeader>
+                <AskQuestionForm
+                  chapterId={chapter.id}
+                  resourceTypes={resourceTypes}
+                  onSuccess={() => {
+                    setIsQuestionDialogOpen(false);
+                    // Refresh data
+                    const fetchChapterData = async () => {
+                      const { data: questionsData } = await supabase
+                        .from('questions')
+                        .select('id, data, created_at, type_id')
+                        .eq('chapter_id', chapter.id)
+                        .eq('deleted', false)
+                        .order('created_at', { ascending: false });
+
+                      const questionsWithVotes = await Promise.all(
+                        (questionsData || []).map(async (question) => {
+                          const { count: upvotes } = await supabase
+                            .from('votes')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('content_id', question.id)
+                            .eq('content_type', 'question')
+                            .eq('vote_type', 'upvote');
+
+                          const { count: downvotes } = await supabase
+                            .from('votes')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('content_id', question.id)
+                            .eq('content_type', 'question')
+                            .eq('vote_type', 'downvote');
+
+                          let userVote = null;
+                          if (user) {
+                            const { data: voteData } = await supabase
+                              .from('votes')
+                              .select('vote_type')
+                              .eq('content_id', question.id)
+                              .eq('content_type', 'question')
+                              .eq('user_id', user.id)
+                              .maybeSingle();
+
+                            userVote = voteData?.vote_type || null;
+                          }
+
+                          return {
+                            ...question,
+                            upvotes: upvotes || 0,
+                            downvotes: downvotes || 0,
+                            userVote,
+                          };
+                        })
+                      );
+
+                      setQuestions(questionsWithVotes);
+                    };
+                    fetchChapterData();
+                  }}
+                  onCancel={() => setIsQuestionDialogOpen(false)}
+                />
+              </DialogContent>
+            </Dialog>
+
             {questions.filter(q => 
               (selectedTypeFilters.length === 0 || (q.type_id && selectedTypeFilters.includes(q.type_id)))
             ).length === 0 ? (
@@ -661,6 +741,7 @@ export default function Chapter() {
             ) : (
               questions
                 .filter(q => selectedTypeFilters.length === 0 || (q.type_id && selectedTypeFilters.includes(q.type_id)))
+                .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
                 .map((question) => {
                   const questionType = resourceTypes.find(t => t.id === question.type_id);
                   return (
@@ -707,6 +788,80 @@ export default function Chapter() {
           </TabsContent>
 
           <TabsContent value="resources" className="space-y-3">
+            <Dialog open={isResourceDialogOpen} onOpenChange={setIsResourceDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full mb-4">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Resource
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Add a Resource</DialogTitle>
+                </DialogHeader>
+                <AddResourceForm
+                  chapterId={chapter.id}
+                  subjectId={subjectId || 0}
+                  resourceTypes={resourceTypes}
+                  devoirTypes={devoirTypes}
+                  onSuccess={() => {
+                    setIsResourceDialogOpen(false);
+                    // Refresh data
+                    const fetchResources = async () => {
+                      const { data: resourcesData } = await supabase
+                        .from('resources')
+                        .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction')
+                        .eq('chapter_id', chapter.id)
+                        .eq('deleted', false)
+                        .order('created_at', { ascending: false });
+
+                      const resourcesWithVotes = await Promise.all(
+                        (resourcesData || []).map(async (resource) => {
+                          const { count: upvotes } = await supabase
+                            .from('votes')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('content_id', resource.id)
+                            .eq('content_type', 'resource')
+                            .eq('vote_type', 'upvote');
+
+                          const { count: downvotes } = await supabase
+                            .from('votes')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('content_id', resource.id)
+                            .eq('content_type', 'resource')
+                            .eq('vote_type', 'downvote');
+
+                          let userVote = null;
+                          if (user) {
+                            const { data: voteData } = await supabase
+                              .from('votes')
+                              .select('vote_type')
+                              .eq('content_id', resource.id)
+                              .eq('content_type', 'resource')
+                              .eq('user_id', user.id)
+                              .maybeSingle();
+
+                            userVote = voteData?.vote_type || null;
+                          }
+
+                          return {
+                            ...resource,
+                            upvotes: upvotes || 0,
+                            downvotes: downvotes || 0,
+                            userVote,
+                          };
+                        })
+                      );
+
+                      setResources(resourcesWithVotes);
+                    };
+                    fetchResources();
+                  }}
+                  onCancel={() => setIsResourceDialogOpen(false)}
+                />
+              </DialogContent>
+            </Dialog>
+
             {resources.filter(r => 
               (selectedTypeFilters.length === 0 || selectedTypeFilters.includes(r.type_id)) &&
               (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
@@ -723,6 +878,7 @@ export default function Chapter() {
                   (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
                   (!showWithCorrectionOnly || r.with_correction)
                 )
+                .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
                 .map((resource) => {
                   const resourceType = resourceTypes.find(t => t.id === resource.type_id);
                   const devoirType = devoirTypes.find(t => t.id === resource.devoir_type_id);
