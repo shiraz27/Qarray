@@ -45,14 +45,14 @@ export const SubjectTabs: React.FC = () => {
   };
 
   return (
-    <nav className="w-full text-xs text-[#BDBDBD] font-normal whitespace-nowrap text-center tracking-[0.2px] leading-[1.6] flex-1 px-2.5 py-4" aria-label="Subject navigation">
-      <div className="flex w-full items-center gap-4 justify-center rounded-xl">
+    <nav className="w-full text-xs text-[#BDBDBD] font-normal whitespace-nowrap text-center tracking-[0.2px] leading-[1.6] px-2.5 py-4 overflow-x-auto" aria-label="Subject navigation">
+      <div className="flex w-full items-center gap-4 justify-start sm:justify-center rounded-xl min-w-max sm:min-w-0">
         {subjects.map((subject) => {
           const isActive = activeSubject === subject.id;
           return (
             <button
               key={subject.id}
-              className={`items-center self-stretch flex flex-col flex-1 shrink basis-[0%] my-auto ${
+              className={`items-center flex flex-col flex-shrink-0 sm:flex-1 ${
                 isActive 
                   ? 'text-[#38a6ff] font-semibold border-b-2 border-b-[#38A6FF] border-solid' 
                   : 'hover:text-[#38a6ff] transition-colors'
