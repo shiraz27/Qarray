@@ -8,6 +8,9 @@ import { MessageSquare, FileText, ArrowLeft, Bookmark, ThumbsUp, ThumbsDown } fr
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
+import { BottomNavigation } from '@/components/BottomNavigation';
+import { ContentSkeleton } from '@/components/LoadingSkeleton';
+import { EmptyState } from '@/components/EmptyState';
 
 interface ChapterData {
   id: number;
@@ -66,6 +69,17 @@ export default function Chapter() {
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<number | null>(null);
   const [selectedDevoirFilter, setSelectedDevoirFilter] = useState<number | null>(null);
   const [showWithCorrectionOnly, setShowWithCorrectionOnly] = useState(false);
+  const [activeTab, setActiveTab] = useState('subjects');
+
+  const handleTabChange = (tab: string) => {
+    if (tab === 'subjects') {
+      navigate('/');
+    } else if (tab === 'bookmarks') {
+      navigate('/bookmarks');
+    } else {
+      setActiveTab(tab);
+    }
+  };
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -74,6 +88,14 @@ export default function Chapter() {
 
     // Fetch resource types and devoir types for filters
     const fetchFilters = async () => {
+      // Try to get from cache first
+      const cache = (window as any).__appCache;
+      if (cache?.resourceTypes && cache?.devoirTypes) {
+        setResourceTypes(cache.resourceTypes);
+        setDevoirTypes(cache.devoirTypes);
+        return;
+      }
+
       const { data: types } = await supabase
         .from('resource_types')
         .select('*')
@@ -86,6 +108,13 @@ export default function Chapter() {
 
       setResourceTypes(types || []);
       setDevoirTypes(devoirTypes || []);
+      
+      // Cache for future use
+      (window as any).__appCache = {
+        ...(window as any).__appCache,
+        resourceTypes: types || [],
+        devoirTypes: devoirTypes || []
+      };
     };
 
     fetchFilters();
@@ -434,16 +463,35 @@ export default function Chapter() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">{t('loading') || 'Loading...'}</div>
+      <div className="min-h-screen bg-background flex flex-col pb-24">
+        <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft size={20} />
+          </Button>
+          <h1 className="text-lg font-semibold flex-1">{t('chapter') || 'Chapter'}</h1>
+        </div>
+        <div className="flex-1 p-4">
+          <ContentSkeleton />
+        </div>
+        <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
       </div>
     );
   }
 
   if (!chapter) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">{t('chapterNotFound') || 'Chapter not found'}</div>
+      <div className="min-h-screen bg-background flex flex-col pb-24">
+        <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft size={20} />
+          </Button>
+          <h1 className="text-lg font-semibold flex-1">{t('chapter') || 'Chapter'}</h1>
+        </div>
+        <EmptyState
+          type="chapters"
+          message={t('chapterNotFound') || 'Chapter not found'}
+        />
+        <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
       </div>
     );
   }
@@ -499,26 +547,26 @@ export default function Chapter() {
             {chapter.name.toUpperCase()}
           </h2>
           
-          <div className="flex gap-6">
+          <div className="grid grid-cols-3 gap-4">
             <div className="flex items-center gap-2">
-              <MessageSquare size={18} className="text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">{t('questions') || 'Questions'}</p>
-                <p className="text-lg font-semibold text-foreground">{chapter.questionCount}</p>
+              <MessageSquare size={16} className="text-muted-foreground flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground truncate">{t('questions') || 'Questions'}</p>
+                <p className="text-base font-semibold text-foreground">{chapter.questionCount}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <MessageSquare size={18} className="text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">{t('answers') || 'Answers'}</p>
-                <p className="text-lg font-semibold text-foreground">{chapter.answerCount}</p>
+              <MessageSquare size={16} className="text-muted-foreground flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground truncate">{t('answers') || 'Answers'}</p>
+                <p className="text-base font-semibold text-foreground">{chapter.answerCount}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <FileText size={18} className="text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">{t('resources') || 'Resources'}</p>
-                <p className="text-lg font-semibold text-foreground">{chapter.resourceCount}</p>
+              <FileText size={16} className="text-muted-foreground flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground truncate">{t('resources') || 'Resources'}</p>
+                <p className="text-base font-semibold text-foreground">{chapter.resourceCount}</p>
               </div>
             </div>
           </div>
@@ -593,9 +641,10 @@ export default function Chapter() {
             {questions.filter(q => 
               (selectedTypeFilter === null || q.type_id === selectedTypeFilter)
             ).length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {t('noQuestions') || 'No questions yet'}
-              </div>
+              <EmptyState
+                type="questions"
+                message={t('noQuestions') || 'No questions available yet'}
+              />
             ) : (
               questions
                 .filter(q => selectedTypeFilter === null || q.type_id === selectedTypeFilter)
@@ -650,9 +699,10 @@ export default function Chapter() {
               (selectedDevoirFilter === null || r.devoir_type_id === selectedDevoirFilter) &&
               (!showWithCorrectionOnly || r.with_correction)
             ).length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {t('noResources') || 'No resources yet'}
-              </div>
+              <EmptyState
+                type="resources"
+                message={t('noResources') || 'No resources available yet'}
+              />
             ) : (
               resources
                 .filter(r => 
@@ -721,7 +771,7 @@ export default function Chapter() {
         </Tabs>
       </div>
 
-      
+      <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
     </div>
   );
 }

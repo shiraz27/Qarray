@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
 import { Header } from '@/components/Header';
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { BookmarkSkeleton } from '@/components/LoadingSkeleton';
+import { EmptyState } from '@/components/EmptyState';
 
 interface BookmarkedChapter {
   id: number;
@@ -24,6 +26,15 @@ export default function Bookmarks() {
   const [chapters, setChapters] = useState<BookmarkedChapter[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('bookmarks');
+
+  const handleTabChange = (tab: string) => {
+    if (tab === 'subjects') {
+      navigate('/');
+    } else {
+      setActiveTab(tab);
+    }
+  };
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -147,13 +158,12 @@ export default function Bookmarks() {
         </h1>
 
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground">
-            {t('loading') || 'Loading...'}
-          </div>
+          <BookmarkSkeleton />
         ) : chapters.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            {t('noBookmarks') || 'No bookmarked chapters yet'}
-          </div>
+          <EmptyState
+            type="bookmarks"
+            message={t('noBookmarks') || "You haven't bookmarked any chapters yet"}
+          />
         ) : (
           <div className="space-y-3">
             {chapters.map((chapter) => {
@@ -225,7 +235,7 @@ export default function Bookmarks() {
         )}
       </main>
 
-      
+      <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
     </div>
   );
 }

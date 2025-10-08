@@ -6,6 +6,8 @@ import { MessageSquare, FileText, Bookmark } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
+import { ChapterSkeleton } from '@/components/LoadingSkeleton';
+import { EmptyState } from '@/components/EmptyState';
 
 interface Chapter {
   id: number;
@@ -158,10 +160,8 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
 
   if (loading) {
     return (
-      <main className="w-full px-4 pb-4">
-        <div className="text-center py-8 text-gray-500">
-          {t('loading') || 'Loading...'}
-        </div>
+      <main className="w-full px-4 pb-4 mt-4">
+        <ChapterSkeleton />
       </main>
     );
   }
@@ -169,9 +169,10 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
   if (chapters.length === 0) {
     return (
       <main className="w-full px-4 pb-4">
-        <div className="text-center py-8 text-gray-500">
-          {t('noChapters') || 'No chapters available for this subject'}
-        </div>
+        <EmptyState
+          type="chapters"
+          message={t('noChapters') || 'No chapters available for this subject'}
+        />
       </main>
     );
   }
