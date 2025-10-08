@@ -173,15 +173,16 @@ const CompleteProfile: React.FC = () => {
 
     setAddingInstitute(true);
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (userError || !user) {
-        console.error('Auth error:', userError);
+      if (sessionError || !session?.user) {
+        console.error('Session error:', sessionError);
         toast({
           title: t('error'),
           description: t('authenticationError'),
           variant: "destructive",
         });
+        setAddingInstitute(false);
         return;
       }
 
@@ -190,7 +191,7 @@ const CompleteProfile: React.FC = () => {
         .insert({
           name: newInstituteName.trim(),
           state_id: parseInt(stateId),
-          added_by: user.id,
+          added_by: session.user.id,
           verified: false,
         })
         .select()
