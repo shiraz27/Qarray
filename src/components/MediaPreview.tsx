@@ -1,6 +1,4 @@
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ExternalLink } from 'lucide-react';
 
 interface MediaPreviewProps {
   url: string;
@@ -39,16 +37,18 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   if (youtubeEmbedUrl) {
     return (
       <Card className={`overflow-hidden ${className}`}>
-        <iframe
-          width="100%"
-          height="315"
-          src={youtubeEmbedUrl}
-          title="YouTube video player"
-          frameBorder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          className="w-full"
-        />
+        <div className="aspect-video w-full">
+          <iframe
+            width="100%"
+            height="100%"
+            src={youtubeEmbedUrl}
+            title="YouTube video player"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="w-full h-full"
+          />
+        </div>
       </Card>
     );
   }
@@ -56,20 +56,10 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   if (isPdf) {
     return (
       <Card className={`overflow-hidden ${className}`}>
-        <div className="p-2 flex items-center justify-between bg-muted">
-          <span className="text-sm">📄 PDF Document</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => window.open(url, '_blank')}
-          >
-            <ExternalLink size={16} />
-          </Button>
-        </div>
         <iframe
           src={`${url}#view=FitH`}
           width="100%"
-          height="400"
+          height="500"
           title="PDF viewer"
           className="w-full border-0"
         />
@@ -80,7 +70,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   if (isImage) {
     return (
       <Card className={`overflow-hidden ${className}`}>
-        <img src={url} alt="Media content" className="w-full h-auto object-contain max-h-96" />
+        <img src={url} alt="Media content" className="w-full h-auto object-contain max-h-[600px]" />
       </Card>
     );
   }
@@ -88,15 +78,12 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   if (isAudio) {
     return (
       <Card className={`p-4 ${className}`}>
-        <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium">🎤 Audio</span>
-          <audio controls className="w-full">
-            <source src={url} type="audio/mpeg" />
-            <source src={url} type="audio/webm" />
-            <source src={url} type="audio/wav" />
-            Your browser does not support the audio element.
-          </audio>
-        </div>
+        <audio controls className="w-full">
+          <source src={url} type="audio/mpeg" />
+          <source src={url} type="audio/webm" />
+          <source src={url} type="audio/wav" />
+          Your browser does not support the audio element.
+        </audio>
       </Card>
     );
   }

@@ -26,18 +26,27 @@ export function MediaList({ data, showText = true }: MediaListProps) {
           </h3>
           {media.map((file, index) => (
             <div key={index} className="space-y-2">
-              <Card className="p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium flex-1">{file.displayName}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => window.open(file.url, '_blank')}
-                  >
-                    <ExternalLink size={16} />
-                  </Button>
+              {/* Only show file card with external link for PDFs */}
+              {file.type === 'pdf' && (
+                <Card className="p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium flex-1">{file.displayName}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(file.url, '_blank')}
+                    >
+                      <ExternalLink size={16} />
+                    </Button>
+                  </div>
+                </Card>
+              )}
+              {/* Show label for non-PDF media */}
+              {file.type !== 'pdf' && (
+                <div className="text-sm font-medium text-muted-foreground">
+                  {file.displayName}
                 </div>
-              </Card>
+              )}
               <MediaPreview url={file.url} />
             </div>
           ))}
