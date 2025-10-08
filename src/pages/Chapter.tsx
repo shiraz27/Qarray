@@ -25,6 +25,7 @@ interface Question {
   upvotes: number;
   downvotes: number;
   userVote: 'upvote' | 'downvote' | null;
+  type_id: number | null;
 }
 
 interface Resource {
@@ -36,6 +37,19 @@ interface Resource {
   upvotes: number;
   downvotes: number;
   userVote: 'upvote' | 'downvote' | null;
+  type_id: number;
+  devoir_type_id: number | null;
+  with_correction: boolean;
+}
+
+interface ResourceType {
+  id: number;
+  type: string;
+}
+
+interface DevoirType {
+  id: number;
+  devoir_type: string;
 }
 
 export default function Chapter() {
@@ -47,11 +61,34 @@ export default function Chapter() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [resourceTypes, setResourceTypes] = useState<ResourceType[]>([]);
+  const [devoirTypes, setDevoirTypes] = useState<DevoirType[]>([]);
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<number | null>(null);
+  const [selectedDevoirFilter, setSelectedDevoirFilter] = useState<number | null>(null);
+  const [showWithCorrectionOnly, setShowWithCorrectionOnly] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
     });
+
+    // Fetch resource types and devoir types for filters
+    const fetchFilters = async () => {
+      const { data: types } = await supabase
+        .from('resource_types')
+        .select('*')
+        .order('id');
+      
+      const { data: devoirTypes } = await supabase
+        .from('devoir_types')
+        .select('*')
+        .order('id');
+
+      setResourceTypes(types || []);
+      setDevoirTypes(devoirTypes || []);
+    };
+
+    fetchFilters();
   }, []);
 
   useEffect(() => {
@@ -126,7 +163,7 @@ export default function Chapter() {
         // Fetch questions with vote counts
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, data, created_at')
+          .select('id, data, created_at, type_id')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -175,7 +212,7 @@ export default function Chapter() {
         // Fetch resources with vote counts
         const { data: resourcesData } = await supabase
           .from('resources')
-          .select('id, title, description, data, created_at')
+          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -307,7 +344,7 @@ export default function Chapter() {
       if (contentType === 'question') {
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, data, created_at')
+          .select('id, data, created_at, type_id')
           .eq('chapter_id', chapter?.id)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -349,7 +386,7 @@ export default function Chapter() {
       } else {
         const { data: resourcesData } = await supabase
           .from('resources')
-          .select('id, title, description, data, created_at')
+          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction')
           .eq('chapter_id', chapter?.id)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -496,15 +533,84 @@ export default function Chapter() {
             <TabsTrigger value="resources">{t('resources') || 'Resources'}</TabsTrigger>
           </TabsList>
 
+          {/* Filters */}
+          <div className="mb-4 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={selectedTypeFilter === null ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedTypeFilter(null)}
+              >
+                {t('all') || 'All'}
+              </Button>
+              {resourceTypes.map((type) => (
+                <Button
+                  key={type.id}
+                  variant={selectedTypeFilter === type.id ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedTypeFilter(type.id)}
+                >
+                  {type.type}
+                </Button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={selectedDevoirFilter === null ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedDevoirFilter(null)}
+              >
+                {t('allDevoirs') || 'All Types'}
+              </Button>
+              {devoirTypes.map((type) => (
+                <Button
+                  key={type.id}
+                  variant={selectedDevoirFilter === type.id ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedDevoirFilter(type.id)}
+                >
+                  {type.devoir_type}
+                </Button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="withCorrection"
+                checked={showWithCorrectionOnly}
+                onChange={(e) => setShowWithCorrectionOnly(e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="withCorrection" className="text-sm">
+                {t('withCorrection') || 'Avec correction'}
+              </label>
+            </div>
+          </div>
+
           <TabsContent value="questions" className="space-y-3">
-            {questions.length === 0 ? (
+            {questions.filter(q => 
+              (selectedTypeFilter === null || q.type_id === selectedTypeFilter)
+            ).length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 {t('noQuestions') || 'No questions yet'}
               </div>
             ) : (
-              questions.map((question) => (
+              questions
+                .filter(q => selectedTypeFilter === null || q.type_id === selectedTypeFilter)
+                .map((question) => {
+                  const questionType = resourceTypes.find(t => t.id === question.type_id);
+                  return (
                 <Card key={question.id} className="p-4">
-                  <p className="text-foreground mb-3">{question.data}</p>
+                  <div className="flex items-start justify-between mb-2">
+                    <p className="text-foreground flex-1">{question.data}</p>
+                    {questionType && (
+                      <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full ml-2">
+                        {questionType.type}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
                       {new Date(question.created_at).toLocaleDateString()}
@@ -533,19 +639,52 @@ export default function Chapter() {
                     </div>
                   </div>
                 </Card>
-              ))
+              );
+            })
             )}
           </TabsContent>
 
           <TabsContent value="resources" className="space-y-3">
-            {resources.length === 0 ? (
+            {resources.filter(r => 
+              (selectedTypeFilter === null || r.type_id === selectedTypeFilter) &&
+              (selectedDevoirFilter === null || r.devoir_type_id === selectedDevoirFilter) &&
+              (!showWithCorrectionOnly || r.with_correction)
+            ).length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 {t('noResources') || 'No resources yet'}
               </div>
             ) : (
-              resources.map((resource) => (
+              resources
+                .filter(r => 
+                  (selectedTypeFilter === null || r.type_id === selectedTypeFilter) &&
+                  (selectedDevoirFilter === null || r.devoir_type_id === selectedDevoirFilter) &&
+                  (!showWithCorrectionOnly || r.with_correction)
+                )
+                .map((resource) => {
+                  const resourceType = resourceTypes.find(t => t.id === resource.type_id);
+                  const devoirType = devoirTypes.find(t => t.id === resource.devoir_type_id);
+                  return (
                 <Card key={resource.id} className="p-4">
-                  <h3 className="font-semibold text-foreground mb-2">{resource.title}</h3>
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-foreground flex-1">{resource.title}</h3>
+                    <div className="flex gap-1 ml-2">
+                      {resourceType && (
+                        <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+                          {resourceType.type}
+                        </span>
+                      )}
+                      {devoirType && (
+                        <span className="text-xs px-2 py-1 bg-secondary/10 text-secondary-foreground rounded-full">
+                          {devoirType.devoir_type}
+                        </span>
+                      )}
+                      {resource.with_correction && (
+                        <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">
+                          {t('withCorrection') || 'Avec correction'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                   <p className="text-sm text-muted-foreground mb-3">{resource.description}</p>
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
@@ -575,7 +714,8 @@ export default function Chapter() {
                     </div>
                   </div>
                 </Card>
-              ))
+              );
+            })
             )}
           </TabsContent>
         </Tabs>

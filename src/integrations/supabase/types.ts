@@ -280,6 +280,7 @@ export type Database = {
           deleted: boolean
           id: number
           resource_id: number | null
+          type_id: number | null
           updated_at: string | null
           verified: boolean
         }
@@ -291,6 +292,7 @@ export type Database = {
           deleted?: boolean
           id?: number
           resource_id?: number | null
+          type_id?: number | null
           updated_at?: string | null
           verified?: boolean
         }
@@ -302,6 +304,7 @@ export type Database = {
           deleted?: boolean
           id?: number
           resource_id?: number | null
+          type_id?: number | null
           updated_at?: string | null
           verified?: boolean
         }
@@ -318,6 +321,13 @@ export type Database = {
             columns: ["resource_id"]
             isOneToOne: false
             referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_type_id_fkey"
+            columns: ["type_id"]
+            isOneToOne: false
+            referencedRelation: "resource_types"
             referencedColumns: ["id"]
           },
         ]
