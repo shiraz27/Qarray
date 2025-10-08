@@ -23,7 +23,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -62,6 +70,9 @@ const CompleteProfile: React.FC = () => {
   const [loadingInstitutes, setLoadingInstitutes] = useState(true);
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [openInstitute, setOpenInstitute] = useState(false);
+  const [openAddInstitute, setOpenAddInstitute] = useState(false);
+  const [newInstituteName, setNewInstituteName] = useState('');
+  const [addingInstitute, setAddingInstitute] = useState(false);
 
   // Fetch states on component mount
   useEffect(() => {
@@ -149,6 +160,48 @@ const CompleteProfile: React.FC = () => {
   const filteredInstitutes = stateId 
     ? institutes.filter(institute => institute.state_id === parseInt(stateId))
     : institutes;
+
+  const handleAddInstitute = async () => {
+    if (!newInstituteName.trim() || !stateId) return;
+
+    setAddingInstitute(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+
+      const { data, error } = await supabase
+        .from('institutes')
+        .insert({
+          name: newInstituteName.trim(),
+          state_id: parseInt(stateId),
+          added_by: user.id,
+          verified: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Add to local institutes list
+      setInstitutes([...institutes, data]);
+      setInstituteId(data.id);
+      setNewInstituteName('');
+      setOpenAddInstitute(false);
+
+      toast({
+        title: t('success'),
+        description: t('instituteAddedSuccess'),
+      });
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setAddingInstitute(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -294,9 +347,23 @@ const CompleteProfile: React.FC = () => {
                   <CommandInput placeholder={t('searchInstitute')} />
                   <CommandList>
                     <CommandEmpty>
-                      {filteredInstitutes.length === 0 && !loadingInstitutes 
-                        ? t('noInstitutesFound')
-                        : t('noResults')}
+                      <div className="py-6 text-center text-sm">
+                        <p className="mb-2">{t('noInstitutesFound')}</p>
+                        {stateId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setOpenInstitute(false);
+                              setOpenAddInstitute(true);
+                            }}
+                            className="gap-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            {t('addMissingInstitute')}
+                          </Button>
+                        )}
+                      </div>
                     </CommandEmpty>
                     <CommandGroup>
                       {filteredInstitutes.map((institute) => (
@@ -333,6 +400,47 @@ const CompleteProfile: React.FC = () => {
           </Button>
         </form>
       </div>
+
+      {/* Add Institute Dialog */}
+      <Dialog open={openAddInstitute} onOpenChange={setOpenAddInstitute}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('addMissingInstitute')}</DialogTitle>
+            <DialogDescription>
+              {t('addInstituteDescription')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="instituteName">{t('instituteName')}</Label>
+              <Input
+                id="instituteName"
+                value={newInstituteName}
+                onChange={(e) => setNewInstituteName(e.target.value)}
+                placeholder={t('enterInstituteName')}
+                className="mt-2"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setOpenAddInstitute(false);
+                setNewInstituteName('');
+              }}
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              onClick={handleAddInstitute}
+              disabled={!newInstituteName.trim() || addingInstitute}
+            >
+              {addingInstitute ? t('adding') : t('add')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

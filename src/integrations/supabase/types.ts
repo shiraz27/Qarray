@@ -147,25 +147,31 @@ export type Database = {
       }
       institutes: {
         Row: {
+          added_by: string | null
           created_at: string | null
           id: string
           name: string
           state_id: number | null
           updated_at: string | null
+          verified: boolean
         }
         Insert: {
+          added_by?: string | null
           created_at?: string | null
           id?: string
           name: string
           state_id?: number | null
           updated_at?: string | null
+          verified?: boolean
         }
         Update: {
+          added_by?: string | null
           created_at?: string | null
           id?: string
           name?: string
           state_id?: number | null
           updated_at?: string | null
+          verified?: boolean
         }
         Relationships: [
           {

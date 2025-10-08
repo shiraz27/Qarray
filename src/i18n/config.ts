@@ -44,7 +44,14 @@ const resources = {
       selectGouvernoratFirst: "Select a gouvernorat first",
       noInstitutesFound: "No institutes found in this gouvernorat",
       searchInstitute: "Search institute...",
-      noResults: "No results found"
+      noResults: "No results found",
+      addMissingInstitute: "Add Missing Institute",
+      addInstituteDescription: "The institute will be added and verified by our moderators.",
+      instituteName: "Institute Name",
+      enterInstituteName: "Enter full name",
+      instituteAddedSuccess: "Institute added successfully!",
+      adding: "Adding...",
+      add: "Add"
     }
   },
   fr: {
@@ -89,7 +96,14 @@ const resources = {
       selectGouvernoratFirst: "Sélectionnez d'abord un gouvernorat",
       noInstitutesFound: "Aucun institut trouvé dans ce gouvernorat",
       searchInstitute: "Rechercher un institut...",
-      noResults: "Aucun résultat trouvé"
+      noResults: "Aucun résultat trouvé",
+      addMissingInstitute: "Ajouter un établissement manquant",
+      addInstituteDescription: "L'établissement sera ajouté et vérifié par nos modérateurs.",
+      instituteName: "Nom de l'établissement",
+      enterInstituteName: "Entrez le nom complet",
+      instituteAddedSuccess: "Établissement ajouté avec succès!",
+      adding: "Ajout...",
+      add: "Ajouter"
     }
   },
   ar: {
@@ -134,7 +148,14 @@ const resources = {
       selectGouvernoratFirst: "اختر ولاية أولاً",
       noInstitutesFound: "لم يتم العثور على معاهد في هذه الولاية",
       searchInstitute: "ابحث عن معهد...",
-      noResults: "لم يتم العثور على نتائج"
+      noResults: "لم يتم العثور على نتائج",
+      addMissingInstitute: "إضافة معهد مفقود",
+      addInstituteDescription: "سيتم إضافة المعهد والتحقق منه من قبل المشرفين.",
+      instituteName: "اسم المعهد",
+      enterInstituteName: "أدخل الاسم الكامل",
+      instituteAddedSuccess: "تم إضافة المعهد بنجاح!",
+      adding: "جارٍ الإضافة...",
+      add: "إضافة"
     }
   }
 };
