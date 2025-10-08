@@ -11,7 +11,7 @@ import { ContentSkeleton } from '@/components/LoadingSkeleton';
 import chapterPattern from '@/assets/chapter-pattern.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { MediaPreview } from '@/components/MediaPreview';
+import { MediaList } from '@/components/MediaList';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AnswerQuestionForm } from '@/components/AnswerQuestionForm';
 import { EditQuestionForm } from '@/components/EditQuestionForm';
@@ -339,10 +339,7 @@ export default function QuestionDetail() {
           
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 space-y-3">
-              <p className="text-lg font-semibold text-foreground">{question.data}</p>
-              {question.data.includes('http') && (
-                <MediaPreview url={question.data.match(/https?:\/\/[^\s]+/)?.[0] || ''} />
-              )}
+              <MediaList data={question.data} showText={true} />
             </div>
             {!question.verified && (
               <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs flex-shrink-0">
@@ -485,10 +482,7 @@ export default function QuestionDetail() {
               
               <div className="flex items-start justify-between">
                 <div className="flex-1 space-y-2">
-                  <p className="text-foreground">{answer.data}</p>
-                  {answer.data.includes('http') && (
-                    <MediaPreview url={answer.data.match(/https?:\/\/[^\s]+/)?.[0] || ''} />
-                  )}
+                  <MediaList data={answer.data} showText={true} />
                 </div>
                 {!answer.verified && (
                   <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs ml-2 flex-shrink-0">

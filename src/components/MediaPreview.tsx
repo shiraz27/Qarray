@@ -1,4 +1,6 @@
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ExternalLink } from 'lucide-react';
 
 interface MediaPreviewProps {
   url: string;
@@ -29,7 +31,10 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   const isPdf = url.toLowerCase().includes('.pdf') || url.includes('pdf');
 
   // Check if it's an image
-  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url) || url.includes('image');
+
+  // Check if it's an audio file
+  const isAudio = /\.(mp3|wav|webm|ogg|m4a)$/i.test(url) || url.includes('audio');
 
   if (youtubeEmbedUrl) {
     return (
@@ -51,10 +56,20 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   if (isPdf) {
     return (
       <Card className={`overflow-hidden ${className}`}>
+        <div className="p-2 flex items-center justify-between bg-muted">
+          <span className="text-sm">📄 PDF Document</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.open(url, '_blank')}
+          >
+            <ExternalLink size={16} />
+          </Button>
+        </div>
         <iframe
           src={`${url}#view=FitH`}
           width="100%"
-          height="200"
+          height="400"
           title="PDF viewer"
           className="w-full border-0"
         />
@@ -65,7 +80,23 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   if (isImage) {
     return (
       <Card className={`overflow-hidden ${className}`}>
-        <img src={url} alt="Media content" className="w-full h-auto" />
+        <img src={url} alt="Media content" className="w-full h-auto object-contain max-h-96" />
+      </Card>
+    );
+  }
+
+  if (isAudio) {
+    return (
+      <Card className={`p-4 ${className}`}>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">🎤 Audio</span>
+          <audio controls className="w-full">
+            <source src={url} type="audio/mpeg" />
+            <source src={url} type="audio/webm" />
+            <source src={url} type="audio/wav" />
+            Your browser does not support the audio element.
+          </audio>
+        </div>
       </Card>
     );
   }
