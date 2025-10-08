@@ -53,7 +53,7 @@ const CompleteProfile: React.FC = () => {
   const [states, setStates] = useState<State[]>([]);
   const [institutes, setInstitutes] = useState<Institute[]>([]);
   const [loadingStates, setLoadingStates] = useState(true);
-  const [loadingInstitutes, setLoadingInstitutes] = useState(false);
+  const [loadingInstitutes, setLoadingInstitutes] = useState(true);
   const [openInstitute, setOpenInstitute] = useState(false);
 
   // Fetch states on component mount
@@ -81,28 +81,18 @@ const CompleteProfile: React.FC = () => {
     fetchStates();
   }, [toast, t]);
 
-  // Fetch institutes when state changes
+  // Fetch all institutes on component mount
   useEffect(() => {
-    if (!stateId) {
-      setInstitutes([]);
-      setInstituteId('');
-      return;
-    }
-
     const fetchInstitutes = async () => {
       setLoadingInstitutes(true);
       try {
         const { data, error } = await supabase
           .from('institutes')
           .select('id, name, state_id')
-          .eq('state_id', parseInt(stateId))
           .order('name');
 
         if (error) throw error;
         setInstitutes(data || []);
-        
-        // Reset institute selection when state changes
-        setInstituteId('');
       } catch (error: any) {
         toast({
           title: t('error'),
@@ -115,7 +105,7 @@ const CompleteProfile: React.FC = () => {
     };
 
     fetchInstitutes();
-  }, [stateId, toast, t]);
+  }, [toast, t]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -242,7 +232,7 @@ const CompleteProfile: React.FC = () => {
                   variant="outline"
                   role="combobox"
                   aria-expanded={openInstitute}
-                  disabled={!stateId || loadingInstitutes}
+                  disabled={loadingInstitutes}
                   className={cn(
                     "w-full h-12 justify-between",
                     !instituteId && "text-muted-foreground"
@@ -250,8 +240,6 @@ const CompleteProfile: React.FC = () => {
                 >
                   {instituteId
                     ? institutes.find((institute) => institute.id === instituteId)?.name
-                    : !stateId 
-                    ? t('selectGouvernoratFirst')
                     : loadingInstitutes
                     ? t('loading')
                     : t('selectLycee')}
