@@ -201,7 +201,7 @@ export default function ResourceDetail() {
 
     toast({
       title: 'Success',
-      description: 'Resource archived successfully',
+      description: 'Resource deleted successfully',
     });
 
     navigate(-1);
@@ -387,14 +387,14 @@ export default function ResourceDetail() {
                 </Button>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Archive Resource?</AlertDialogTitle>
+                    <AlertDialogTitle>Delete Resource?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will archive the resource. It won't be permanently deleted.
+                      This will permanently delete the resource.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete}>Archive</AlertDialogAction>
+                    <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>

@@ -230,15 +230,24 @@ export default function QuestionDetail() {
     const questionId = Number(id);
     if (isNaN(questionId)) return;
 
-    const { error } = await supabase
+    console.log('Attempting to delete question:', questionId);
+    console.log('User ID:', user?.id);
+    console.log('Is Moderator:', isModerator);
+    console.log('Question contributors:', question?.contributors);
+
+    const { data, error } = await supabase
       .from('questions')
       .update({ deleted: true })
-      .eq('id', questionId);
+      .eq('id', questionId)
+      .select();
+
+    console.log('Delete result:', { data, error });
 
     if (error) {
+      console.error('Delete error details:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete question',
+        description: `Failed to delete question: ${error.message}`,
         variant: 'destructive',
       });
       return;
@@ -246,7 +255,7 @@ export default function QuestionDetail() {
 
     toast({
       title: 'Success',
-      description: 'Question archived successfully',
+      description: 'Question deleted successfully',
     });
 
     navigate(-1);
@@ -418,14 +427,14 @@ export default function QuestionDetail() {
                 </Button>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Archive Question?</AlertDialogTitle>
+                    <AlertDialogTitle>Delete Question?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will archive the question. It won't be permanently deleted.
+                      This will permanently delete the question and all its answers.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete}>Archive</AlertDialogAction>
+                    <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
