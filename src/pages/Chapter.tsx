@@ -32,6 +32,7 @@ interface Question {
   downvotes: number;
   userVote: 'upvote' | 'downvote' | null;
   type_id: number | null;
+  verified: boolean;
 }
 
 interface Resource {
@@ -46,6 +47,7 @@ interface Resource {
   type_id: number;
   devoir_type_id: number | null;
   with_correction: boolean;
+  verified: boolean;
 }
 
 interface ResourceType {
@@ -202,7 +204,7 @@ export default function Chapter() {
         // Fetch questions with vote counts
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, data, created_at, type_id')
+          .select('id, data, created_at, type_id, verified')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -251,7 +253,7 @@ export default function Chapter() {
         // Fetch resources with vote counts
         const { data: resourcesData } = await supabase
           .from('resources')
-          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction')
+          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -383,7 +385,7 @@ export default function Chapter() {
       if (contentType === 'question') {
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, data, created_at, type_id')
+          .select('id, data, created_at, type_id, verified')
           .eq('chapter_id', chapter?.id)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -425,7 +427,7 @@ export default function Chapter() {
       } else {
         const { data: resourcesData } = await supabase
           .from('resources')
-          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction')
+          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified')
           .eq('chapter_id', chapter?.id)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -681,7 +683,7 @@ export default function Chapter() {
                     const fetchChapterData = async () => {
                       const { data: questionsData } = await supabase
                         .from('questions')
-                        .select('id, data, created_at, type_id')
+                        .select('id, data, created_at, type_id, verified')
                         .eq('chapter_id', chapter.id)
                         .eq('deleted', false)
                         .order('created_at', { ascending: false });
@@ -747,14 +749,25 @@ export default function Chapter() {
                 .map((question) => {
                   const questionType = resourceTypes.find(t => t.id === question.type_id);
                   return (
-                <Card key={question.id} className="p-4">
+                <Card 
+                  key={question.id} 
+                  className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                  onClick={() => navigate(`/question/${question.id}`)}
+                >
                   <div className="flex items-start justify-between mb-2">
                     <p className="text-foreground flex-1">{question.data}</p>
-                    {questionType && (
-                      <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full ml-2">
-                        {questionType.type}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {!question.verified && (
+                        <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full whitespace-nowrap">
+                          Unverified
+                        </span>
+                      )}
+                      {questionType && (
+                        <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full whitespace-nowrap">
+                          {questionType.type}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
@@ -762,7 +775,10 @@ export default function Chapter() {
                     </p>
                     <div className="flex items-center gap-4">
                       <button
-                        onClick={() => handleVote(question.id, 'question', 'upvote', question.userVote)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleVote(question.id, 'question', 'upvote', question.userVote);
+                        }}
                         className="flex items-center gap-1.5 transition-colors hover:text-green-600"
                       >
                         <ThumbsUp
@@ -772,7 +788,10 @@ export default function Chapter() {
                         <span className="text-sm font-medium">{question.upvotes}</span>
                       </button>
                       <button
-                        onClick={() => handleVote(question.id, 'question', 'downvote', question.userVote)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleVote(question.id, 'question', 'downvote', question.userVote);
+                        }}
                         className="flex items-center gap-1.5 transition-colors hover:text-red-600"
                       >
                         <ThumbsDown
@@ -812,7 +831,7 @@ export default function Chapter() {
                     const fetchResources = async () => {
                       const { data: resourcesData } = await supabase
                         .from('resources')
-                        .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction')
+                        .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified')
                         .eq('chapter_id', chapter.id)
                         .eq('deleted', false)
                         .order('created_at', { ascending: false });
@@ -885,22 +904,31 @@ export default function Chapter() {
                   const resourceType = resourceTypes.find(t => t.id === resource.type_id);
                   const devoirType = devoirTypes.find(t => t.id === resource.devoir_type_id);
                   return (
-                <Card key={resource.id} className="p-4">
+                <Card 
+                  key={resource.id} 
+                  className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                  onClick={() => navigate(`/resource/${resource.id}`)}
+                >
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-semibold text-foreground flex-1">{resource.title}</h3>
-                    <div className="flex gap-1 ml-2">
+                    <div className="flex gap-1 ml-2 flex-shrink-0">
+                      {!resource.verified && (
+                        <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full whitespace-nowrap">
+                          Unverified
+                        </span>
+                      )}
                       {resourceType && (
-                        <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+                        <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full whitespace-nowrap">
                           {resourceType.type}
                         </span>
                       )}
                       {devoirType && (
-                        <span className="text-xs px-2 py-1 bg-secondary/10 text-secondary-foreground rounded-full">
+                        <span className="text-xs px-2 py-1 bg-secondary/10 text-secondary-foreground rounded-full whitespace-nowrap">
                           {devoirType.devoir_type}
                         </span>
                       )}
                       {resource.with_correction && (
-                        <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">
+                        <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full whitespace-nowrap">
                           {t('withCorrection') || 'Avec correction'}
                         </span>
                       )}
@@ -913,7 +941,10 @@ export default function Chapter() {
                     </p>
                     <div className="flex items-center gap-4">
                       <button
-                        onClick={() => handleVote(resource.id, 'resource', 'upvote', resource.userVote)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleVote(resource.id, 'resource', 'upvote', resource.userVote);
+                        }}
                         className="flex items-center gap-1.5 transition-colors hover:text-green-600"
                       >
                         <ThumbsUp
@@ -923,7 +954,10 @@ export default function Chapter() {
                         <span className="text-sm font-medium">{resource.upvotes}</span>
                       </button>
                       <button
-                        onClick={() => handleVote(resource.id, 'resource', 'downvote', resource.userVote)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleVote(resource.id, 'resource', 'downvote', resource.userVote);
+                        }}
                         className="flex items-center gap-1.5 transition-colors hover:text-red-600"
                       >
                         <ThumbsDown

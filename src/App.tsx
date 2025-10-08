@@ -10,6 +10,8 @@ import Login from "./pages/Login";
 import CompleteProfile from "./pages/CompleteProfile";
 import Bookmarks from "./pages/Bookmarks";
 import Chapter from "./pages/Chapter";
+import QuestionDetail from "./pages/QuestionDetail";
+import ResourceDetail from "./pages/ResourceDetail";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import DeleteBookmark from "./pages/DeleteBookmark";
@@ -27,6 +29,8 @@ const AppContent = () => {
       <Route path="/complete-profile" element={<CompleteProfile />} />
       <Route path="/bookmarks" element={<Bookmarks />} />
       <Route path="/chapter/:id" element={<Chapter />} />
+      <Route path="/question/:id" element={<QuestionDetail />} />
+      <Route path="/resource/:id" element={<ResourceDetail />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/delete-bookmark" element={<DeleteBookmark />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

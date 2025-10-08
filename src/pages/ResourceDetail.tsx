@@ -1,0 +1,421 @@
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { ArrowLeft, ThumbsUp, ThumbsDown, FileText, Edit, Trash2, AlertCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { BottomNavigation } from '@/components/BottomNavigation';
+import { ContentSkeleton } from '@/components/LoadingSkeleton';
+import chapterPattern from '@/assets/chapter-pattern.png';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+
+interface Resource {
+  id: number;
+  title: string;
+  description: string;
+  data: string[];
+  type_id: number | null;
+  devoir_type_id: number | null;
+  with_correction: boolean;
+  created_at: string;
+  verified: boolean;
+  published_by: string | null;
+  upvotes: number;
+  downvotes: number;
+  userVote: string | null;
+}
+
+export default function ResourceDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const [resource, setResource] = useState<Resource | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('subjects');
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
+  const [editedDescription, setEditedDescription] = useState('');
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
+
+  useEffect(() => {
+    const fetchResource = async () => {
+      if (!id) return;
+
+      const resourceId = Number(id);
+      if (isNaN(resourceId)) return;
+
+      const { data: resourceData, error } = await supabase
+        .from('resources')
+        .select('*')
+        .eq('id', resourceId)
+        .eq('deleted', false)
+        .single();
+
+      if (error || !resourceData) {
+        toast({
+          title: 'Error',
+          description: 'Resource not found',
+          variant: 'destructive',
+        });
+        navigate(-1);
+        return;
+      }
+
+      // Get vote counts
+      const { count: upvotes } = await supabase
+        .from('votes')
+        .select('*', { count: 'exact', head: true })
+        .eq('content_id', resourceData.id)
+        .eq('content_type', 'resource')
+        .eq('vote_type', 'upvote');
+
+      const { count: downvotes } = await supabase
+        .from('votes')
+        .select('*', { count: 'exact', head: true })
+        .eq('content_id', resourceData.id)
+        .eq('content_type', 'resource')
+        .eq('vote_type', 'downvote');
+
+      // Get user's vote
+      let userVote = null;
+      if (user) {
+        const { data: voteData } = await supabase
+          .from('votes')
+          .select('vote_type')
+          .eq('content_id', resourceData.id)
+          .eq('content_type', 'resource')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        userVote = voteData?.vote_type || null;
+      }
+
+      setResource({
+        ...resourceData,
+        upvotes: upvotes || 0,
+        downvotes: downvotes || 0,
+        userVote,
+      });
+
+      setLoading(false);
+    };
+
+    fetchResource();
+  }, [id, user, navigate, toast]);
+
+  const handleVote = async (voteType: string, currentVote: string | null) => {
+    if (!user || !resource) {
+      toast({
+        title: 'Authentication required',
+        description: 'Please log in to vote',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (currentVote === voteType) {
+      await supabase
+        .from('votes')
+        .delete()
+        .eq('content_id', resource.id)
+        .eq('content_type', 'resource')
+        .eq('user_id', user.id);
+    } else {
+      if (currentVote) {
+        await supabase
+          .from('votes')
+          .delete()
+          .eq('content_id', resource.id)
+          .eq('content_type', 'resource')
+          .eq('user_id', user.id);
+      }
+
+      await supabase.from('votes').insert({
+        content_id: resource.id,
+        content_type: 'resource',
+        user_id: user.id,
+        vote_type: voteType,
+      });
+    }
+
+    // Refresh data
+    window.location.reload();
+  };
+
+  const handleEdit = async () => {
+    if (!editedTitle.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Title cannot be empty',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const resourceId = Number(id);
+    if (isNaN(resourceId)) return;
+
+    const { error } = await supabase
+      .from('resources')
+      .update({ 
+        title: editedTitle,
+        description: editedDescription,
+      })
+      .eq('id', resourceId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update resource',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Success',
+      description: 'Resource updated successfully',
+    });
+
+    setIsEditDialogOpen(false);
+    window.location.reload();
+  };
+
+  const handleDelete = async () => {
+    const resourceId = Number(id);
+    if (isNaN(resourceId)) return;
+
+    const { error } = await supabase
+      .from('resources')
+      .update({ deleted: true })
+      .eq('id', resourceId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete resource',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Success',
+      description: 'Resource archived successfully',
+    });
+
+    navigate(-1);
+  };
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    if (tab === 'subjects') navigate('/');
+    else if (tab === 'bookmarks') navigate('/bookmarks');
+    else if (tab === 'profile') navigate('/profile');
+  };
+
+  const getDisplayName = (url: string) => {
+    if (url.includes('youtube.com') || url.includes('youtu.be')) return '📹 YouTube Video';
+    if (url.includes('.pdf')) return '📄 PDF Document';
+    if (url.includes('.mp3') || url.includes('.wav')) return '🎤 Audio Recording';
+    if (url.includes('.jpg') || url.includes('.png') || url.includes('.jpeg')) return '📷 Image';
+    const filename = url.split('/').pop() || 'File';
+    return `📎 ${filename}`;
+  };
+
+  const isOwner = user && resource?.published_by === user.id;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col pb-24">
+        <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft size={20} />
+          </Button>
+          <h1 className="text-lg font-semibold flex-1">{t('resource') || 'Resource'}</h1>
+        </div>
+        <div className="flex-1 p-4">
+          <ContentSkeleton />
+        </div>
+        <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
+      </div>
+    );
+  }
+
+  if (!resource) return null;
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col pb-24">
+      <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <ArrowLeft size={20} />
+        </Button>
+        <h1 className="text-lg font-semibold flex-1">{t('resource') || 'Resource'}</h1>
+      </div>
+
+      {/* Resource Banner */}
+      <Card 
+        className="relative overflow-hidden p-6 m-4 border-none"
+        style={{
+          background: 'linear-gradient(to right, #FFFFFF 0%, #FDE6E6 100%)',
+        }}
+      >
+        <div 
+          className="absolute inset-0 opacity-40"
+          style={{
+            backgroundImage: `url(${chapterPattern})`,
+            backgroundSize: 'auto',
+            backgroundRepeat: 'repeat',
+            imageRendering: 'crisp-edges',
+          }}
+        />
+        
+        <div className="relative z-10 space-y-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-foreground mb-2">{resource.title}</h2>
+              <p className="text-sm text-muted-foreground">{resource.description}</p>
+            </div>
+            {!resource.verified && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+                <AlertCircle size={12} />
+                <span>Unverified</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText size={16} className="text-muted-foreground" />
+              <span className="text-sm">{resource.data.length} file(s)</span>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => handleVote('upvote', resource.userVote)}
+                className="flex items-center gap-1.5 transition-colors hover:text-green-600"
+              >
+                <ThumbsUp
+                  size={20}
+                  className={resource.userVote === 'upvote' ? 'fill-green-600 text-green-600' : ''}
+                />
+                <span className="text-sm font-medium">{resource.upvotes}</span>
+              </button>
+              <button
+                onClick={() => handleVote('downvote', resource.userVote)}
+                className="flex items-center gap-1.5 transition-colors hover:text-red-600"
+              >
+                <ThumbsDown
+                  size={20}
+                  className={resource.userVote === 'downvote' ? 'fill-red-600 text-red-600' : ''}
+                />
+                <span className="text-sm font-medium">{resource.downvotes}</span>
+              </button>
+            </div>
+          </div>
+
+          {isOwner && (
+            <div className="flex gap-2 pt-2 border-t">
+              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditedTitle(resource.title);
+                      setEditedDescription(resource.description);
+                    }}
+                  >
+                    <Edit size={16} className="mr-1" />
+                    Edit
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Edit Resource</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <Input
+                      placeholder="Title"
+                      value={editedTitle}
+                      onChange={(e) => setEditedTitle(e.target.value)}
+                    />
+                    <Textarea
+                      placeholder="Description"
+                      value={editedDescription}
+                      onChange={(e) => setEditedDescription(e.target.value)}
+                      rows={4}
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={handleEdit}>Save</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                >
+                  <Trash2 size={16} className="mr-1" />
+                  Delete
+                </Button>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Archive Resource?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will archive the resource. It won't be permanently deleted.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete}>Archive</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Files Section */}
+      <div className="flex-1 px-4 space-y-3">
+        <h2 className="text-lg font-semibold">Files</h2>
+        {resource.data.map((url, index) => (
+          <Card key={index} className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm">{getDisplayName(url)}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(url, '_blank')}
+              >
+                Open
+              </Button>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
+    </div>
+  );
+}
