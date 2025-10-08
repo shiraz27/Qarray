@@ -52,10 +52,10 @@ export const SubjectTabs: React.FC = () => {
           return (
             <button
               key={subject.id}
-              className={`items-center flex flex-col flex-shrink-0 sm:flex-1 ${
+              className={`items-center flex flex-col flex-shrink-0 sm:flex-1 pb-2 ${
                 isActive 
-                  ? 'text-[#38a6ff] font-semibold border-b-2 border-b-[#38A6FF] border-solid' 
-                  : 'hover:text-[#38a6ff] transition-colors'
+                  ? 'text-[#38a6ff] font-semibold border-b-2 border-[#38A6FF]' 
+                  : 'text-[#9E9E9E] border-b-2 border-transparent hover:text-[#38a6ff] transition-colors'
               }`}
               onClick={() => handleSubjectClick(subject.id)}
               aria-pressed={isActive}
@@ -63,10 +63,10 @@ export const SubjectTabs: React.FC = () => {
             >
               <img
                 src={subject.icon}
-                className="aspect-[1] object-contain w-6"
+                className={`aspect-[1] object-contain w-6 ${isActive ? 'opacity-100' : 'opacity-50'}`}
                 alt=""
               />
-              <span className={`mt-1 ${isActive ? '' : 'text-[#BDBDBD]'}`}>
+              <span className="mt-1">
                 {subject.name}
               </span>
             </button>
