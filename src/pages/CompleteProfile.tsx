@@ -173,8 +173,17 @@ const CompleteProfile: React.FC = () => {
 
     setAddingInstitute(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('Auth error:', userError);
+        toast({
+          title: t('error'),
+          description: t('authenticationError'),
+          variant: "destructive",
+        });
+        return;
+      }
 
       const { data, error } = await supabase
         .from('institutes')
@@ -187,7 +196,10 @@ const CompleteProfile: React.FC = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Insert error:', error);
+        throw error;
+      }
 
       // Add the new institute to the list
       setInstitutes([...institutes, data]);
@@ -197,12 +209,13 @@ const CompleteProfile: React.FC = () => {
 
       toast({
         title: t('success'),
-        description: t('instituteAddedForReview'),
+        description: t('instituteAddedSuccess'),
       });
     } catch (error: any) {
+      console.error('Error adding institute:', error);
       toast({
         title: t('error'),
-        description: error.message,
+        description: error.message || t('somethingWentWrong'),
         variant: "destructive",
       });
     } finally {
@@ -395,7 +408,7 @@ const CompleteProfile: React.FC = () => {
 
           <Button 
             type="submit"
-            disabled={loading || !phoneNumber || !stateId || !classId}
+            disabled={loading || !phoneNumber || !stateId || !classId || !instituteId}
             className="w-full h-12 bg-[#38A6FF] hover:bg-[#2B8FE8] text-white text-base font-medium rounded-lg mt-6"
           >
             {loading ? t('loading') : t('complete')}
@@ -409,7 +422,7 @@ const CompleteProfile: React.FC = () => {
           <DialogHeader>
             <DialogTitle>{t('addMissingInstitute')}</DialogTitle>
             <DialogDescription>
-              {t('addMissingInstituteDescription')}
+              {t('addInstituteDesc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
