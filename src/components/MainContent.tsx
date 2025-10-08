@@ -132,17 +132,18 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
               className="relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer border-none"
               style={{
                 background: hasContent 
-                  ? 'linear-gradient(to right, #FFFFFF, #FDE6E6)' 
-                  : '#E0E0E0',
+                  ? 'linear-gradient(to right, #FFFFFF 0%, #FDE6E6 100%)' 
+                  : 'linear-gradient(to right, #FFFFFF 0%, #E0E0E0 100%)',
               }}
             >
               {/* Pattern overlay */}
               <div 
-                className="absolute inset-0 opacity-30"
+                className="absolute inset-0 opacity-40"
                 style={{
                   backgroundImage: `url(${chapterPattern})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
+                  backgroundSize: 'auto',
+                  backgroundRepeat: 'repeat',
+                  imageRendering: 'crisp-edges',
                 }}
               />
               
