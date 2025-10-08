@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Bell } from 'lucide-react';
 import { NotificationPanel } from './NotificationPanel';
@@ -8,34 +8,42 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ userName = "Osman" }) => {
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
-    fetchUnreadCount();
+    fetchNotificationCount();
     
-    // Set up realtime subscription for new notifications
-    const channel = supabase
-      .channel('notifications-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications'
-        },
-        () => {
-          fetchUnreadCount();
-        }
-      )
-      .subscribe();
+    // Subscribe to new notifications
+    const setupSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const channel = supabase
+        .channel('notifications-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`
+          },
+          () => {
+            fetchNotificationCount();
+          }
+        )
+        .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
+      return () => {
+        supabase.removeChannel(channel);
+      };
     };
+
+    setupSubscription();
   }, []);
 
-  const fetchUnreadCount = async () => {
+  const fetchNotificationCount = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -47,9 +55,9 @@ export const Header: React.FC<HeaderProps> = ({ userName = "Osman" }) => {
         .eq('read', false);
 
       if (error) throw error;
-      setUnreadCount(count || 0);
+      setNotificationCount(count || 0);
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      console.error('Error fetching notification count:', error);
     }
   };
 
@@ -70,25 +78,25 @@ export const Header: React.FC<HeaderProps> = ({ userName = "Osman" }) => {
             <div className="flex min-h-6 w-6" />
           </button>
           <button 
-            aria-label="Notifications"
-            onClick={() => setIsNotificationOpen(true)}
+            aria-label="Notifications" 
             className="relative"
+            onClick={() => setShowNotifications(true)}
           >
-            <Bell className="w-6 h-6 text-destructive" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                {unreadCount > 9 ? '9+' : unreadCount}
+            <Bell className="h-6 w-6 text-destructive" />
+            {notificationCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                {notificationCount > 9 ? '9+' : notificationCount}
               </span>
             )}
           </button>
         </nav>
       </header>
-
+      
       <NotificationPanel 
-        isOpen={isNotificationOpen} 
+        open={showNotifications} 
         onClose={() => {
-          setIsNotificationOpen(false);
-          fetchUnreadCount();
+          setShowNotifications(false);
+          fetchNotificationCount();
         }} 
       />
     </>
