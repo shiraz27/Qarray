@@ -1,57 +1,113 @@
-import React, { useState } from 'react';
-import { Calculator, Atom, Code, BookOpen, Globe } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calculator, Atom, Code, BookOpen, Globe, Beaker, TestTube, FlaskConical } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Subject {
-  id: string;
+  id: number;
   name: string;
-  icon: LucideIcon;
-  isActive?: boolean;
+  logo: string | null;
 }
 
-const subjects: Subject[] = [
-  {
-    id: 'maths',
-    name: 'Maths',
-    icon: Calculator,
-    isActive: true
-  },
-  {
-    id: 'physique',
-    name: 'Physique',
-    icon: Atom
-  },
-  {
-    id: 'programming',
-    name: 'Program..',
-    icon: Code
-  },
-  {
-    id: 'francais',
-    name: 'Français',
-    icon: BookOpen
-  },
-  {
-    id: 'anglais',
-    name: 'Anglais',
-    icon: Globe
+interface SubjectTabsProps {
+  classId?: number;
+}
+
+const iconMap: Record<string, LucideIcon> = {
+  'calculator': Calculator,
+  'atom': Atom,
+  'code': Code,
+  'book-open': BookOpen,
+  'globe': Globe,
+  'beaker': Beaker,
+  'test-tube': TestTube,
+  'flask-conical': FlaskConical,
+};
+
+const getIconForSubject = (logo: string | null, subjectName: string): LucideIcon => {
+  if (logo && iconMap[logo.toLowerCase()]) {
+    return iconMap[logo.toLowerCase()];
   }
-];
+  
+  // Fallback based on subject name
+  const nameLower = subjectName.toLowerCase();
+  if (nameLower.includes('math')) return Calculator;
+  if (nameLower.includes('phys') || nameLower.includes('chim')) return Atom;
+  if (nameLower.includes('program') || nameLower.includes('info')) return Code;
+  if (nameLower.includes('fran') || nameLower.includes('arab')) return BookOpen;
+  if (nameLower.includes('angl') || nameLower.includes('alleman')) return Globe;
+  if (nameLower.includes('scien')) return Beaker;
+  
+  return BookOpen; // Default icon
+};
 
-export const SubjectTabs: React.FC = () => {
-  const [activeSubject, setActiveSubject] = useState('maths');
+export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId }) => {
+  const [activeSubject, setActiveSubject] = useState<number | null>(null);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleSubjectClick = (subjectId: string) => {
+  useEffect(() => {
+    const fetchSubjects = async () => {
+      if (!classId) return;
+      
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('subjects')
+          .select('id, name, logo')
+          .eq('class_id', classId)
+          .eq('deleted', false)
+          .order('name');
+
+        if (error) throw error;
+        
+        setSubjects(data || []);
+        if (data && data.length > 0) {
+          setActiveSubject(data[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching subjects:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSubjects();
+  }, [classId]);
+
+  const handleSubjectClick = (subjectId: number) => {
     setActiveSubject(subjectId);
     console.log(`Selected subject: ${subjectId}`);
   };
+
+  if (loading) {
+    return (
+      <nav className="w-full text-xs px-2.5 py-4" aria-label="Subject navigation">
+        <div className="flex w-full items-center gap-4 justify-center">
+          <div className="text-gray-500">Loading subjects...</div>
+        </div>
+      </nav>
+    );
+  }
+
+  if (subjects.length === 0) {
+    return (
+      <nav className="w-full text-xs px-2.5 py-4" aria-label="Subject navigation">
+        <div className="flex w-full items-center gap-4 justify-center">
+          <div className="text-gray-500">No subjects available</div>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <nav className="w-full text-xs text-[#BDBDBD] font-normal whitespace-nowrap text-center tracking-[0.2px] leading-[1.6] px-2.5 py-4 overflow-x-auto" aria-label="Subject navigation">
       <div className="flex w-full items-center gap-4 justify-start sm:justify-center rounded-xl min-w-max sm:min-w-0">
         {subjects.map((subject) => {
           const isActive = activeSubject === subject.id;
-          const Icon = subject.icon;
+          const Icon = getIconForSubject(subject.logo, subject.name);
+          const displayName = subject.name.length > 10 ? `${subject.name.substring(0, 8)}..` : subject.name;
+          
           return (
             <button
               key={subject.id}
@@ -69,7 +125,7 @@ export const SubjectTabs: React.FC = () => {
                 className={isActive ? 'text-[#38a6ff]' : 'text-[#9E9E9E]'}
               />
               <span className="mt-1">
-                {subject.name}
+                {displayName}
               </span>
             </button>
           );

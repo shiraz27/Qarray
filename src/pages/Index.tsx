@@ -31,6 +31,7 @@ const Index: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [activeTab, setActiveTab] = useState('subjects');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [userProfile, setUserProfile] = useState<{ full_name: string; class_id: number } | null>(null);
 
   const handleLogout = async () => {
     try {
@@ -97,16 +98,18 @@ const Index: React.FC = () => {
         if (!session) {
           navigate('/login');
         } else {
-          // Check if profile is complete
+          // Check if profile is complete and fetch user data
           setTimeout(async () => {
             const { data: profile } = await supabase
               .from('profiles')
-              .select('phone_number, state_id, class_id')
+              .select('phone_number, state_id, class_id, full_name')
               .eq('user_id', session.user.id)
               .single();
             
             if (!profile || !profile.phone_number || !profile.state_id || !profile.class_id) {
               navigate('/complete-profile');
+            } else {
+              setUserProfile({ full_name: profile.full_name, class_id: profile.class_id });
             }
           }, 0);
         }
@@ -119,16 +122,18 @@ const Index: React.FC = () => {
       if (!session) {
         navigate('/login');
       } else {
-        // Check if profile is complete
+        // Check if profile is complete and fetch user data
         setTimeout(async () => {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('phone_number, state_id, class_id')
+            .select('phone_number, state_id, class_id, full_name')
             .eq('user_id', session.user.id)
             .single();
           
           if (!profile || !profile.phone_number || !profile.state_id || !profile.class_id) {
             navigate('/complete-profile');
+          } else {
+            setUserProfile({ full_name: profile.full_name, class_id: profile.class_id });
           }
         }, 0);
       }
@@ -148,7 +153,7 @@ const Index: React.FC = () => {
           {activeTab === 'subjects' && (
             <>
               <section className="items-stretch flex w-full flex-col bg-white">
-                <Header userName="Osman" />
+                <Header userName={userProfile?.full_name || 'User'} />
                 
                 <div className="flex justify-center mt-4">
                   <img
@@ -161,7 +166,7 @@ const Index: React.FC = () => {
                 <ActionButtons />
               </section>
               
-              <SubjectTabs />
+              <SubjectTabs classId={userProfile?.class_id} />
               <MainContent />
             </>
           )}
@@ -184,7 +189,7 @@ const Index: React.FC = () => {
                       👤
                     </div>
                     <div>
-                      <h3 className="font-semibold text-lg">Osman</h3>
+                      <h3 className="font-semibold text-lg">{userProfile?.full_name || 'User'}</h3>
                       <p className="text-sm text-gray-600">{session?.user?.email}</p>
                     </div>
                   </div>
