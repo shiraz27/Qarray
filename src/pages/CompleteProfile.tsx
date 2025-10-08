@@ -41,6 +41,11 @@ interface Institute {
   state_id: number;
 }
 
+interface Class {
+  id: number;
+  name: string;
+}
+
 const CompleteProfile: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -52,8 +57,10 @@ const CompleteProfile: React.FC = () => {
   const [instituteId, setInstituteId] = useState('');
   const [states, setStates] = useState<State[]>([]);
   const [institutes, setInstitutes] = useState<Institute[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
   const [loadingStates, setLoadingStates] = useState(true);
   const [loadingInstitutes, setLoadingInstitutes] = useState(true);
+  const [loadingClasses, setLoadingClasses] = useState(true);
   const [openInstitute, setOpenInstitute] = useState(false);
 
   // Fetch states on component mount
@@ -79,6 +86,32 @@ const CompleteProfile: React.FC = () => {
     };
 
     fetchStates();
+  }, [toast, t]);
+
+  // Fetch classes on component mount
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('classes')
+          .select('id, name')
+          .eq('hidden', false)
+          .order('id');
+
+        if (error) throw error;
+        setClasses(data || []);
+      } catch (error: any) {
+        toast({
+          title: t('error'),
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingClasses(false);
+      }
+    };
+
+    fetchClasses();
   }, [toast, t]);
 
   // Fetch all institutes on component mount
@@ -208,18 +241,16 @@ const CompleteProfile: React.FC = () => {
 
           <div>
             <Label htmlFor="class">{t('classe')}</Label>
-            <Select value={classId} onValueChange={setClassId} required>
+            <Select value={classId} onValueChange={setClassId} required disabled={loadingClasses}>
               <SelectTrigger className="h-12">
-                <SelectValue placeholder={t('selectClasse')} />
+                <SelectValue placeholder={loadingClasses ? t('loading') : t('selectClasse')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1">7ème année</SelectItem>
-                <SelectItem value="2">8ème année</SelectItem>
-                <SelectItem value="3">9ème année</SelectItem>
-                <SelectItem value="4">1ère année</SelectItem>
-                <SelectItem value="5">2ème année</SelectItem>
-                <SelectItem value="6">3ème année</SelectItem>
-                <SelectItem value="7">Bac</SelectItem>
+                {classes.map((classItem) => (
+                  <SelectItem key={classItem.id} value={classItem.id.toString()}>
+                    {classItem.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
