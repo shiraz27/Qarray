@@ -13,7 +13,6 @@ import { MediaUploader } from './MediaUploader';
 
 const questionSchema = z.object({
   question: z.string().min(10, 'Question must be at least 10 characters').max(500, 'Question must be less than 500 characters'),
-  type_id: z.string().min(1, 'Please select a question type'),
 });
 
 type QuestionFormData = z.infer<typeof questionSchema>;
@@ -38,7 +37,6 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
     resolver: zodResolver(questionSchema),
     defaultValues: {
       question: '',
-      type_id: '',
     },
   });
 
@@ -66,12 +64,25 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
         ? `${data.question}\n\nAttachments:\n${mediaUrls.join('\n')}`
         : data.question;
 
+      // Auto-detect type based on media
+      let typeId = 1; // Default type
+      if (mediaUrls.length > 0) {
+        const firstUrl = mediaUrls[0].toLowerCase();
+        if (firstUrl.includes('youtube') || firstUrl.includes('youtu.be')) {
+          typeId = 2; // Video type
+        } else if (firstUrl.includes('.pdf')) {
+          typeId = 3; // Document type
+        } else if (firstUrl.includes('archive.org') && firstUrl.includes('audio')) {
+          typeId = 4; // Audio type
+        }
+      }
+
       const { error } = await supabase
         .from('questions')
         .insert({
           chapter_id: chapterId,
           data: questionData,
-          type_id: parseInt(data.type_id),
+          type_id: typeId,
           contributors: [user.id],
         });
 
@@ -105,31 +116,6 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
                   {...field}
                 />
               </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="type_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Question Type</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select question type" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {resourceTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id.toString()}>
-                      {type.type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <FormMessage />
             </FormItem>
           )}

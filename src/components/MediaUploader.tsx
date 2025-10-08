@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Camera, Upload, Mic, Youtube, FileText, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { enhanceDocument, isMobileDevice } from '@/utils/documentScanner';
 
 interface MediaUploaderProps {
   onMediaUploaded: (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => void;
@@ -60,7 +61,18 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    await uploadToArchive(file, 'image');
+    
+    try {
+      // Enhance document image
+      toast.info('Enhancing document...');
+      const enhancedBlob = await enhanceDocument(file);
+      const enhancedFile = new File([enhancedBlob], file.name, { type: 'image/jpeg' });
+      await uploadToArchive(enhancedFile, 'image');
+    } catch (error) {
+      console.error('Enhancement error:', error);
+      // Fallback to original image
+      await uploadToArchive(file, 'image');
+    }
   };
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,7 +180,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
                   className="flex-1"
                 >
                   <Camera className="mr-2 h-4 w-4" />
-                  Take Photo
+                  {isMobileDevice() ? 'Take Photo' : 'Camera'}
                 </Button>
               </div>
               <input
@@ -182,7 +194,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
                 ref={cameraInputRef}
                 type="file"
                 accept="image/*"
-                capture="environment"
+                capture={isMobileDevice() ? 'environment' : undefined}
                 onChange={handleCameraCapture}
                 className="hidden"
               />
@@ -223,7 +235,10 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
                 )}
                 {isRecording && (
                   <Button type="button" onClick={stopRecording} variant="destructive" className="flex-1">
-                    Stop Recording
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                      Stop Recording
+                    </div>
                   </Button>
                 )}
                 {audioBlob && !isRecording && (

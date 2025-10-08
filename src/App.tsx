@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import CompleteProfile from "./pages/CompleteProfile";
 import Bookmarks from "./pages/Bookmarks";
 import Chapter from "./pages/Chapter";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import DeleteBookmark from "./pages/DeleteBookmark";
 import { useDataPreload } from "./hooks/useDataPreload";
@@ -26,6 +27,7 @@ const AppContent = () => {
       <Route path="/complete-profile" element={<CompleteProfile />} />
       <Route path="/bookmarks" element={<Bookmarks />} />
       <Route path="/chapter/:id" element={<Chapter />} />
+      <Route path="/profile" element={<Profile />} />
       <Route path="/delete-bookmark" element={<DeleteBookmark />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />

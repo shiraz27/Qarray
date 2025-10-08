@@ -16,7 +16,7 @@ import { MediaUploader } from './MediaUploader';
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
   description: z.string().min(10, 'Description must be at least 10 characters').max(500, 'Description must be less than 500 characters'),
-  type_id: z.string().min(1, 'Please select a resource type'),
+  type_id: z.string().optional(),
   devoir_type_id: z.string().optional(),
   with_correction: z.boolean().default(false),
 });
@@ -78,6 +78,19 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
         return;
       }
 
+      // Auto-detect resource type based on media
+      let typeId = parseInt(data.type_id) || 1;
+      if (!data.type_id && mediaUrls.length > 0) {
+        const firstUrl = mediaUrls[0].toLowerCase();
+        if (firstUrl.includes('youtube') || firstUrl.includes('youtu.be')) {
+          typeId = 2; // Video type
+        } else if (firstUrl.includes('.pdf')) {
+          typeId = 3; // Document type
+        } else if (firstUrl.includes('archive.org') && firstUrl.includes('audio')) {
+          typeId = 4; // Audio type
+        }
+      }
+
       const { error } = await supabase
         .from('resources')
         .insert({
@@ -85,7 +98,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           subject_id: subjectId,
           title: data.title,
           description: data.description,
-          type_id: parseInt(data.type_id),
+          type_id: typeId,
           devoir_type_id: data.devoir_type_id ? parseInt(data.devoir_type_id) : null,
           with_correction: data.with_correction,
           data: mediaUrls,
@@ -171,11 +184,11 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           name="type_id"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Resource Type</FormLabel>
+              <FormLabel>Resource Type (Optional - Auto-detected)</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select resource type" />
+                    <SelectValue placeholder="Select resource type (optional)" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>

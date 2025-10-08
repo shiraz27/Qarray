@@ -82,6 +82,8 @@ export default function Chapter() {
       navigate('/');
     } else if (tab === 'bookmarks') {
       navigate('/bookmarks');
+    } else if (tab === 'profile') {
+      navigate('/profile');
     } else {
       setActiveTab(tab);
     }
