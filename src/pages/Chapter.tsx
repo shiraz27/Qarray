@@ -4,11 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, FileText, ArrowLeft, Bookmark } from 'lucide-react';
+import { MessageSquare, FileText, ArrowLeft, Bookmark, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
-import { BottomNavigation } from '@/components/BottomNavigation';
 
 interface ChapterData {
   id: number;
@@ -23,6 +22,9 @@ interface Question {
   id: number;
   data: string;
   created_at: string;
+  upvotes: number;
+  downvotes: number;
+  userVote: 'upvote' | 'downvote' | null;
 }
 
 interface Resource {
@@ -31,6 +33,9 @@ interface Resource {
   description: string;
   data: string[];
   created_at: string;
+  upvotes: number;
+  downvotes: number;
+  userVote: 'upvote' | 'downvote' | null;
 }
 
 export default function Chapter() {
@@ -118,7 +123,7 @@ export default function Chapter() {
           isBookmarked,
         });
 
-        // Fetch questions
+        // Fetch questions with vote counts
         const { data: questionsData } = await supabase
           .from('questions')
           .select('id, data, created_at')
@@ -126,9 +131,48 @@ export default function Chapter() {
           .eq('deleted', false)
           .order('created_at', { ascending: false });
 
-        setQuestions(questionsData || []);
+        // Fetch vote counts and user votes for questions
+        const questionsWithVotes = await Promise.all(
+          (questionsData || []).map(async (question) => {
+            const { count: upvotes } = await supabase
+              .from('votes')
+              .select('*', { count: 'exact', head: true })
+              .eq('content_id', question.id)
+              .eq('content_type', 'question')
+              .eq('vote_type', 'upvote');
 
-        // Fetch resources
+            const { count: downvotes } = await supabase
+              .from('votes')
+              .select('*', { count: 'exact', head: true })
+              .eq('content_id', question.id)
+              .eq('content_type', 'question')
+              .eq('vote_type', 'downvote');
+
+            let userVote = null;
+            if (user) {
+              const { data: voteData } = await supabase
+                .from('votes')
+                .select('vote_type')
+                .eq('content_id', question.id)
+                .eq('content_type', 'question')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+              userVote = voteData?.vote_type || null;
+            }
+
+            return {
+              ...question,
+              upvotes: upvotes || 0,
+              downvotes: downvotes || 0,
+              userVote,
+            };
+          })
+        );
+
+        setQuestions(questionsWithVotes);
+
+        // Fetch resources with vote counts
         const { data: resourcesData } = await supabase
           .from('resources')
           .select('id, title, description, data, created_at')
@@ -136,7 +180,46 @@ export default function Chapter() {
           .eq('deleted', false)
           .order('created_at', { ascending: false });
 
-        setResources(resourcesData || []);
+        // Fetch vote counts and user votes for resources
+        const resourcesWithVotes = await Promise.all(
+          (resourcesData || []).map(async (resource) => {
+            const { count: upvotes } = await supabase
+              .from('votes')
+              .select('*', { count: 'exact', head: true })
+              .eq('content_id', resource.id)
+              .eq('content_type', 'resource')
+              .eq('vote_type', 'upvote');
+
+            const { count: downvotes } = await supabase
+              .from('votes')
+              .select('*', { count: 'exact', head: true })
+              .eq('content_id', resource.id)
+              .eq('content_type', 'resource')
+              .eq('vote_type', 'downvote');
+
+            let userVote = null;
+            if (user) {
+              const { data: voteData } = await supabase
+                .from('votes')
+                .select('vote_type')
+                .eq('content_id', resource.id)
+                .eq('content_type', 'resource')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+              userVote = voteData?.vote_type || null;
+            }
+
+            return {
+              ...resource,
+              upvotes: upvotes || 0,
+              downvotes: downvotes || 0,
+              userVote,
+            };
+          })
+        );
+
+        setResources(resourcesWithVotes);
       } catch (error) {
         console.error('Error fetching chapter data:', error);
         toast.error(t('errorLoadingChapter') || 'Failed to load chapter');
@@ -177,6 +260,138 @@ export default function Chapter() {
     } catch (error) {
       console.error('Error toggling bookmark:', error);
       toast.error(t('bookmarkError') || 'Failed to update bookmark');
+    }
+  };
+
+  const handleVote = async (
+    contentId: number,
+    contentType: 'question' | 'resource',
+    voteType: 'upvote' | 'downvote',
+    currentVote: 'upvote' | 'downvote' | null
+  ) => {
+    if (!user) {
+      toast.error(t('pleaseLogin') || 'Please login to vote');
+      return;
+    }
+
+    try {
+      if (currentVote === voteType) {
+        // Remove vote
+        await supabase
+          .from('votes')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('content_id', contentId)
+          .eq('content_type', contentType);
+      } else {
+        // Delete existing vote if any
+        await supabase
+          .from('votes')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('content_id', contentId)
+          .eq('content_type', contentType);
+
+        // Insert new vote
+        await supabase
+          .from('votes')
+          .insert({
+            user_id: user.id,
+            content_id: contentId,
+            content_type: contentType,
+            vote_type: voteType,
+          });
+      }
+
+      // Refresh the data
+      if (contentType === 'question') {
+        const { data: questionsData } = await supabase
+          .from('questions')
+          .select('id, data, created_at')
+          .eq('chapter_id', chapter?.id)
+          .eq('deleted', false)
+          .order('created_at', { ascending: false });
+
+        const questionsWithVotes = await Promise.all(
+          (questionsData || []).map(async (question) => {
+            const { count: upvotes } = await supabase
+              .from('votes')
+              .select('*', { count: 'exact', head: true })
+              .eq('content_id', question.id)
+              .eq('content_type', 'question')
+              .eq('vote_type', 'upvote');
+
+            const { count: downvotes } = await supabase
+              .from('votes')
+              .select('*', { count: 'exact', head: true })
+              .eq('content_id', question.id)
+              .eq('content_type', 'question')
+              .eq('vote_type', 'downvote');
+
+            const { data: voteData } = await supabase
+              .from('votes')
+              .select('vote_type')
+              .eq('content_id', question.id)
+              .eq('content_type', 'question')
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+            return {
+              ...question,
+              upvotes: upvotes || 0,
+              downvotes: downvotes || 0,
+              userVote: (voteData?.vote_type as 'upvote' | 'downvote') || null,
+            };
+          })
+        );
+
+        setQuestions(questionsWithVotes);
+      } else {
+        const { data: resourcesData } = await supabase
+          .from('resources')
+          .select('id, title, description, data, created_at')
+          .eq('chapter_id', chapter?.id)
+          .eq('deleted', false)
+          .order('created_at', { ascending: false });
+
+        const resourcesWithVotes = await Promise.all(
+          (resourcesData || []).map(async (resource) => {
+            const { count: upvotes } = await supabase
+              .from('votes')
+              .select('*', { count: 'exact', head: true })
+              .eq('content_id', resource.id)
+              .eq('content_type', 'resource')
+              .eq('vote_type', 'upvote');
+
+            const { count: downvotes } = await supabase
+              .from('votes')
+              .select('*', { count: 'exact', head: true })
+              .eq('content_id', resource.id)
+              .eq('content_type', 'resource')
+              .eq('vote_type', 'downvote');
+
+            const { data: voteData } = await supabase
+              .from('votes')
+              .select('vote_type')
+              .eq('content_id', resource.id)
+              .eq('content_type', 'resource')
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+            return {
+              ...resource,
+              upvotes: upvotes || 0,
+              downvotes: downvotes || 0,
+              userVote: (voteData?.vote_type as 'upvote' | 'downvote') || null,
+            };
+          })
+        );
+
+        setResources(resourcesWithVotes);
+      }
+    } catch (error) {
+      console.error('Error voting:', error);
+      toast.error(t('voteError') || 'Failed to vote');
     }
   };
 
@@ -248,24 +463,24 @@ export default function Chapter() {
           </h2>
           
           <div className="flex gap-6">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MessageSquare size={18} />
+            <div className="flex items-center gap-2">
+              <MessageSquare size={18} className="text-muted-foreground" />
               <div>
-                <p className="text-xs">{t('questions') || 'Questions'}</p>
+                <p className="text-xs text-muted-foreground">{t('questions') || 'Questions'}</p>
                 <p className="text-lg font-semibold text-foreground">{chapter.questionCount}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MessageSquare size={18} />
+            <div className="flex items-center gap-2">
+              <MessageSquare size={18} className="text-muted-foreground" />
               <div>
-                <p className="text-xs">{t('answers') || 'Answers'}</p>
+                <p className="text-xs text-muted-foreground">{t('answers') || 'Answers'}</p>
                 <p className="text-lg font-semibold text-foreground">{chapter.answerCount}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <FileText size={18} />
+            <div className="flex items-center gap-2">
+              <FileText size={18} className="text-muted-foreground" />
               <div>
-                <p className="text-xs">{t('resources') || 'Resources'}</p>
+                <p className="text-xs text-muted-foreground">{t('resources') || 'Resources'}</p>
                 <p className="text-lg font-semibold text-foreground">{chapter.resourceCount}</p>
               </div>
             </div>
@@ -289,10 +504,34 @@ export default function Chapter() {
             ) : (
               questions.map((question) => (
                 <Card key={question.id} className="p-4">
-                  <p className="text-foreground">{question.data}</p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {new Date(question.created_at).toLocaleDateString()}
-                  </p>
+                  <p className="text-foreground mb-3">{question.data}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(question.created_at).toLocaleDateString()}
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => handleVote(question.id, 'question', 'upvote', question.userVote)}
+                        className="flex items-center gap-1.5 transition-colors hover:text-green-600"
+                      >
+                        <ThumbsUp
+                          size={16}
+                          className={question.userVote === 'upvote' ? 'fill-green-600 text-green-600' : ''}
+                        />
+                        <span className="text-sm font-medium">{question.upvotes}</span>
+                      </button>
+                      <button
+                        onClick={() => handleVote(question.id, 'question', 'downvote', question.userVote)}
+                        className="flex items-center gap-1.5 transition-colors hover:text-red-600"
+                      >
+                        <ThumbsDown
+                          size={16}
+                          className={question.userVote === 'downvote' ? 'fill-red-600 text-red-600' : ''}
+                        />
+                        <span className="text-sm font-medium">{question.downvotes}</span>
+                      </button>
+                    </div>
+                  </div>
                 </Card>
               ))
             )}
@@ -307,10 +546,34 @@ export default function Chapter() {
               resources.map((resource) => (
                 <Card key={resource.id} className="p-4">
                   <h3 className="font-semibold text-foreground mb-2">{resource.title}</h3>
-                  <p className="text-sm text-muted-foreground mb-2">{resource.description}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(resource.created_at).toLocaleDateString()}
-                  </p>
+                  <p className="text-sm text-muted-foreground mb-3">{resource.description}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(resource.created_at).toLocaleDateString()}
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => handleVote(resource.id, 'resource', 'upvote', resource.userVote)}
+                        className="flex items-center gap-1.5 transition-colors hover:text-green-600"
+                      >
+                        <ThumbsUp
+                          size={16}
+                          className={resource.userVote === 'upvote' ? 'fill-green-600 text-green-600' : ''}
+                        />
+                        <span className="text-sm font-medium">{resource.upvotes}</span>
+                      </button>
+                      <button
+                        onClick={() => handleVote(resource.id, 'resource', 'downvote', resource.userVote)}
+                        className="flex items-center gap-1.5 transition-colors hover:text-red-600"
+                      >
+                        <ThumbsDown
+                          size={16}
+                          className={resource.userVote === 'downvote' ? 'fill-red-600 text-red-600' : ''}
+                        />
+                        <span className="text-sm font-medium">{resource.downvotes}</span>
+                      </button>
+                    </div>
+                  </div>
                 </Card>
               ))
             )}
