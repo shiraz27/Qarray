@@ -222,8 +222,74 @@ export default function QuestionDetail() {
       });
     }
 
-    // Refresh data
-    window.location.reload();
+    // Refetch data instead of reloading the page
+    if (contentType === 'question') {
+      const { count: upvotes } = await supabase
+        .from('votes')
+        .select('*', { count: 'exact', head: true })
+        .eq('content_id', contentId)
+        .eq('content_type', 'question')
+        .eq('vote_type', 'upvote');
+
+      const { count: downvotes } = await supabase
+        .from('votes')
+        .select('*', { count: 'exact', head: true })
+        .eq('content_id', contentId)
+        .eq('content_type', 'question')
+        .eq('vote_type', 'downvote');
+
+      const { data: voteData } = await supabase
+        .from('votes')
+        .select('vote_type')
+        .eq('content_id', contentId)
+        .eq('content_type', 'question')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      setQuestion(prev => prev ? {
+        ...prev,
+        upvotes: upvotes || 0,
+        downvotes: downvotes || 0,
+        userVote: voteData?.vote_type || null
+      } : null);
+    } else {
+      // Update answer vote
+      const updatedAnswers = await Promise.all(
+        answers.map(async (answer) => {
+          if (answer.id !== contentId) return answer;
+
+          const { count: upvotes } = await supabase
+            .from('votes')
+            .select('*', { count: 'exact', head: true })
+            .eq('content_id', contentId)
+            .eq('content_type', 'answer')
+            .eq('vote_type', 'upvote');
+
+          const { count: downvotes } = await supabase
+            .from('votes')
+            .select('*', { count: 'exact', head: true })
+            .eq('content_id', contentId)
+            .eq('content_type', 'answer')
+            .eq('vote_type', 'downvote');
+
+          const { data: voteData } = await supabase
+            .from('votes')
+            .select('vote_type')
+            .eq('content_id', contentId)
+            .eq('content_type', 'answer')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          return {
+            ...answer,
+            upvotes: upvotes || 0,
+            downvotes: downvotes || 0,
+            userVote: voteData?.vote_type || null
+          };
+        })
+      );
+      setAnswers(updatedAnswers);
+    }
   };
 
   const handleDelete = async () => {
@@ -403,9 +469,19 @@ export default function QuestionDetail() {
                   <EditQuestionForm
                     questionId={question.id}
                     initialData={question.data}
-                    onSuccess={() => {
+                    onSuccess={async () => {
                       setIsEditDialogOpen(false);
-                      window.location.reload();
+                      // Refetch question data
+                      const { data: questionData } = await supabase
+                        .from('questions')
+                        .select('*')
+                        .eq('id', question.id)
+                        .eq('deleted', false)
+                        .single();
+                      
+                      if (questionData) {
+                        setQuestion(prev => prev ? { ...prev, data: questionData.data } : null);
+                      }
                     }}
                     onCancel={() => setIsEditDialogOpen(false)}
                   />
@@ -453,9 +529,62 @@ export default function QuestionDetail() {
               </DialogHeader>
               <AnswerQuestionForm
                 questionId={Number(id)}
-                onSuccess={() => {
+                onSuccess={async () => {
                   setIsAnswerDialogOpen(false);
-                  window.location.reload();
+                  // Refetch answers
+                  const { data: answersData } = await supabase
+                    .from('answers')
+                    .select('*')
+                    .eq('question_id', Number(id))
+                    .eq('deleted', false)
+                    .order('created_at', { ascending: false });
+
+                  if (answersData) {
+                    const answersWithVotes = await Promise.all(
+                      answersData.map(async (answer) => {
+                        const { count: upvotes } = await supabase
+                          .from('votes')
+                          .select('*', { count: 'exact', head: true })
+                          .eq('content_id', answer.id)
+                          .eq('content_type', 'answer')
+                          .eq('vote_type', 'upvote');
+
+                        const { count: downvotes } = await supabase
+                          .from('votes')
+                          .select('*', { count: 'exact', head: true })
+                          .eq('content_id', answer.id)
+                          .eq('content_type', 'answer')
+                          .eq('vote_type', 'downvote');
+
+                        let userVote = null;
+                        if (user) {
+                          const { data: voteData } = await supabase
+                            .from('votes')
+                            .select('vote_type')
+                            .eq('content_id', answer.id)
+                            .eq('content_type', 'answer')
+                            .eq('user_id', user.id)
+                            .maybeSingle();
+
+                          userVote = voteData?.vote_type || null;
+                        }
+
+                        return {
+                          ...answer,
+                          upvotes: upvotes || 0,
+                          downvotes: downvotes || 0,
+                          userVote,
+                        };
+                      })
+                    );
+                    setAnswers(answersWithVotes);
+                    
+                    // Update answer count
+                    setQuestion(prev => prev ? {
+                      ...prev,
+                      answerCount: answersWithVotes.length
+                    } : null);
+                  }
                 }}
                 onCancel={() => setIsAnswerDialogOpen(false)}
               />

@@ -177,8 +177,35 @@ export default function ResourceDetail() {
       });
     }
 
-    // Refresh data
-    window.location.reload();
+    // Refetch votes instead of reloading
+    const { count: upvotes } = await supabase
+      .from('votes')
+      .select('*', { count: 'exact', head: true })
+      .eq('content_id', resource.id)
+      .eq('content_type', 'resource')
+      .eq('vote_type', 'upvote');
+
+    const { count: downvotes } = await supabase
+      .from('votes')
+      .select('*', { count: 'exact', head: true })
+      .eq('content_id', resource.id)
+      .eq('content_type', 'resource')
+      .eq('vote_type', 'downvote');
+
+    const { data: voteData } = await supabase
+      .from('votes')
+      .select('vote_type')
+      .eq('content_id', resource.id)
+      .eq('content_type', 'resource')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    setResource(prev => prev ? {
+      ...prev,
+      upvotes: upvotes || 0,
+      downvotes: downvotes || 0,
+      userVote: voteData?.vote_type || null
+    } : null);
   };
 
   const handleDelete = async () => {
@@ -367,9 +394,27 @@ export default function ResourceDetail() {
                     }}
                     resourceTypes={resourceTypes}
                     devoirTypes={devoirTypes}
-                    onSuccess={() => {
+                    onSuccess={async () => {
                       setIsEditDialogOpen(false);
-                      window.location.reload();
+                      // Refetch resource data
+                      const { data: resourceData } = await supabase
+                        .from('resources')
+                        .select('*')
+                        .eq('id', resource.id)
+                        .eq('deleted', false)
+                        .single();
+                      
+                      if (resourceData) {
+                        setResource(prev => prev ? {
+                          ...prev,
+                          title: resourceData.title,
+                          description: resourceData.description,
+                          data: resourceData.data,
+                          type_id: resourceData.type_id,
+                          devoir_type_id: resourceData.devoir_type_id,
+                          with_correction: resourceData.with_correction
+                        } : null);
+                      }
                     }}
                     onCancel={() => setIsEditDialogOpen(false)}
                   />
@@ -444,7 +489,10 @@ export default function ResourceDetail() {
                   resourceTypes={resourceTypes}
                   onSuccess={() => {
                     setIsAskQuestionDialogOpen(false);
-                    window.location.reload();
+                    toast({
+                      title: 'Success',
+                      description: 'Question added successfully',
+                    });
                   }}
                   onCancel={() => setIsAskQuestionDialogOpen(false)}
                 />
