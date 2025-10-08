@@ -1,27 +1,45 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { StatusBar } from '@/components/StatusBar';
 import { Header } from '@/components/Header';
 import { ActionButtons } from '@/components/ActionButtons';
 import { SubjectTabs } from '@/components/SubjectTabs';
 import { MainContent } from '@/components/MainContent';
-import { BottomNavigation } from '@/components/BottomNavigation';
-import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { Session } from '@supabase/supabase-js';
 
 const Index: React.FC = () => {
   const navigate = useNavigate();
+  const [session, setSession] = useState<Session | null>(null);
+
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        if (!session) {
+          navigate('/login');
+        }
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (!session) {
+        navigate('/login');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  if (!session) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <div className="w-full mx-auto flex flex-col min-h-screen">
-        <StatusBar />
-        
-        <div className="p-4">
-          <Button onClick={() => navigate('/login')} className="w-full">
-            Go to Login Screen
-          </Button>
-        </div>
-        
         <div className="flex-1 w-full overflow-auto">
           <section className="items-stretch flex w-full flex-col bg-white">
             <Header userName="Osman" />
@@ -40,8 +58,6 @@ const Index: React.FC = () => {
           <SubjectTabs />
           <MainContent />
         </div>
-        
-        <BottomNavigation />
       </div>
     </div>
   );

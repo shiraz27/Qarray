@@ -1,30 +1,102 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const Login: React.FC = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`
+          }
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "Success!",
+          description: "Account created successfully. You can now sign in.",
+        });
+        setIsSignUp(false);
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "Welcome back!",
+          description: "You've successfully signed in.",
+        });
+        navigate('/');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSocialLogin = async (provider: 'google' | 'facebook') => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/`
+        }
+      });
+
+      if (error) throw error;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      {/* Status Bar */}
-      <div className="flex justify-between items-center px-6 py-2 text-sm">
-        <span>9:41</span>
-        <div className="flex gap-1 items-center">
-          <div className="w-4 h-4">📶</div>
-          <div className="w-4 h-4">📡</div>
-          <div className="w-4 h-4">🔋</div>
-        </div>
-      </div>
-
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 pb-20">
-        {/* Logo/Illustration placeholder */}
-        <div className="w-48 h-48 mb-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-3xl flex items-center justify-center">
-          <div className="text-6xl">📚</div>
-        </div>
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+        {/* Logo placeholder */}
+        <div className="w-32 h-32 mb-8 bg-gradient-to-br from-blue-100 to-blue-200 rounded-3xl" />
+
+        <h1 className="text-2xl font-bold mb-2">
+          {isSignUp ? 'Create Account' : 'Welcome Back'}
+        </h1>
+        <p className="text-gray-600 mb-8">
+          {isSignUp ? 'Sign up to get started' : 'Sign in to continue'}
+        </p>
 
         {/* Social Login Buttons */}
         <div className="w-full max-w-sm space-y-3 mb-6">
           <Button
+            onClick={() => handleSocialLogin('facebook')}
             variant="outline"
             className="w-full h-12 flex items-center justify-center gap-3 border-2 hover:bg-gray-50"
           >
@@ -38,6 +110,7 @@ const Login: React.FC = () => {
           </Button>
 
           <Button
+            onClick={() => handleSocialLogin('google')}
             variant="outline"
             className="w-full h-12 flex items-center justify-center gap-3 border-2 hover:bg-gray-50"
           >
@@ -70,19 +143,50 @@ const Login: React.FC = () => {
           <div className="flex-1 h-px bg-gray-300"></div>
         </div>
 
-        {/* Email Input */}
-        <div className="w-full max-w-sm mb-4">
-          <Input
-            type="email"
-            placeholder="Your email"
-            className="h-12 text-base"
-          />
-        </div>
+        {/* Email Form */}
+        <form onSubmit={handleEmailAuth} className="w-full max-w-sm space-y-4">
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="h-12 text-base"
+            />
+          </div>
 
-        {/* Sign In Button */}
-        <Button className="w-full max-w-sm h-12 bg-blue-500 hover:bg-blue-600 text-white text-base font-medium rounded-lg">
-          Sign In
-        </Button>
+          <div>
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="h-12 text-base"
+            />
+          </div>
+
+          <Button 
+            type="submit"
+            disabled={loading}
+            className="w-full h-12 bg-blue-500 hover:bg-blue-600 text-white text-base font-medium rounded-lg"
+          >
+            {loading ? 'Loading...' : (isSignUp ? 'Sign Up' : 'Sign In')}
+          </Button>
+        </form>
+
+        {/* Toggle Sign Up/Sign In */}
+        <button
+          onClick={() => setIsSignUp(!isSignUp)}
+          className="mt-6 text-sm text-gray-600 hover:text-gray-900"
+        >
+          {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+        </button>
       </div>
     </div>
   );
