@@ -55,6 +55,27 @@ export type Database = {
           },
         ]
       }
+      bookmarks: {
+        Row: {
+          chapter_id: number
+          created_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          chapter_id: number
+          created_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          chapter_id?: number
+          created_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       chapters: {
         Row: {
           class_id: number | null

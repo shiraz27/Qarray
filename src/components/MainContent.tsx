@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
-import { BookOpen, MessageSquare, FileText, Star } from 'lucide-react';
+import { BookOpen, MessageSquare, FileText, Bookmark } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
 
 interface Chapter {
@@ -11,6 +12,7 @@ interface Chapter {
   questionCount: number;
   answerCount: number;
   resourceCount: number;
+  isBookmarked: boolean;
 }
 
 interface MainContentProps {
@@ -21,6 +23,13 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
   const { t } = useTranslation();
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+  }, []);
 
   useEffect(() => {
     const fetchChapters = async () => {
@@ -37,6 +46,16 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
           .order('name');
 
         if (chaptersError) throw chaptersError;
+
+        // Fetch user's bookmarks if logged in
+        let bookmarkedChapterIds: number[] = [];
+        if (user) {
+          const { data: bookmarksData } = await supabase
+            .from('bookmarks')
+            .select('chapter_id')
+            .eq('user_id', user.id);
+          bookmarkedChapterIds = bookmarksData?.map(b => b.chapter_id) || [];
+        }
 
         // Fetch counts for each chapter
         const chaptersWithCounts = await Promise.all(
@@ -75,6 +94,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
               questionCount: questionCount || 0,
               answerCount: answerCount || 0,
               resourceCount: resourceCount || 0,
+              isBookmarked: bookmarkedChapterIds.includes(chapter.id),
             };
           })
         );
@@ -88,7 +108,47 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
     };
 
     fetchChapters();
-  }, [subjectId]);
+  }, [subjectId, user]);
+
+  const toggleBookmark = async (chapterId: number, currentlyBookmarked: boolean) => {
+    if (!user) {
+      toast.error(t('pleaseLogin') || 'Please login to bookmark chapters');
+      return;
+    }
+
+    try {
+      if (currentlyBookmarked) {
+        // Remove bookmark
+        const { error } = await supabase
+          .from('bookmarks')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('chapter_id', chapterId);
+
+        if (error) throw error;
+        
+        setChapters(prev => prev.map(ch => 
+          ch.id === chapterId ? { ...ch, isBookmarked: false } : ch
+        ));
+        toast.success(t('bookmarkRemoved') || 'Bookmark removed');
+      } else {
+        // Add bookmark
+        const { error } = await supabase
+          .from('bookmarks')
+          .insert({ user_id: user.id, chapter_id: chapterId });
+
+        if (error) throw error;
+        
+        setChapters(prev => prev.map(ch => 
+          ch.id === chapterId ? { ...ch, isBookmarked: true } : ch
+        ));
+        toast.success(t('bookmarkAdded') || 'Bookmark added');
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      toast.error(t('bookmarkError') || 'Failed to update bookmark');
+    }
+  };
 
   if (!subjectId) {
     return (
@@ -148,13 +208,22 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
               />
               
               <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-3">
-                  {hasContent && (
-                    <Star size={20} className="text-foreground fill-foreground" />
-                  )}
+                <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-sm tracking-wide text-foreground flex-1">
                     {chapter.name.toUpperCase()}
                   </h3>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleBookmark(chapter.id, chapter.isBookmarked);
+                    }}
+                    className="hover:scale-110 transition-transform"
+                  >
+                    <Bookmark
+                      size={20}
+                      className={`text-foreground ${chapter.isBookmarked ? 'fill-foreground' : ''}`}
+                    />
+                  </button>
                 </div>
                 
                 <div className="flex gap-4 text-xs">
