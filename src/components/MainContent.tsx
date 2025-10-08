@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { BookOpen, MessageSquare, FileText, Star } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import chapterFilledBg from '@/assets/chapter-filled-bg.png';
+import chapterUnfilledBg from '@/assets/chapter-unfilled-bg.png';
 
 interface Chapter {
   id: number;
@@ -128,43 +130,32 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
           return (
             <Card 
               key={chapter.id}
-              className={`relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer ${
-                hasContent ? 'bg-gradient-to-br from-blue-50 to-purple-50' : 'bg-gray-50'
-              }`}
+              className="relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer bg-card border-none"
+              style={{
+                backgroundImage: `url(${hasContent ? chapterFilledBg : chapterUnfilledBg})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
             >
-              {/* Decorative pattern background */}
-              {hasContent && (
-                <div className="absolute -right-16 -bottom-80 w-96 h-96 opacity-10">
-                  <svg viewBox="0 0 200 200" className="w-full h-full">
-                    <defs>
-                      <pattern id="pattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
-                        <circle cx="20" cy="20" r="2" fill="currentColor" className="text-blue-500" />
-                      </pattern>
-                    </defs>
-                    <rect width="200" height="200" fill="url(#pattern)" />
-                  </svg>
-                </div>
-              )}
-              
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-3">
                   {hasContent && (
-                    <Star size={20} className="text-orange-400 fill-orange-400" />
+                    <Star size={20} className="text-foreground fill-foreground" />
                   )}
-                  <h3 className="font-semibold text-sm tracking-wide text-gray-900 flex-1">
+                  <h3 className="font-semibold text-sm tracking-wide text-foreground flex-1">
                     {chapter.name.toUpperCase()}
                   </h3>
                 </div>
                 
                 <div className="flex gap-4 text-xs">
-                  <div className="flex items-center gap-1.5 text-gray-700">
-                    <MessageSquare size={14} className="text-blue-500" />
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <MessageSquare size={14} className="text-muted-foreground" />
                     <span className="font-medium">
                       {chapter.questionCount} {t('questions') || 'Questions'}/ {t('answers') || 'Answers'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-gray-700">
-                    <FileText size={14} className="text-purple-500" />
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <FileText size={14} className="text-muted-foreground" />
                     <span className="font-medium">
                       {chapter.resourceCount} {t('resources') || 'Resources'}
                     </span>
