@@ -16,6 +16,8 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { AnswerQuestionForm } from '@/components/AnswerQuestionForm';
 import { EditQuestionForm } from '@/components/EditQuestionForm';
 
+import { useUserRole } from '@/hooks/useUserRole';
+
 interface Question {
   id: number;
   data: string;
@@ -54,6 +56,7 @@ export default function QuestionDetail() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isAnswerDialogOpen, setIsAnswerDialogOpen] = useState(false);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
+  const { isModerator } = useUserRole();
 
   useEffect(() => {
     const getUser = async () => {
@@ -267,6 +270,7 @@ export default function QuestionDetail() {
   };
 
   const isOwner = user && question?.contributors?.includes(user.id);
+  const canEdit = isOwner || isModerator;
 
   if (loading) {
     return (
@@ -375,7 +379,7 @@ export default function QuestionDetail() {
             </div>
           </div>
 
-          {isOwner && (
+          {canEdit && (
             <div className="flex gap-2 pt-2 border-t">
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogTrigger asChild>

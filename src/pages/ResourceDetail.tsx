@@ -16,6 +16,8 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
 
+import { useUserRole } from '@/hooks/useUserRole';
+
 interface Resource {
   id: number;
   title: string;
@@ -47,6 +49,7 @@ export default function ResourceDetail() {
   const [isAskQuestionDialogOpen, setIsAskQuestionDialogOpen] = useState(false);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
   const [devoirTypes, setDevoirTypes] = useState<Array<{ id: number; devoir_type: string }>>([]);
+  const { isModerator } = useUserRole();
 
   useEffect(() => {
     const getUser = async () => {
@@ -231,6 +234,7 @@ export default function ResourceDetail() {
   };
 
   const isOwner = user && resource?.published_by === user.id;
+  const canEdit = isOwner || isModerator;
 
   if (loading) {
     return (
@@ -335,7 +339,7 @@ export default function ResourceDetail() {
             </div>
           </div>
 
-          {isOwner && (
+          {canEdit && (
             <div className="flex gap-2 pt-2 border-t">
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogTrigger asChild>
