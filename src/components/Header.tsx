@@ -12,35 +12,50 @@ export const Header: React.FC<HeaderProps> = ({ userName = "Osman" }) => {
   const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
+    console.log('Header component mounted');
     fetchNotificationCount();
     
     // Subscribe to new notifications
+    let channel: any;
+    
     const setupSubscription = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      
-      const channel = supabase
-        .channel('notifications-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${user.id}`
-          },
-          () => {
-            fetchNotificationCount();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.log('No user found in Header');
+          return;
+        }
+        
+        console.log('Setting up notification subscription for user:', user.id);
+        channel = supabase
+          .channel('notifications-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'notifications',
+              filter: `user_id=eq.${user.id}`
+            },
+            () => {
+              console.log('New notification received');
+              fetchNotificationCount();
+            }
+          )
+          .subscribe();
+      } catch (error) {
+        console.error('Error setting up notification subscription:', error);
+      }
     };
 
     setupSubscription();
+
+    return () => {
+      if (channel) {
+        console.log('Cleaning up notification channel');
+        supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
   const fetchNotificationCount = async () => {
