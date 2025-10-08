@@ -480,16 +480,8 @@ export default function QuestionDetail() {
                 />
               )}
               
-              <div className="flex items-start justify-between">
-                <div className="flex-1 space-y-2">
-                  <MediaList data={answer.data} showText={true} />
-                </div>
-                {!answer.verified && (
-                  <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs ml-2 flex-shrink-0">
-                    <AlertCircle size={10} />
-                    <span>Unverified</span>
-                  </div>
-                )}
+              <div className="flex-1 space-y-2">
+                <MediaList data={answer.data} showText={true} />
               </div>
               
               <div className="flex items-center justify-end gap-4 pt-2 border-t">
