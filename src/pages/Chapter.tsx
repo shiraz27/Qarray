@@ -66,8 +66,8 @@ export default function Chapter() {
   const [user, setUser] = useState<any>(null);
   const [resourceTypes, setResourceTypes] = useState<ResourceType[]>([]);
   const [devoirTypes, setDevoirTypes] = useState<DevoirType[]>([]);
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState<number | null>(null);
-  const [selectedDevoirFilter, setSelectedDevoirFilter] = useState<number | null>(null);
+  const [selectedTypeFilters, setSelectedTypeFilters] = useState<number[]>([]);
+  const [selectedDevoirFilters, setSelectedDevoirFilters] = useState<number[]>([]);
   const [showWithCorrectionOnly, setShowWithCorrectionOnly] = useState(false);
   const [activeTab, setActiveTab] = useState('subjects');
 
@@ -465,7 +465,7 @@ export default function Chapter() {
     return (
       <div className="min-h-screen bg-background flex flex-col pb-24">
         <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
             <ArrowLeft size={20} />
           </Button>
           <h1 className="text-lg font-semibold flex-1">{t('chapter') || 'Chapter'}</h1>
@@ -482,7 +482,7 @@ export default function Chapter() {
     return (
       <div className="min-h-screen bg-background flex flex-col pb-24">
         <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
             <ArrowLeft size={20} />
           </Button>
           <h1 className="text-lg font-semibold flex-1">{t('chapter') || 'Chapter'}</h1>
@@ -505,7 +505,7 @@ export default function Chapter() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate(-1)}
+          onClick={() => navigate('/')}
         >
           <ArrowLeft size={20} />
         </Button>
@@ -517,7 +517,8 @@ export default function Chapter() {
         >
           <Bookmark
             size={20}
-            className={chapter.isBookmarked ? 'fill-foreground' : ''}
+            className={chapter.isBookmarked ? 'fill-primary' : ''}
+            style={chapter.isBookmarked ? { color: '#F6A18A' } : undefined}
           />
         </Button>
       </div>
@@ -585,18 +586,24 @@ export default function Chapter() {
           <div className="mb-4 space-y-3">
             <div className="flex flex-wrap gap-2">
               <Button
-                variant={selectedTypeFilter === null ? 'default' : 'outline'}
+                variant={selectedTypeFilters.length === 0 ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setSelectedTypeFilter(null)}
+                onClick={() => setSelectedTypeFilters([])}
               >
                 {t('all') || 'All'}
               </Button>
               {resourceTypes.map((type) => (
                 <Button
                   key={type.id}
-                  variant={selectedTypeFilter === type.id ? 'default' : 'outline'}
+                  variant={selectedTypeFilters.includes(type.id) ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setSelectedTypeFilter(type.id)}
+                  onClick={() => {
+                    setSelectedTypeFilters(prev =>
+                      prev.includes(type.id)
+                        ? prev.filter(id => id !== type.id)
+                        : [...prev, type.id]
+                    );
+                  }}
                 >
                   {type.type}
                 </Button>
@@ -605,18 +612,24 @@ export default function Chapter() {
 
             <div className="flex flex-wrap gap-2">
               <Button
-                variant={selectedDevoirFilter === null ? 'default' : 'outline'}
+                variant={selectedDevoirFilters.length === 0 ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setSelectedDevoirFilter(null)}
+                onClick={() => setSelectedDevoirFilters([])}
               >
                 {t('allDevoirs') || 'All Types'}
               </Button>
               {devoirTypes.map((type) => (
                 <Button
                   key={type.id}
-                  variant={selectedDevoirFilter === type.id ? 'default' : 'outline'}
+                  variant={selectedDevoirFilters.includes(type.id) ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setSelectedDevoirFilter(type.id)}
+                  onClick={() => {
+                    setSelectedDevoirFilters(prev =>
+                      prev.includes(type.id)
+                        ? prev.filter(id => id !== type.id)
+                        : [...prev, type.id]
+                    );
+                  }}
                 >
                   {type.devoir_type}
                 </Button>
@@ -639,7 +652,7 @@ export default function Chapter() {
 
           <TabsContent value="questions" className="space-y-3">
             {questions.filter(q => 
-              (selectedTypeFilter === null || q.type_id === selectedTypeFilter)
+              (selectedTypeFilters.length === 0 || (q.type_id && selectedTypeFilters.includes(q.type_id)))
             ).length === 0 ? (
               <EmptyState
                 type="questions"
@@ -647,7 +660,7 @@ export default function Chapter() {
               />
             ) : (
               questions
-                .filter(q => selectedTypeFilter === null || q.type_id === selectedTypeFilter)
+                .filter(q => selectedTypeFilters.length === 0 || (q.type_id && selectedTypeFilters.includes(q.type_id)))
                 .map((question) => {
                   const questionType = resourceTypes.find(t => t.id === question.type_id);
                   return (
@@ -695,8 +708,8 @@ export default function Chapter() {
 
           <TabsContent value="resources" className="space-y-3">
             {resources.filter(r => 
-              (selectedTypeFilter === null || r.type_id === selectedTypeFilter) &&
-              (selectedDevoirFilter === null || r.devoir_type_id === selectedDevoirFilter) &&
+              (selectedTypeFilters.length === 0 || selectedTypeFilters.includes(r.type_id)) &&
+              (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
               (!showWithCorrectionOnly || r.with_correction)
             ).length === 0 ? (
               <EmptyState
@@ -706,8 +719,8 @@ export default function Chapter() {
             ) : (
               resources
                 .filter(r => 
-                  (selectedTypeFilter === null || r.type_id === selectedTypeFilter) &&
-                  (selectedDevoirFilter === null || r.devoir_type_id === selectedDevoirFilter) &&
+                  (selectedTypeFilters.length === 0 || selectedTypeFilters.includes(r.type_id)) &&
+                  (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
                   (!showWithCorrectionOnly || r.with_correction)
                 )
                 .map((resource) => {
