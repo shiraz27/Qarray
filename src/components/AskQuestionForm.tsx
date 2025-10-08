@@ -58,6 +58,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
       
       if (!user) {
         toast.error('Please login to ask a question');
+        setIsSubmitting(false);
         return;
       }
 
@@ -79,7 +80,13 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
         }
       }
 
-      const { error } = await supabase
+      console.log('Submitting question with:', { 
+        chapter_id: chapterId, 
+        resource_id: resourceId || null,
+        user_id: user.id 
+      });
+
+      const { data: insertedData, error } = await supabase
         .from('questions')
         .insert({
           chapter_id: chapterId,
@@ -87,17 +94,22 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
           data: questionData,
           type_id: typeId,
           contributors: [user.id],
-        });
+        })
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Insert error:', error);
+        throw error;
+      }
 
+      console.log('Question inserted successfully:', insertedData);
       toast.success('Question submitted successfully');
       form.reset();
       setMediaUrls([]);
       onSuccess();
     } catch (error) {
       console.error('Error submitting question:', error);
-      toast.error('Failed to submit question');
+      toast.error(`Failed to submit question: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }

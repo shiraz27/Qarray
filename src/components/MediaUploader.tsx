@@ -3,10 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Camera, Upload, Mic, Youtube, FileText, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { enhanceDocument, isMobileDevice } from '@/utils/documentScanner';
+import { ImagePreviewDialog } from './ImagePreviewDialog';
 
 interface MediaUploaderProps {
   onMediaUploaded: (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => void;
@@ -21,6 +23,11 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [previewImage, setPreviewImage] = useState<string>('');
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [isProcessingPreview, setIsProcessingPreview] = useState(false);
+  const [enhanceImages, setEnhanceImages] = useState(false);
+  const [fromCamera, setFromCamera] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -55,24 +62,62 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    await uploadToArchive(file, 'image');
+    
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPreviewImage(event.target?.result as string);
+      setPreviewFile(file);
+      setFromCamera(false);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPreviewImage(event.target?.result as string);
+      setPreviewFile(file);
+      setFromCamera(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleKeepImage = async () => {
+    if (!previewFile) return;
+    
+    setIsProcessingPreview(true);
     try {
-      // Enhance document image
-      toast.info('Enhancing document...');
-      const enhancedBlob = await enhanceDocument(file);
-      const enhancedFile = new File([enhancedBlob], file.name, { type: 'image/jpeg' });
-      await uploadToArchive(enhancedFile, 'image');
+      let fileToUpload = previewFile;
+      
+      // Apply enhancement if checkbox is checked and it's from camera
+      if (enhanceImages && fromCamera) {
+        toast.info('Enhancing document...');
+        const enhancedBlob = await enhanceDocument(previewFile);
+        fileToUpload = new File([enhancedBlob], previewFile.name, { type: 'image/jpeg' });
+      }
+      
+      await uploadToArchive(fileToUpload, 'image');
     } catch (error) {
-      console.error('Enhancement error:', error);
-      // Fallback to original image
-      await uploadToArchive(file, 'image');
+      console.error('Upload error:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setIsProcessingPreview(false);
+      setPreviewImage('');
+      setPreviewFile(null);
+      setFromCamera(false);
     }
+  };
+
+  const handleDiscardImage = () => {
+    setPreviewImage('');
+    setPreviewFile(null);
+    setFromCamera(false);
+    setIsProcessingPreview(false);
   };
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,7 +202,20 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
           <TabsContent value="image" className="space-y-3">
             <div>
               <Label htmlFor="image-upload">Upload Image</Label>
-              <div className="flex gap-2 mt-2">
+              <div className="flex items-center gap-2 mt-2 mb-3">
+                <Checkbox 
+                  id="enhance-images"
+                  checked={enhanceImages}
+                  onCheckedChange={(checked) => setEnhanceImages(checked as boolean)}
+                />
+                <label
+                  htmlFor="enhance-images"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Enhance document images (applies to camera photos)
+                </label>
+              </div>
+              <div className="flex gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -201,6 +259,14 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
             </div>
           </TabsContent>
         )}
+
+        <ImagePreviewDialog
+          open={!!previewImage}
+          imageUrl={previewImage}
+          isProcessing={isProcessingPreview}
+          onKeep={handleKeepImage}
+          onDiscard={handleDiscardImage}
+        />
 
         {acceptedTypes.includes('video') && (
           <TabsContent value="video" className="space-y-3">
