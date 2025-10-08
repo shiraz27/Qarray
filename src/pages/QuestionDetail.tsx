@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, ThumbsUp, ThumbsDown, MessageSquare, Edit, Trash2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ThumbsUp, ThumbsDown, MessageSquare, Edit, Trash2, AlertCircle, Share2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { ContentSkeleton } from '@/components/LoadingSkeleton';
@@ -293,6 +293,16 @@ export default function QuestionDetail() {
     else if (tab === 'profile') navigate('/profile');
   };
 
+  const handleShare = () => {
+    const url = window.location.href;
+    const message = `Check out this question on Qarray - A free e-learning platform for student collaboration! 🎓\n\n${url}`;
+    navigator.clipboard.writeText(message);
+    toast({
+      title: 'Link copied!',
+      description: 'Share this question with your friends',
+    });
+  };
+
   const isOwner = user && question?.contributors?.includes(user.id);
 
   if (loading) {
@@ -395,6 +405,10 @@ export default function QuestionDetail() {
                 />
                 <span className="text-sm font-medium">{question.downvotes}</span>
               </button>
+              <Button variant="outline" size="sm" onClick={handleShare}>
+                <Share2 size={16} className="mr-1" />
+                Share
+              </Button>
             </div>
           </div>
 

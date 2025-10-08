@@ -52,9 +52,9 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
     return (
       <Card className={`overflow-hidden ${className}`}>
         <iframe
-          src={url}
+          src={`${url}#view=FitH`}
           width="100%"
-          height="600"
+          height="200"
           title="PDF viewer"
           className="w-full border-0"
         />

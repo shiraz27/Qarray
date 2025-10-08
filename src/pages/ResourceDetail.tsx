@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, ThumbsUp, ThumbsDown, FileText, Edit, Trash2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ThumbsUp, ThumbsDown, FileText, Edit, Trash2, AlertCircle, Share2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { ContentSkeleton } from '@/components/LoadingSkeleton';
@@ -246,6 +246,16 @@ export default function ResourceDetail() {
     else if (tab === 'profile') navigate('/profile');
   };
 
+  const handleShare = () => {
+    const url = window.location.href;
+    const message = `Check out this resource on Qarray - A free e-learning platform for student collaboration! 🎓\n\n${url}`;
+    navigator.clipboard.writeText(message);
+    toast({
+      title: 'Link copied!',
+      description: 'Share this resource with your friends',
+    });
+  };
+
   const getDisplayName = (url: string) => {
     if (url.includes('youtube.com') || url.includes('youtu.be')) return '📹 YouTube Video';
     if (url.includes('.pdf')) return '📄 PDF Document';
@@ -353,6 +363,10 @@ export default function ResourceDetail() {
                 />
                 <span className="text-sm font-medium">{resource.downvotes}</span>
               </button>
+              <Button variant="outline" size="sm" onClick={handleShare}>
+                <Share2 size={16} className="mr-1" />
+                Share
+              </Button>
             </div>
           </div>
 
