@@ -8,7 +8,7 @@ import { Camera, Upload, Mic, Youtube, FileText, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { enhanceDocument, isMobileDevice } from '@/utils/documentScanner';
-import { ImagePreviewDialog } from './ImagePreviewDialog';
+import { MediaPreviewDialog } from './MediaPreviewDialog';
 
 interface MediaUploaderProps {
   onMediaUploaded: (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => void;
@@ -23,8 +23,9 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [previewImage, setPreviewImage] = useState<string>('');
+  const [previewUrl, setPreviewUrl] = useState<string>('');
   const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [previewType, setPreviewType] = useState<'image' | 'audio' | 'pdf' | null>(null);
   const [isProcessingPreview, setIsProcessingPreview] = useState(false);
   const [enhanceImages, setEnhanceImages] = useState(false);
   const [fromCamera, setFromCamera] = useState(false);
@@ -66,8 +67,9 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     // Show preview
     const reader = new FileReader();
     reader.onload = (event) => {
-      setPreviewImage(event.target?.result as string);
+      setPreviewUrl(event.target?.result as string);
       setPreviewFile(file);
+      setPreviewType('image');
       setFromCamera(false);
     };
     reader.readAsDataURL(file);
@@ -80,51 +82,64 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     // Show preview
     const reader = new FileReader();
     reader.onload = (event) => {
-      setPreviewImage(event.target?.result as string);
+      setPreviewUrl(event.target?.result as string);
       setPreviewFile(file);
+      setPreviewType('image');
       setFromCamera(true);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleKeepImage = async () => {
-    if (!previewFile) return;
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPreviewUrl(event.target?.result as string);
+      setPreviewFile(file);
+      setPreviewType('pdf');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleKeepFile = async () => {
+    if (!previewFile || !previewType) return;
     
     setIsProcessingPreview(true);
     try {
       let fileToUpload = previewFile;
       
-      // Apply enhancement if checkbox is checked and it's from camera
-      if (enhanceImages && fromCamera) {
+      // Apply enhancement if checkbox is checked, it's an image, and from camera
+      if (previewType === 'image' && enhanceImages && fromCamera) {
         toast.info('Enhancing document...');
         const enhancedBlob = await enhanceDocument(previewFile);
         fileToUpload = new File([enhancedBlob], previewFile.name, { type: 'image/jpeg' });
       }
       
-      await uploadToArchive(fileToUpload, 'image');
+      await uploadToArchive(fileToUpload, previewType === 'pdf' ? 'pdf' : previewType);
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Failed to upload image');
+      toast.error('Failed to upload file');
     } finally {
       setIsProcessingPreview(false);
-      setPreviewImage('');
+      setPreviewUrl('');
       setPreviewFile(null);
+      setPreviewType(null);
       setFromCamera(false);
+      setAudioBlob(null); // Clear audio blob after upload
     }
   };
 
-  const handleDiscardImage = () => {
-    setPreviewImage('');
+  const handleDiscardFile = () => {
+    setPreviewUrl('');
     setPreviewFile(null);
+    setPreviewType(null);
     setFromCamera(false);
     setIsProcessingPreview(false);
   };
 
-  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await uploadToArchive(file, 'pdf');
-  };
 
   const handleYoutubeSubmit = () => {
     if (!youtubeUrl) {
@@ -180,12 +195,16 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     }
   };
 
-  const uploadRecording = async () => {
+  const handlePreviewRecording = () => {
     if (!audioBlob) return;
     
+    // Create preview URL for audio
+    const audioUrl = URL.createObjectURL(audioBlob);
     const file = new File([audioBlob], `recording-${Date.now()}.webm`, { type: 'audio/webm' });
-    await uploadToArchive(file, 'audio');
-    setAudioBlob(null);
+    
+    setPreviewUrl(audioUrl);
+    setPreviewFile(file);
+    setPreviewType('audio');
   };
 
   return (
@@ -260,12 +279,13 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
           </TabsContent>
         )}
 
-        <ImagePreviewDialog
-          open={!!previewImage}
-          imageUrl={previewImage}
+        <MediaPreviewDialog
+          open={!!previewUrl}
+          mediaUrl={previewUrl}
+          mediaType={previewType}
           isProcessing={isProcessingPreview}
-          onKeep={handleKeepImage}
-          onDiscard={handleDiscardImage}
+          onKeep={handleKeepFile}
+          onDiscard={handleDiscardFile}
         />
 
         {acceptedTypes.includes('video') && (
@@ -311,16 +331,11 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
                   <>
                     <Button 
                       type="button" 
-                      onClick={uploadRecording} 
-                      disabled={isUploading}
+                      onClick={handlePreviewRecording} 
                       className="flex-1"
                     >
-                      {isUploading ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Upload className="mr-2 h-4 w-4" />
-                      )}
-                      Upload Recording
+                      <Upload className="mr-2 h-4 w-4" />
+                      Preview Recording
                     </Button>
                     <Button 
                       type="button" 
