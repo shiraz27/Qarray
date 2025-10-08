@@ -7,38 +7,33 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 
-const questionSchema = z.object({
-  question: z.string().min(10, 'Question must be at least 10 characters').max(500, 'Question must be less than 500 characters'),
+const answerSchema = z.object({
+  answer: z.string().min(10, 'Answer must be at least 10 characters').max(1000, 'Answer must be less than 1000 characters'),
 });
 
-type QuestionFormData = z.infer<typeof questionSchema>;
+type AnswerFormData = z.infer<typeof answerSchema>;
 
-interface AskQuestionFormProps {
-  chapterId: number;
-  resourceTypes: Array<{ id: number; type: string }>;
+interface AnswerQuestionFormProps {
+  questionId: number;
   onSuccess: () => void;
   onCancel: () => void;
-  resourceId?: number;
 }
 
-export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({ 
-  chapterId, 
-  resourceTypes,
+export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({ 
+  questionId, 
   onSuccess, 
-  onCancel,
-  resourceId
+  onCancel 
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   
-  const form = useForm<QuestionFormData>({
-    resolver: zodResolver(questionSchema),
+  const form = useForm<AnswerFormData>({
+    resolver: zodResolver(answerSchema),
     defaultValues: {
-      question: '',
+      answer: '',
     },
   });
 
@@ -51,53 +46,38 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
     setMediaUrls(prev => prev.filter((_, i) => i !== index));
   };
 
-  const onSubmit = async (data: QuestionFormData) => {
+  const onSubmit = async (data: AnswerFormData) => {
     setIsSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        toast.error('Please login to ask a question');
+        toast.error('Please login to answer');
         return;
       }
 
-      // Combine question text with media URLs
-      const questionData = mediaUrls.length > 0 
-        ? `${data.question}\n\nAttachments:\n${mediaUrls.join('\n')}`
-        : data.question;
-
-      // Auto-detect type based on media
-      let typeId = 1; // Default type
-      if (mediaUrls.length > 0) {
-        const firstUrl = mediaUrls[0].toLowerCase();
-        if (firstUrl.includes('youtube') || firstUrl.includes('youtu.be')) {
-          typeId = 2; // Video type
-        } else if (firstUrl.includes('.pdf')) {
-          typeId = 3; // Document type
-        } else if (firstUrl.includes('archive.org') && firstUrl.includes('audio')) {
-          typeId = 4; // Audio type
-        }
-      }
+      // Combine answer text with media URLs
+      const answerData = mediaUrls.length > 0 
+        ? `${data.answer}\n\nAttachments:\n${mediaUrls.join('\n')}`
+        : data.answer;
 
       const { error } = await supabase
-        .from('questions')
+        .from('answers')
         .insert({
-          chapter_id: chapterId,
-          resource_id: resourceId || null,
-          data: questionData,
-          type_id: typeId,
+          question_id: questionId,
+          data: answerData,
           contributors: [user.id],
         });
 
       if (error) throw error;
 
-      toast.success('Question submitted successfully');
+      toast.success('Answer submitted successfully');
       form.reset();
       setMediaUrls([]);
       onSuccess();
     } catch (error) {
-      console.error('Error submitting question:', error);
-      toast.error('Failed to submit question');
+      console.error('Error submitting answer:', error);
+      toast.error('Failed to submit answer');
     } finally {
       setIsSubmitting(false);
     }
@@ -108,13 +88,13 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
-          name="question"
+          name="answer"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Your Question</FormLabel>
+              <FormLabel>Your Answer</FormLabel>
               <FormControl>
                 <Textarea 
-                  placeholder="Ask your question here..."
+                  placeholder="Write your answer here..."
                   className="min-h-32 resize-none"
                   {...field}
                 />
@@ -132,7 +112,6 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
             <div className="mt-3 space-y-2">
               <p className="text-sm font-medium">Added attachments:</p>
               {mediaUrls.map((url, index) => {
-                // Extract filename or create friendly name
                 let displayName = 'Attachment ' + (index + 1);
                 if (url.includes('youtube.com') || url.includes('youtu.be')) {
                   displayName = '📹 YouTube Video';
@@ -174,7 +153,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Submit Question
+            Submit Answer
           </Button>
         </div>
       </form>

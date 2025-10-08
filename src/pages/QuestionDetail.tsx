@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MediaPreview } from '@/components/MediaPreview';
 import { UserAvatar } from '@/components/UserAvatar';
+import { AnswerQuestionForm } from '@/components/AnswerQuestionForm';
 
 interface Question {
   id: number;
@@ -52,6 +53,8 @@ export default function QuestionDetail() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editedData, setEditedData] = useState('');
+  const [isAnswerDialogOpen, setIsAnswerDialogOpen] = useState(false);
+  const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
 
   useEffect(() => {
     const getUser = async () => {
@@ -453,7 +456,27 @@ export default function QuestionDetail() {
 
       {/* Answers Section */}
       <div className="flex-1 px-4 space-y-3">
-        <h2 className="text-lg font-semibold">{t('answers') || 'Answers'}</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">{t('answers') || 'Answers'}</h2>
+          <Dialog open={isAnswerDialogOpen} onOpenChange={setIsAnswerDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">Add Answer</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Answer this Question</DialogTitle>
+              </DialogHeader>
+              <AnswerQuestionForm
+                questionId={Number(id)}
+                onSuccess={() => {
+                  setIsAnswerDialogOpen(false);
+                  window.location.reload();
+                }}
+                onCancel={() => setIsAnswerDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
         {answers.length === 0 ? (
           <Card className="p-8 text-center">
             <p className="text-muted-foreground">No answers yet</p>

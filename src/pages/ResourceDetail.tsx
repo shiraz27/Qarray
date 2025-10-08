@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MediaPreview } from '@/components/MediaPreview';
 import { UserAvatar } from '@/components/UserAvatar';
+import { AskQuestionForm } from '@/components/AskQuestionForm';
 
 interface Resource {
   id: number;
@@ -27,6 +28,7 @@ interface Resource {
   created_at: string;
   verified: boolean;
   published_by: string | null;
+  chapter_id: number | null;
   upvotes: number;
   downvotes: number;
   userVote: string | null;
@@ -45,6 +47,8 @@ export default function ResourceDetail() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const [editedDescription, setEditedDescription] = useState('');
+  const [isAskQuestionDialogOpen, setIsAskQuestionDialogOpen] = useState(false);
+  const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
 
   useEffect(() => {
     const getUser = async () => {
@@ -119,6 +123,17 @@ export default function ResourceDetail() {
 
     fetchResource();
   }, [id, user, navigate, toast]);
+
+  useEffect(() => {
+    const fetchResourceTypes = async () => {
+      const { data } = await supabase
+        .from('resource_types')
+        .select('id, type')
+        .order('id');
+      if (data) setResourceTypes(data);
+    };
+    fetchResourceTypes();
+  }, []);
 
   const handleVote = async (voteType: string, currentVote: string | null) => {
     if (!user || !resource) {
@@ -428,6 +443,35 @@ export default function ResourceDetail() {
             <MediaPreview url={url} />
           </div>
         ))}
+      </div>
+
+      {/* Questions Section */}
+      <div className="px-4 py-6 border-t">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Questions about this resource</h2>
+          <Dialog open={isAskQuestionDialogOpen} onOpenChange={setIsAskQuestionDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">Ask Question</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Ask a Question</DialogTitle>
+              </DialogHeader>
+              {resource.chapter_id && (
+                <AskQuestionForm
+                  chapterId={resource.chapter_id}
+                  resourceId={resource.id}
+                  resourceTypes={resourceTypes}
+                  onSuccess={() => {
+                    setIsAskQuestionDialogOpen(false);
+                    window.location.reload();
+                  }}
+                  onCancel={() => setIsAskQuestionDialogOpen(false)}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
