@@ -32,7 +32,7 @@ export const BottomNavigation: React.FC = () => {
   };
 
   return (
-    <footer className="bg-white w-full border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+    <footer className="bg-white w-full border-t border-gray-100 shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
       <nav className="flex w-full items-center text-xs font-medium whitespace-nowrap text-center justify-around px-4 py-3" aria-label="Main navigation">
         {navigationItems.map((item) => {
           const isActive = activeItem === item.id;
