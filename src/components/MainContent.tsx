@@ -212,18 +212,20 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
                   <h3 className="font-semibold text-sm tracking-wide text-foreground flex-1">
                     {chapter.name.toUpperCase()}
                   </h3>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleBookmark(chapter.id, chapter.isBookmarked);
-                    }}
-                    className="hover:scale-110 transition-transform"
-                  >
-                    <Bookmark
-                      size={20}
-                      className={`text-foreground ${chapter.isBookmarked ? 'fill-foreground' : ''}`}
-                    />
-                  </button>
+                  {hasContent && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleBookmark(chapter.id, chapter.isBookmarked);
+                      }}
+                      className="hover:scale-110 transition-transform"
+                    >
+                      <Bookmark
+                        size={20}
+                        className={`text-foreground ${chapter.isBookmarked ? 'fill-foreground' : ''}`}
+                      />
+                    </button>
+                  )}
                 </div>
                 
                 <div className="flex gap-4 text-xs">
