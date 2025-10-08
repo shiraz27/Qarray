@@ -29,7 +29,18 @@ const resources = {
       cancel: "Cancel",
       delete: "Delete",
       accountDeleted: "Account deleted successfully",
-      verifyEmail: "Please check your email to verify your account before signing in."
+      verifyEmail: "Please check your email to verify your account before signing in.",
+      completeProfile: "Complete Your Profile",
+      completeProfileSubtitle: "Enter your details to complete your profile",
+      phoneNumber: "Phone Number",
+      gouvernorat: "Gouvernorat",
+      selectGouvernorat: "Select Gouvernorat",
+      classe: "Class",
+      selectClasse: "Select Class",
+      lycee: "High School",
+      selectLycee: "Select High School (Optional)",
+      complete: "Complete",
+      profileCompleted: "Profile completed successfully!"
     }
   },
   fr: {
@@ -59,7 +70,18 @@ const resources = {
       cancel: "Annuler",
       delete: "Supprimer",
       accountDeleted: "Compte supprimé avec succès",
-      verifyEmail: "Veuillez vérifier votre e-mail pour activer votre compte avant de vous connecter."
+      verifyEmail: "Veuillez vérifier votre e-mail pour activer votre compte avant de vous connecter.",
+      completeProfile: "Complétez Votre Profil",
+      completeProfileSubtitle: "Entrez vos détails pour compléter votre profil",
+      phoneNumber: "Numéro de Téléphone",
+      gouvernorat: "Gouvernorat",
+      selectGouvernorat: "Sélectionner Gouvernorat",
+      classe: "Classe",
+      selectClasse: "Sélectionner Classe",
+      lycee: "Lycée",
+      selectLycee: "Sélectionner Lycée (Optionnel)",
+      complete: "Terminer",
+      profileCompleted: "Profil complété avec succès!"
     }
   },
   ar: {
@@ -89,7 +111,18 @@ const resources = {
       cancel: "إلغاء",
       delete: "حذف",
       accountDeleted: "تم حذف الحساب بنجاح",
-      verifyEmail: "يرجى التحقق من بريدك الإلكتروني لتفعيل حسابك قبل تسجيل الدخول."
+      verifyEmail: "يرجى التحقق من بريدك الإلكتروني لتفعيل حسابك قبل تسجيل الدخول.",
+      completeProfile: "أكمل ملفك الشخصي",
+      completeProfileSubtitle: "أدخل تفاصيلك لإكمال ملفك الشخصي",
+      phoneNumber: "رقم الهاتف",
+      gouvernorat: "الولاية",
+      selectGouvernorat: "اختر الولاية",
+      classe: "القسم",
+      selectClasse: "اختر القسم",
+      lycee: "المعهد",
+      selectLycee: "اختر المعهد (اختياري)",
+      complete: "إتمام",
+      profileCompleted: "تم إكمال الملف الشخصي بنجاح!"
     }
   }
 };

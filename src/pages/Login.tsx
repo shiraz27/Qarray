@@ -38,7 +38,8 @@ const Login: React.FC = () => {
           title: t('success'),
           description: t('verifyEmail'),
         });
-        setIsSignUp(false);
+        // Redirect to complete profile after signup
+        navigate('/complete-profile');
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,

@@ -96,6 +96,19 @@ const Index: React.FC = () => {
         setSession(session);
         if (!session) {
           navigate('/login');
+        } else {
+          // Check if profile is complete
+          setTimeout(async () => {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('phone_number, state_id, class_id')
+              .eq('user_id', session.user.id)
+              .single();
+            
+            if (!profile || !profile.phone_number || !profile.state_id || !profile.class_id) {
+              navigate('/complete-profile');
+            }
+          }, 0);
         }
       }
     );
@@ -105,6 +118,19 @@ const Index: React.FC = () => {
       setSession(session);
       if (!session) {
         navigate('/login');
+      } else {
+        // Check if profile is complete
+        setTimeout(async () => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('phone_number, state_id, class_id')
+            .eq('user_id', session.user.id)
+            .single();
+          
+          if (!profile || !profile.phone_number || !profile.state_id || !profile.class_id) {
+            navigate('/complete-profile');
+          }
+        }, 0);
       }
     });
 
