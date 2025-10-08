@@ -109,7 +109,8 @@ const Login: React.FC = () => {
             <span className="font-medium">Facebook</span>
           </Button>
 
-          <Button
+          {/* Google login - commented out temporarily */}
+          {/* <Button
             onClick={() => handleSocialLogin('google')}
             variant="outline"
             className="w-full h-12 flex items-center justify-center gap-3 border-2 hover:bg-gray-50"
@@ -133,7 +134,7 @@ const Login: React.FC = () => {
               />
             </svg>
             <span className="font-medium">Google</span>
-          </Button>
+          </Button> */}
         </div>
 
         {/* Divider */}
