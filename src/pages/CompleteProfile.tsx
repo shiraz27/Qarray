@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,17 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import qarayLogo from '@/assets/qarray-logo-new.png';
 
+interface State {
+  id: number;
+  name: string;
+}
+
+interface Institute {
+  id: string;
+  name: string;
+  state_id: number;
+}
+
 const CompleteProfile: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -24,6 +35,68 @@ const CompleteProfile: React.FC = () => {
   const [stateId, setStateId] = useState('');
   const [classId, setClassId] = useState('');
   const [instituteId, setInstituteId] = useState('');
+  const [states, setStates] = useState<State[]>([]);
+  const [institutes, setInstitutes] = useState<Institute[]>([]);
+  const [loadingStates, setLoadingStates] = useState(true);
+  const [loadingInstitutes, setLoadingInstitutes] = useState(false);
+
+  // Fetch states on component mount
+  useEffect(() => {
+    const fetchStates = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('states')
+          .select('id, name')
+          .order('name');
+
+        if (error) throw error;
+        setStates(data || []);
+      } catch (error: any) {
+        toast({
+          title: t('error'),
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingStates(false);
+      }
+    };
+
+    fetchStates();
+  }, [toast, t]);
+
+  // Fetch institutes when state changes
+  useEffect(() => {
+    if (!stateId) {
+      setInstitutes([]);
+      setInstituteId('');
+      return;
+    }
+
+    const fetchInstitutes = async () => {
+      setLoadingInstitutes(true);
+      try {
+        const { data, error } = await supabase
+          .from('institutes')
+          .select('id, name, state_id')
+          .eq('state_id', parseInt(stateId))
+          .order('name');
+
+        if (error) throw error;
+        setInstitutes(data || []);
+      } catch (error: any) {
+        toast({
+          title: t('error'),
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingInstitutes(false);
+      }
+    };
+
+    fetchInstitutes();
+  }, [stateId, toast, t]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,35 +183,16 @@ const CompleteProfile: React.FC = () => {
 
           <div>
             <Label htmlFor="state">{t('gouvernorat')}</Label>
-            <Select value={stateId} onValueChange={setStateId} required>
+            <Select value={stateId} onValueChange={setStateId} required disabled={loadingStates}>
               <SelectTrigger className="h-12">
-                <SelectValue placeholder={t('selectGouvernorat')} />
+                <SelectValue placeholder={loadingStates ? t('loading') : t('selectGouvernorat')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1">Tunis</SelectItem>
-                <SelectItem value="2">Ariana</SelectItem>
-                <SelectItem value="3">Ben Arous</SelectItem>
-                <SelectItem value="4">Manouba</SelectItem>
-                <SelectItem value="5">Nabeul</SelectItem>
-                <SelectItem value="6">Zaghouan</SelectItem>
-                <SelectItem value="7">Bizerte</SelectItem>
-                <SelectItem value="8">Béja</SelectItem>
-                <SelectItem value="9">Jendouba</SelectItem>
-                <SelectItem value="10">Kef</SelectItem>
-                <SelectItem value="11">Siliana</SelectItem>
-                <SelectItem value="12">Sousse</SelectItem>
-                <SelectItem value="13">Monastir</SelectItem>
-                <SelectItem value="14">Mahdia</SelectItem>
-                <SelectItem value="15">Sfax</SelectItem>
-                <SelectItem value="16">Kairouan</SelectItem>
-                <SelectItem value="17">Kasserine</SelectItem>
-                <SelectItem value="18">Sidi Bouzid</SelectItem>
-                <SelectItem value="19">Gabès</SelectItem>
-                <SelectItem value="20">Médenine</SelectItem>
-                <SelectItem value="21">Tataouine</SelectItem>
-                <SelectItem value="22">Gafsa</SelectItem>
-                <SelectItem value="23">Tozeur</SelectItem>
-                <SelectItem value="24">Kebili</SelectItem>
+                {states.map((state) => (
+                  <SelectItem key={state.id} value={state.id.toString()}>
+                    {state.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -163,12 +217,34 @@ const CompleteProfile: React.FC = () => {
 
           <div>
             <Label htmlFor="institute">{t('lycee')}</Label>
-            <Select value={instituteId} onValueChange={setInstituteId}>
+            <Select 
+              value={instituteId} 
+              onValueChange={setInstituteId}
+              disabled={!stateId || loadingInstitutes}
+            >
               <SelectTrigger className="h-12">
-                <SelectValue placeholder={t('selectLycee')} />
+                <SelectValue 
+                  placeholder={
+                    !stateId 
+                      ? t('selectGouvernoratFirst')
+                      : loadingInstitutes 
+                      ? t('loading')
+                      : t('selectLycee')
+                  } 
+                />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="placeholder">-- {t('selectLycee')} --</SelectItem>
+                {institutes.length === 0 && !loadingInstitutes ? (
+                  <SelectItem value="none" disabled>
+                    {t('noInstitutesFound')}
+                  </SelectItem>
+                ) : (
+                  institutes.map((institute) => (
+                    <SelectItem key={institute.id} value={institute.id}>
+                      {institute.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>

@@ -40,7 +40,9 @@ const resources = {
       lycee: "High School",
       selectLycee: "Select High School (Optional)",
       complete: "Complete",
-      profileCompleted: "Profile completed successfully!"
+      profileCompleted: "Profile completed successfully!",
+      selectGouvernoratFirst: "Select a gouvernorat first",
+      noInstitutesFound: "No institutes found in this gouvernorat"
     }
   },
   fr: {
@@ -81,7 +83,9 @@ const resources = {
       lycee: "Lycée",
       selectLycee: "Sélectionner Lycée (Optionnel)",
       complete: "Terminer",
-      profileCompleted: "Profil complété avec succès!"
+      profileCompleted: "Profil complété avec succès!",
+      selectGouvernoratFirst: "Sélectionnez d'abord un gouvernorat",
+      noInstitutesFound: "Aucun institut trouvé dans ce gouvernorat"
     }
   },
   ar: {
@@ -122,7 +126,9 @@ const resources = {
       lycee: "المعهد",
       selectLycee: "اختر المعهد (اختياري)",
       complete: "إتمام",
-      profileCompleted: "تم إكمال الملف الشخصي بنجاح!"
+      profileCompleted: "تم إكمال الملف الشخصي بنجاح!",
+      selectGouvernoratFirst: "اختر ولاية أولاً",
+      noInstitutesFound: "لم يتم العثور على معاهد في هذه الولاية"
     }
   }
 };
