@@ -42,7 +42,9 @@ const resources = {
       complete: "Complete",
       profileCompleted: "Profile completed successfully!",
       selectGouvernoratFirst: "Select a gouvernorat first",
-      noInstitutesFound: "No institutes found in this gouvernorat"
+      noInstitutesFound: "No institutes found in this gouvernorat",
+      searchInstitute: "Search institute...",
+      noResults: "No results found"
     }
   },
   fr: {
@@ -85,7 +87,9 @@ const resources = {
       complete: "Terminer",
       profileCompleted: "Profil complété avec succès!",
       selectGouvernoratFirst: "Sélectionnez d'abord un gouvernorat",
-      noInstitutesFound: "Aucun institut trouvé dans ce gouvernorat"
+      noInstitutesFound: "Aucun institut trouvé dans ce gouvernorat",
+      searchInstitute: "Rechercher un institut...",
+      noResults: "Aucun résultat trouvé"
     }
   },
   ar: {
@@ -128,7 +132,9 @@ const resources = {
       complete: "إتمام",
       profileCompleted: "تم إكمال الملف الشخصي بنجاح!",
       selectGouvernoratFirst: "اختر ولاية أولاً",
-      noInstitutesFound: "لم يتم العثور على معاهد في هذه الولاية"
+      noInstitutesFound: "لم يتم العثور على معاهد في هذه الولاية",
+      searchInstitute: "ابحث عن معهد...",
+      noResults: "لم يتم العثور على نتائج"
     }
   }
 };

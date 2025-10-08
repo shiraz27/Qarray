@@ -10,6 +10,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +54,7 @@ const CompleteProfile: React.FC = () => {
   const [institutes, setInstitutes] = useState<Institute[]>([]);
   const [loadingStates, setLoadingStates] = useState(true);
   const [loadingInstitutes, setLoadingInstitutes] = useState(false);
+  const [openInstitute, setOpenInstitute] = useState(false);
 
   // Fetch states on component mount
   useEffect(() => {
@@ -84,6 +100,9 @@ const CompleteProfile: React.FC = () => {
 
         if (error) throw error;
         setInstitutes(data || []);
+        
+        // Reset institute selection when state changes
+        setInstituteId('');
       } catch (error: any) {
         toast({
           title: t('error'),
@@ -217,36 +236,61 @@ const CompleteProfile: React.FC = () => {
 
           <div>
             <Label htmlFor="institute">{t('lycee')}</Label>
-            <Select 
-              value={instituteId} 
-              onValueChange={setInstituteId}
-              disabled={!stateId || loadingInstitutes}
-            >
-              <SelectTrigger className="h-12">
-                <SelectValue 
-                  placeholder={
-                    !stateId 
-                      ? t('selectGouvernoratFirst')
-                      : loadingInstitutes 
-                      ? t('loading')
-                      : t('selectLycee')
-                  } 
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {institutes.length === 0 && !loadingInstitutes ? (
-                  <SelectItem value="none" disabled>
-                    {t('noInstitutesFound')}
-                  </SelectItem>
-                ) : (
-                  institutes.map((institute) => (
-                    <SelectItem key={institute.id} value={institute.id}>
-                      {institute.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+            <Popover open={openInstitute} onOpenChange={setOpenInstitute}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openInstitute}
+                  disabled={!stateId || loadingInstitutes}
+                  className={cn(
+                    "w-full h-12 justify-between",
+                    !instituteId && "text-muted-foreground"
+                  )}
+                >
+                  {instituteId
+                    ? institutes.find((institute) => institute.id === instituteId)?.name
+                    : !stateId 
+                    ? t('selectGouvernoratFirst')
+                    : loadingInstitutes
+                    ? t('loading')
+                    : t('selectLycee')}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command>
+                  <CommandInput placeholder={t('searchInstitute')} />
+                  <CommandList>
+                    <CommandEmpty>
+                      {institutes.length === 0 && !loadingInstitutes 
+                        ? t('noInstitutesFound')
+                        : t('noResults')}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {institutes.map((institute) => (
+                        <CommandItem
+                          key={institute.id}
+                          value={institute.name}
+                          onSelect={() => {
+                            setInstituteId(institute.id);
+                            setOpenInstitute(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              instituteId === institute.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {institute.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <Button 
