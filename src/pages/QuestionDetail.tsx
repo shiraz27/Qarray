@@ -10,11 +10,11 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { ContentSkeleton } from '@/components/LoadingSkeleton';
 import chapterPattern from '@/assets/chapter-pattern.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MediaPreview } from '@/components/MediaPreview';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AnswerQuestionForm } from '@/components/AnswerQuestionForm';
+import { EditQuestionForm } from '@/components/EditQuestionForm';
 
 interface Question {
   id: number;
@@ -52,7 +52,6 @@ export default function QuestionDetail() {
   const [activeTab, setActiveTab] = useState('subjects');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [editedData, setEditedData] = useState('');
   const [isAnswerDialogOpen, setIsAnswerDialogOpen] = useState(false);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
 
@@ -224,42 +223,6 @@ export default function QuestionDetail() {
     window.location.reload();
   };
 
-  const handleEdit = async () => {
-    if (!editedData.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Question cannot be empty',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const questionId = Number(id);
-    if (isNaN(questionId)) return;
-
-    const { error } = await supabase
-      .from('questions')
-      .update({ data: editedData })
-      .eq('id', questionId);
-
-    if (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update question',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    toast({
-      title: 'Success',
-      description: 'Question updated successfully',
-    });
-
-    setIsEditDialogOpen(false);
-    window.location.reload();
-  };
-
   const handleDelete = async () => {
     const questionId = Number(id);
     if (isNaN(questionId)) return;
@@ -419,25 +382,24 @@ export default function QuestionDetail() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setEditedData(question.data)}
                   >
                     <Edit size={16} className="mr-1" />
                     Edit
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Edit Question</DialogTitle>
                   </DialogHeader>
-                  <Textarea
-                    value={editedData}
-                    onChange={(e) => setEditedData(e.target.value)}
-                    rows={4}
+                  <EditQuestionForm
+                    questionId={question.id}
+                    initialData={question.data}
+                    onSuccess={() => {
+                      setIsEditDialogOpen(false);
+                      window.location.reload();
+                    }}
+                    onCancel={() => setIsEditDialogOpen(false)}
                   />
-                  <div className="flex gap-2 justify-end">
-                    <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-                    <Button onClick={handleEdit}>Save</Button>
-                  </div>
                 </DialogContent>
               </Dialog>
 

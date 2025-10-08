@@ -10,12 +10,11 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { ContentSkeleton } from '@/components/LoadingSkeleton';
 import chapterPattern from '@/assets/chapter-pattern.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MediaPreview } from '@/components/MediaPreview';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
+import { EditResourceForm } from '@/components/EditResourceForm';
 
 interface Resource {
   id: number;
@@ -45,10 +44,9 @@ export default function ResourceDetail() {
   const [activeTab, setActiveTab] = useState('subjects');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [editedTitle, setEditedTitle] = useState('');
-  const [editedDescription, setEditedDescription] = useState('');
   const [isAskQuestionDialogOpen, setIsAskQuestionDialogOpen] = useState(false);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
+  const [devoirTypes, setDevoirTypes] = useState<Array<{ id: number; devoir_type: string }>>([]);
 
   useEffect(() => {
     const getUser = async () => {
@@ -126,11 +124,17 @@ export default function ResourceDetail() {
 
   useEffect(() => {
     const fetchResourceTypes = async () => {
-      const { data } = await supabase
+      const { data: types } = await supabase
         .from('resource_types')
         .select('id, type')
         .order('id');
-      if (data) setResourceTypes(data);
+      if (types) setResourceTypes(types);
+
+      const { data: devoirTypesData } = await supabase
+        .from('devoir_types')
+        .select('id, devoir_type')
+        .order('id');
+      if (devoirTypesData) setDevoirTypes(devoirTypesData);
     };
     fetchResourceTypes();
   }, []);
@@ -171,45 +175,6 @@ export default function ResourceDetail() {
     }
 
     // Refresh data
-    window.location.reload();
-  };
-
-  const handleEdit = async () => {
-    if (!editedTitle.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Title cannot be empty',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const resourceId = Number(id);
-    if (isNaN(resourceId)) return;
-
-    const { error } = await supabase
-      .from('resources')
-      .update({ 
-        title: editedTitle,
-        description: editedDescription,
-      })
-      .eq('id', resourceId);
-
-    if (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update resource',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    toast({
-      title: 'Success',
-      description: 'Resource updated successfully',
-    });
-
-    setIsEditDialogOpen(false);
     window.location.reload();
   };
 
@@ -377,36 +342,33 @@ export default function ResourceDetail() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      setEditedTitle(resource.title);
-                      setEditedDescription(resource.description);
-                    }}
                   >
                     <Edit size={16} className="mr-1" />
                     Edit
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Edit Resource</DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-4">
-                    <Input
-                      placeholder="Title"
-                      value={editedTitle}
-                      onChange={(e) => setEditedTitle(e.target.value)}
-                    />
-                    <Textarea
-                      placeholder="Description"
-                      value={editedDescription}
-                      onChange={(e) => setEditedDescription(e.target.value)}
-                      rows={4}
-                    />
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-                    <Button onClick={handleEdit}>Save</Button>
-                  </div>
+                  <EditResourceForm
+                    resourceId={resource.id}
+                    initialData={{
+                      title: resource.title,
+                      description: resource.description,
+                      data: resource.data,
+                      type_id: resource.type_id,
+                      devoir_type_id: resource.devoir_type_id,
+                      with_correction: resource.with_correction,
+                    }}
+                    resourceTypes={resourceTypes}
+                    devoirTypes={devoirTypes}
+                    onSuccess={() => {
+                      setIsEditDialogOpen(false);
+                      window.location.reload();
+                    }}
+                    onCancel={() => setIsEditDialogOpen(false)}
+                  />
                 </DialogContent>
               </Dialog>
 
