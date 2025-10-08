@@ -162,7 +162,14 @@ const CompleteProfile: React.FC = () => {
     : institutes;
 
   const handleAddInstitute = async () => {
-    if (!newInstituteName.trim() || !stateId) return;
+    if (!newInstituteName.trim() || !stateId) {
+      toast({
+        title: t('error'),
+        description: t('pleaseFillAllFields'),
+        variant: "destructive",
+      });
+      return;
+    }
 
     setAddingInstitute(true);
     try {
@@ -182,7 +189,7 @@ const CompleteProfile: React.FC = () => {
 
       if (error) throw error;
 
-      // Add to local institutes list
+      // Add the new institute to the list
       setInstitutes([...institutes, data]);
       setInstituteId(data.id);
       setNewInstituteName('');
@@ -190,7 +197,7 @@ const CompleteProfile: React.FC = () => {
 
       toast({
         title: t('success'),
-        description: t('instituteAddedSuccess'),
+        description: t('instituteAddedForReview'),
       });
     } catch (error: any) {
       toast({
@@ -347,23 +354,9 @@ const CompleteProfile: React.FC = () => {
                   <CommandInput placeholder={t('searchInstitute')} />
                   <CommandList>
                     <CommandEmpty>
-                      <div className="py-6 text-center text-sm">
-                        <p className="mb-2">{t('noInstitutesFound')}</p>
-                        {stateId && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setOpenInstitute(false);
-                              setOpenAddInstitute(true);
-                            }}
-                            className="gap-2"
-                          >
-                            <Plus className="h-4 w-4" />
-                            {t('addMissingInstitute')}
-                          </Button>
-                        )}
-                      </div>
+                      {filteredInstitutes.length === 0 && !loadingInstitutes 
+                        ? t('noInstitutesFound')
+                        : t('noResults')}
                     </CommandEmpty>
                     <CommandGroup>
                       {filteredInstitutes.map((institute) => (
@@ -389,6 +382,15 @@ const CompleteProfile: React.FC = () => {
                 </Command>
               </PopoverContent>
             </Popover>
+            <button
+              type="button"
+              onClick={() => setOpenAddInstitute(true)}
+              disabled={!stateId}
+              className="text-sm text-[#38A6FF] hover:underline flex items-center gap-1 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="h-4 w-4" />
+              {t('addMissingInstitute')}
+            </button>
           </div>
 
           <Button 
@@ -407,23 +409,24 @@ const CompleteProfile: React.FC = () => {
           <DialogHeader>
             <DialogTitle>{t('addMissingInstitute')}</DialogTitle>
             <DialogDescription>
-              {t('addInstituteDescription')}
+              {t('addMissingInstituteDescription')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="instituteName">{t('instituteName')}</Label>
+              <Label htmlFor="newInstitute">{t('instituteName')}</Label>
               <Input
-                id="instituteName"
+                id="newInstitute"
                 value={newInstituteName}
                 onChange={(e) => setNewInstituteName(e.target.value)}
                 placeholder={t('enterInstituteName')}
-                className="mt-2"
+                className="h-12 text-base"
               />
             </div>
           </div>
           <DialogFooter>
             <Button
+              type="button"
               variant="outline"
               onClick={() => {
                 setOpenAddInstitute(false);
@@ -433,10 +436,12 @@ const CompleteProfile: React.FC = () => {
               {t('cancel')}
             </Button>
             <Button
+              type="button"
               onClick={handleAddInstitute}
-              disabled={!newInstituteName.trim() || addingInstitute}
+              disabled={addingInstitute || !newInstituteName.trim()}
+              className="bg-[#38A6FF] hover:bg-[#2B8FE8]"
             >
-              {addingInstitute ? t('adding') : t('add')}
+              {addingInstitute ? t('loading') : t('submit')}
             </Button>
           </DialogFooter>
         </DialogContent>
