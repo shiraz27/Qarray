@@ -14,6 +14,7 @@ import { ContentSkeleton } from '@/components/LoadingSkeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { AddResourceForm } from '@/components/AddResourceForm';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface ChapterData {
   id: number;
@@ -33,6 +34,7 @@ interface Question {
   userVote: 'upvote' | 'downvote' | null;
   type_id: number | null;
   verified: boolean;
+  contributors: string[];
 }
 
 interface Resource {
@@ -48,6 +50,7 @@ interface Resource {
   devoir_type_id: number | null;
   with_correction: boolean;
   verified: boolean;
+  published_by: string | null;
 }
 
 interface ResourceType {
@@ -204,7 +207,7 @@ export default function Chapter() {
         // Fetch questions with vote counts
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, data, created_at, type_id, verified')
+          .select('id, data, created_at, type_id, verified, contributors')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -253,7 +256,7 @@ export default function Chapter() {
         // Fetch resources with vote counts
         const { data: resourcesData } = await supabase
           .from('resources')
-          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified')
+          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified, published_by')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -385,7 +388,7 @@ export default function Chapter() {
       if (contentType === 'question') {
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, data, created_at, type_id, verified')
+          .select('id, data, created_at, type_id, verified, contributors')
           .eq('chapter_id', chapter?.id)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -427,7 +430,7 @@ export default function Chapter() {
       } else {
         const { data: resourcesData } = await supabase
           .from('resources')
-          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified')
+          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified, published_by')
           .eq('chapter_id', chapter?.id)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -683,7 +686,7 @@ export default function Chapter() {
                     const fetchChapterData = async () => {
                       const { data: questionsData } = await supabase
                         .from('questions')
-                        .select('id, data, created_at, type_id, verified')
+                        .select('id, data, created_at, type_id, verified, contributors')
                         .eq('chapter_id', chapter.id)
                         .eq('deleted', false)
                         .order('created_at', { ascending: false });
@@ -751,9 +754,18 @@ export default function Chapter() {
                   return (
                 <Card 
                   key={question.id} 
-                  className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                  className="p-4 cursor-pointer hover:bg-accent/50 transition-colors space-y-2"
                   onClick={() => navigate(`/question/${question.id}`)}
                 >
+                  {question.contributors && question.contributors.length > 0 && (
+                    <UserAvatar 
+                      userId={question.contributors[0]} 
+                      size="sm" 
+                      showName 
+                      showDate 
+                      date={question.created_at}
+                    />
+                  )}
                   <div className="flex items-start justify-between mb-2">
                     <p className="text-foreground flex-1">{question.data}</p>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -831,7 +843,7 @@ export default function Chapter() {
                     const fetchResources = async () => {
                       const { data: resourcesData } = await supabase
                         .from('resources')
-                        .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified')
+                        .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified, published_by')
                         .eq('chapter_id', chapter.id)
                         .eq('deleted', false)
                         .order('created_at', { ascending: false });
@@ -906,9 +918,18 @@ export default function Chapter() {
                   return (
                 <Card 
                   key={resource.id} 
-                  className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                  className="p-4 cursor-pointer hover:bg-accent/50 transition-colors space-y-2"
                   onClick={() => navigate(`/resource/${resource.id}`)}
                 >
+                  {resource.published_by && (
+                    <UserAvatar 
+                      userId={resource.published_by} 
+                      size="sm" 
+                      showName 
+                      showDate 
+                      date={resource.created_at}
+                    />
+                  )}
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-semibold text-foreground flex-1">{resource.title}</h3>
                     <div className="flex gap-1 ml-2 flex-shrink-0">

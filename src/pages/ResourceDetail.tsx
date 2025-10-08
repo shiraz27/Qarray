@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { MediaPreview } from '@/components/MediaPreview';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface Resource {
   id: number;
@@ -286,13 +288,23 @@ export default function ResourceDetail() {
         />
         
         <div className="relative z-10 space-y-4">
+          {resource.published_by && (
+            <UserAvatar 
+              userId={resource.published_by} 
+              size="md" 
+              showName 
+              showDate 
+              date={resource.created_at}
+            />
+          )}
+          
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1">
               <h2 className="text-xl font-bold text-foreground mb-2">{resource.title}</h2>
               <p className="text-sm text-muted-foreground">{resource.description}</p>
             </div>
             {!resource.verified && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+              <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs flex-shrink-0">
                 <AlertCircle size={12} />
                 <span>Unverified</span>
               </div>
@@ -400,18 +412,21 @@ export default function ResourceDetail() {
       <div className="flex-1 px-4 space-y-3">
         <h2 className="text-lg font-semibold">Files</h2>
         {resource.data.map((url, index) => (
-          <Card key={index} className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">{getDisplayName(url)}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(url, '_blank')}
-              >
-                Open
-              </Button>
-            </div>
-          </Card>
+          <div key={index} className="space-y-2">
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">{getDisplayName(url)}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(url, '_blank')}
+                >
+                  Open
+                </Button>
+              </div>
+            </Card>
+            <MediaPreview url={url} />
+          </div>
         ))}
       </div>
 

@@ -12,6 +12,8 @@ import chapterPattern from '@/assets/chapter-pattern.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { MediaPreview } from '@/components/MediaPreview';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface Question {
   id: number;
@@ -334,12 +336,27 @@ export default function QuestionDetail() {
             imageRendering: 'crisp-edges',
           }}
         />
-        
+          
         <div className="relative z-10 space-y-4">
+          {question.contributors && question.contributors.length > 0 && (
+            <UserAvatar 
+              userId={question.contributors[0]} 
+              size="md" 
+              showName 
+              showDate 
+              date={question.created_at}
+            />
+          )}
+          
           <div className="flex items-start justify-between gap-2">
-            <p className="text-lg font-semibold text-foreground flex-1">{question.data}</p>
+            <div className="flex-1 space-y-3">
+              <p className="text-lg font-semibold text-foreground">{question.data}</p>
+              {question.data.includes('http') && (
+                <MediaPreview url={question.data.match(/https?:\/\/[^\s]+/)?.[0] || ''} />
+              )}
+            </div>
             {!question.verified && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+              <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs flex-shrink-0">
                 <AlertCircle size={12} />
                 <span>Unverified</span>
               </div>
@@ -443,42 +460,53 @@ export default function QuestionDetail() {
           </Card>
         ) : (
           answers.map((answer) => (
-            <Card key={answer.id} className="p-4">
-              <div className="flex items-start justify-between mb-2">
-                <p className="text-foreground flex-1">{answer.data}</p>
+            <Card key={answer.id} className="p-4 space-y-3">
+              {answer.contributors && answer.contributors.length > 0 && (
+                <UserAvatar 
+                  userId={answer.contributors[0]} 
+                  size="sm" 
+                  showName 
+                  showDate 
+                  date={answer.created_at}
+                />
+              )}
+              
+              <div className="flex items-start justify-between">
+                <div className="flex-1 space-y-2">
+                  <p className="text-foreground">{answer.data}</p>
+                  {answer.data.includes('http') && (
+                    <MediaPreview url={answer.data.match(/https?:\/\/[^\s]+/)?.[0] || ''} />
+                  )}
+                </div>
                 {!answer.verified && (
-                  <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs ml-2">
+                  <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs ml-2 flex-shrink-0">
                     <AlertCircle size={10} />
                     <span>Unverified</span>
                   </div>
                 )}
               </div>
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">
-                  {new Date(answer.created_at).toLocaleDateString()}
-                </p>
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => handleVote(answer.id, 'answer', 'upvote', answer.userVote)}
-                    className="flex items-center gap-1.5 transition-colors hover:text-green-600"
-                  >
-                    <ThumbsUp
-                      size={16}
-                      className={answer.userVote === 'upvote' ? 'fill-green-600 text-green-600' : ''}
-                    />
-                    <span className="text-sm font-medium">{answer.upvotes}</span>
-                  </button>
-                  <button
-                    onClick={() => handleVote(answer.id, 'answer', 'downvote', answer.userVote)}
-                    className="flex items-center gap-1.5 transition-colors hover:text-red-600"
-                  >
-                    <ThumbsDown
-                      size={16}
-                      className={answer.userVote === 'downvote' ? 'fill-red-600 text-red-600' : ''}
-                    />
-                    <span className="text-sm font-medium">{answer.downvotes}</span>
-                  </button>
-                </div>
+              
+              <div className="flex items-center justify-end gap-4 pt-2 border-t">
+                <button
+                  onClick={() => handleVote(answer.id, 'answer', 'upvote', answer.userVote)}
+                  className="flex items-center gap-1.5 transition-colors hover:text-green-600"
+                >
+                  <ThumbsUp
+                    size={16}
+                    className={answer.userVote === 'upvote' ? 'fill-green-600 text-green-600' : ''}
+                  />
+                  <span className="text-sm font-medium">{answer.upvotes}</span>
+                </button>
+                <button
+                  onClick={() => handleVote(answer.id, 'answer', 'downvote', answer.userVote)}
+                  className="flex items-center gap-1.5 transition-colors hover:text-red-600"
+                >
+                  <ThumbsDown
+                    size={16}
+                    className={answer.userVote === 'downvote' ? 'fill-red-600 text-red-600' : ''}
+                  />
+                  <span className="text-sm font-medium">{answer.downvotes}</span>
+                </button>
               </div>
             </Card>
           ))
