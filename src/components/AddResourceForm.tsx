@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
+import { MediaUploader } from './MediaUploader';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
@@ -18,7 +19,6 @@ const resourceSchema = z.object({
   type_id: z.string().min(1, 'Please select a resource type'),
   devoir_type_id: z.string().optional(),
   with_correction: z.boolean().default(false),
-  resource_url: z.string().url('Please enter a valid URL').min(1, 'Resource URL is required'),
 });
 
 type ResourceFormData = z.infer<typeof resourceSchema>;
@@ -41,6 +41,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
   onCancel 
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   
   const form = useForm<ResourceFormData>({
     resolver: zodResolver(resourceSchema),
@@ -50,11 +51,24 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
       type_id: '',
       devoir_type_id: '',
       with_correction: false,
-      resource_url: '',
     },
   });
 
+  const handleMediaUploaded = (url: string) => {
+    setMediaUrls(prev => [...prev, url]);
+    toast.success('Media added successfully');
+  };
+
+  const removeMedia = (index: number) => {
+    setMediaUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
   const onSubmit = async (data: ResourceFormData) => {
+    if (mediaUrls.length === 0) {
+      toast.error('Please add at least one resource file or URL');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -74,7 +88,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           type_id: parseInt(data.type_id),
           devoir_type_id: data.devoir_type_id ? parseInt(data.devoir_type_id) : null,
           with_correction: data.with_correction,
-          data: [data.resource_url],
+          data: mediaUrls,
           published_by: user.id,
           contributors: [user.id],
         });
@@ -83,6 +97,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
 
       toast.success('Resource added successfully');
       form.reset();
+      setMediaUrls([]);
       onSuccess();
     } catch (error) {
       console.error('Error adding resource:', error);
@@ -127,19 +142,29 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="resource_url"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Resource URL</FormLabel>
-              <FormControl>
-                <Input placeholder="https://example.com/resource" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+        <div>
+          <FormLabel>Resource Files/URLs</FormLabel>
+          <MediaUploader onMediaUploaded={handleMediaUploaded} />
+          
+          {mediaUrls.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <p className="text-sm font-medium">Added resources:</p>
+              {mediaUrls.map((url, index) => (
+                <div key={index} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
+                  <span className="truncate flex-1">{url}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeMedia(index)}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+            </div>
           )}
-        />
+        </div>
 
         <FormField
           control={form.control}
