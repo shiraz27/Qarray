@@ -140,6 +140,16 @@ const CompleteProfile: React.FC = () => {
     fetchInstitutes();
   }, [toast, t]);
 
+  // Reset institute when state changes
+  useEffect(() => {
+    setInstituteId('');
+  }, [stateId]);
+
+  // Filter institutes based on selected state
+  const filteredInstitutes = stateId 
+    ? institutes.filter(institute => institute.state_id === parseInt(stateId))
+    : institutes;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -263,17 +273,19 @@ const CompleteProfile: React.FC = () => {
                   variant="outline"
                   role="combobox"
                   aria-expanded={openInstitute}
-                  disabled={loadingInstitutes}
+                  disabled={loadingInstitutes || !stateId}
                   className={cn(
                     "w-full h-12 justify-between",
                     !instituteId && "text-muted-foreground"
                   )}
                 >
                   {instituteId
-                    ? institutes.find((institute) => institute.id === instituteId)?.name
+                    ? filteredInstitutes.find((institute) => institute.id === instituteId)?.name
                     : loadingInstitutes
                     ? t('loading')
-                    : t('selectLycee')}
+                    : stateId
+                    ? t('selectLycee')
+                    : t('selectGouvernoratFirst')}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -282,12 +294,12 @@ const CompleteProfile: React.FC = () => {
                   <CommandInput placeholder={t('searchInstitute')} />
                   <CommandList>
                     <CommandEmpty>
-                      {institutes.length === 0 && !loadingInstitutes 
+                      {filteredInstitutes.length === 0 && !loadingInstitutes 
                         ? t('noInstitutesFound')
                         : t('noResults')}
                     </CommandEmpty>
                     <CommandGroup>
-                      {institutes.map((institute) => (
+                      {filteredInstitutes.map((institute) => (
                         <CommandItem
                           key={institute.id}
                           value={institute.name}
