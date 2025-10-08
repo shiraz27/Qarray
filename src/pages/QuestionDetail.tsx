@@ -15,6 +15,7 @@ import { MediaList } from '@/components/MediaList';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AnswerQuestionForm } from '@/components/AnswerQuestionForm';
 import { EditQuestionForm } from '@/components/EditQuestionForm';
+import { EditAnswerForm } from '@/components/EditAnswerForm';
 
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -55,6 +56,8 @@ export default function QuestionDetail() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isAnswerDialogOpen, setIsAnswerDialogOpen] = useState(false);
+  const [editingAnswerId, setEditingAnswerId] = useState<number | null>(null);
+  const [deletingAnswerId, setDeletingAnswerId] = useState<number | null>(null);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
   const { isModerator } = useUserRole();
 
@@ -343,6 +346,39 @@ export default function QuestionDetail() {
     });
   };
 
+  const handleDeleteAnswer = async (answerId: number) => {
+    const { error } = await supabase
+      .from('answers')
+      .update({ deleted: true })
+      .eq('id', answerId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: `Failed to delete answer: ${error.message}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Success',
+      description: 'Answer deleted successfully',
+    });
+
+    // Remove answer from state
+    setAnswers(prev => prev.filter(a => a.id !== answerId));
+    setQuestion(prev => prev ? {
+      ...prev,
+      answerCount: (prev.answerCount || 1) - 1
+    } : null);
+    setDeletingAnswerId(null);
+  };
+
+  const canEditAnswer = (answer: Answer) => {
+    return user && (answer.contributors?.includes(user.id) || isModerator);
+  };
+
   const isOwner = user && question?.contributors?.includes(user.id);
   const canEdit = isOwner || isModerator;
 
@@ -612,27 +648,95 @@ export default function QuestionDetail() {
                 <MediaList data={answer.data} showText={true} />
               </div>
               
-              <div className="flex items-center justify-end gap-4 pt-2 border-t">
-                <button
-                  onClick={() => handleVote(answer.id, 'answer', 'upvote', answer.userVote)}
-                  className="flex items-center gap-1.5 transition-colors hover:text-green-600"
-                >
-                  <ThumbsUp
-                    size={16}
-                    className={answer.userVote === 'upvote' ? 'fill-green-600 text-green-600' : ''}
-                  />
-                  <span className="text-sm font-medium">{answer.upvotes}</span>
-                </button>
-                <button
-                  onClick={() => handleVote(answer.id, 'answer', 'downvote', answer.userVote)}
-                  className="flex items-center gap-1.5 transition-colors hover:text-red-600"
-                >
-                  <ThumbsDown
-                    size={16}
-                    className={answer.userVote === 'downvote' ? 'fill-red-600 text-red-600' : ''}
-                  />
-                  <span className="text-sm font-medium">{answer.downvotes}</span>
-                </button>
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => handleVote(answer.id, 'answer', 'upvote', answer.userVote)}
+                    className="flex items-center gap-1.5 transition-colors hover:text-green-600"
+                  >
+                    <ThumbsUp
+                      size={16}
+                      className={answer.userVote === 'upvote' ? 'fill-green-600 text-green-600' : ''}
+                    />
+                    <span className="text-sm font-medium">{answer.upvotes}</span>
+                  </button>
+                  <button
+                    onClick={() => handleVote(answer.id, 'answer', 'downvote', answer.userVote)}
+                    className="flex items-center gap-1.5 transition-colors hover:text-red-600"
+                  >
+                    <ThumbsDown
+                      size={16}
+                      className={answer.userVote === 'downvote' ? 'fill-red-600 text-red-600' : ''}
+                    />
+                    <span className="text-sm font-medium">{answer.downvotes}</span>
+                  </button>
+                </div>
+
+                {canEditAnswer(answer) && (
+                  <div className="flex gap-2">
+                    <Dialog open={editingAnswerId === answer.id} onOpenChange={(open) => !open && setEditingAnswerId(null)}>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingAnswerId(answer.id)}
+                        >
+                          <Edit size={14} className="mr-1" />
+                          Edit
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Edit Answer</DialogTitle>
+                        </DialogHeader>
+                        <EditAnswerForm
+                          answerId={answer.id}
+                          initialData={answer.data}
+                          onSuccess={async () => {
+                            setEditingAnswerId(null);
+                            // Refetch answer data
+                            const { data: answerData } = await supabase
+                              .from('answers')
+                              .select('*')
+                              .eq('id', answer.id)
+                              .eq('deleted', false)
+                              .single();
+                            
+                            if (answerData) {
+                              setAnswers(prev => prev.map(a => 
+                                a.id === answer.id ? { ...a, data: answerData.data } : a
+                              ));
+                            }
+                          }}
+                          onCancel={() => setEditingAnswerId(null)}
+                        />
+                      </DialogContent>
+                    </Dialog>
+
+                    <AlertDialog open={deletingAnswerId === answer.id} onOpenChange={(open) => !open && setDeletingAnswerId(null)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeletingAnswerId(answer.id)}
+                      >
+                        <Trash2 size={14} className="mr-1" />
+                        Delete
+                      </Button>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Answer?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete this answer.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteAnswer(answer.id)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                )}
               </div>
             </Card>
           ))
