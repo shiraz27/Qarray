@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Home, Bookmark, User } from 'lucide-react';
 
 interface NavigationItem {
   id: string;
@@ -35,6 +36,7 @@ export const BottomNavigation: React.FC = () => {
       <nav className="flex w-full items-center gap-[40px_83px] text-xs text-[#9E9E9E] font-normal whitespace-nowrap text-center tracking-[0.2px] leading-[1.6] justify-between px-6" aria-label="Main navigation">
         {navigationItems.map((item) => {
           const isActive = activeItem === item.id;
+          const Icon = item.id === 'subjects' ? Home : item.id === 'bookmarks' ? Bookmark : User;
           return (
             <button
               key={item.id}
@@ -45,7 +47,7 @@ export const BottomNavigation: React.FC = () => {
               aria-pressed={isActive}
               aria-label={`Navigate to ${item.label}`}
             >
-              <div className="flex min-h-6 w-6" />
+              <Icon className="w-6 h-6" />
               <span className={`mt-1 ${isActive ? 'text-black' : 'text-[#9E9E9E]'}`}>
                 {item.label}
               </span>

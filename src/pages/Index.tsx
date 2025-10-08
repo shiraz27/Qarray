@@ -9,7 +9,7 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 const Index: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <div className="w-full max-w-[480px] mx-auto flex flex-col min-h-screen">
+      <div className="w-full mx-auto flex flex-col min-h-screen">
         <StatusBar />
         
         <div className="flex-1 w-full overflow-auto">

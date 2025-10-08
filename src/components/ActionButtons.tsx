@@ -1,4 +1,5 @@
 import React from 'react';
+import { MessageCircle, MessageSquare, Plus } from 'lucide-react';
 
 export const ActionButtons: React.FC = () => {
   const handleAskClick = () => {
@@ -21,7 +22,7 @@ export const ActionButtons: React.FC = () => {
           onClick={handleAskClick}
           aria-label="Ask a question"
         >
-          <div className="flex w-6 shrink-0 h-6" />
+          <MessageCircle className="w-6 h-6" />
           <span className="text-white">
             Ask
           </span>
@@ -31,7 +32,7 @@ export const ActionButtons: React.FC = () => {
           onClick={handleAnswerClick}
           aria-label="Find answers"
         >
-          <div className="flex w-6 shrink-0 h-6" />
+          <MessageSquare className="w-6 h-6" />
           <span className="text-white">
             Answer
           </span>
@@ -41,7 +42,7 @@ export const ActionButtons: React.FC = () => {
           onClick={handleAddResourceClick}
           aria-label="Add learning resource"
         >
-          <div className="flex w-6 shrink-0 h-6" />
+          <Plus className="w-6 h-6" />
           <span className="text-white">
             Add Resource
           </span>
