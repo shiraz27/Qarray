@@ -229,18 +229,28 @@ const CompleteProfile: React.FC = () => {
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.user) {
+        await supabase.auth.signOut();
+        toast({
+          title: t('error'),
+          description: t('authenticationError'),
+          variant: "destructive",
+        });
+        navigate('/login');
+        return;
+      }
 
       const { error } = await supabase
         .from('profiles')
         .upsert({
-          user_id: user.id,
+          user_id: session.user.id,
           phone_number: `+216${phoneNumber}`,
           state_id: parseInt(stateId),
           class_id: parseInt(classId),
           institute_id: instituteId,
-          full_name: user.user_metadata.full_name || user.email?.split('@')[0] || 'User',
+          full_name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'User',
         });
 
       if (error) throw error;
