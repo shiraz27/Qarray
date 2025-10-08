@@ -59,7 +59,7 @@ export function UserAvatar({ userId, size = 'md', showName = false, showDate = f
         <Avatar className={sizeClasses[size]}>
           <AvatarImage src="" alt={profile?.full_name || 'User'} />
           <AvatarFallback className="bg-primary/10 text-primary">
-            {profile ? getInitials(profile.full_name) : <User size={size === 'sm' ? 12 : size === 'md' ? 14 : 16} />}
+            {profile ? getInitials(profile.full_name) : <User size={size === 'sm' ? 16 : size === 'md' ? 20 : 24} />}
           </AvatarFallback>
         </Avatar>
         <div className="flex flex-col">
@@ -82,7 +82,7 @@ export function UserAvatar({ userId, size = 'md', showName = false, showDate = f
     <Avatar className={sizeClasses[size]}>
       <AvatarImage src="" alt={profile?.full_name || 'User'} />
       <AvatarFallback className="bg-primary/10 text-primary">
-        {profile ? getInitials(profile.full_name) : <User size={size === 'sm' ? 12 : size === 'md' ? 14 : 16} />}
+        {profile ? getInitials(profile.full_name) : <User size={size === 'sm' ? 16 : size === 'md' ? 20 : 24} />}
       </AvatarFallback>
     </Avatar>
   );
