@@ -32,31 +32,36 @@ export const BottomNavigation: React.FC = () => {
   };
 
   return (
-    <footer className="bg-white w-full pt-[13px]">
-      <nav className="flex w-full items-center gap-[40px_83px] text-xs text-[#9E9E9E] font-normal whitespace-nowrap text-center tracking-[0.2px] leading-[1.6] justify-between px-6" aria-label="Main navigation">
+    <footer className="bg-white w-full border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+      <nav className="flex w-full items-center text-xs font-medium whitespace-nowrap text-center justify-around px-4 py-3" aria-label="Main navigation">
         {navigationItems.map((item) => {
           const isActive = activeItem === item.id;
           const Icon = item.id === 'subjects' ? Home : item.id === 'bookmarks' ? Bookmark : User;
           return (
             <button
               key={item.id}
-              className={`self-stretch flex flex-col items-center my-auto ${
-                isActive ? 'text-black font-bold' : 'hover:text-black transition-colors'
+              className={`flex flex-col items-center gap-1 py-2 px-4 rounded-lg transition-all duration-200 ${
+                isActive 
+                  ? 'text-[#38a6ff]' 
+                  : 'text-[#9E9E9E] hover:text-[#38a6ff] hover:bg-gray-50'
               }`}
               onClick={() => handleNavigationClick(item.id)}
               aria-pressed={isActive}
               aria-label={`Navigate to ${item.label}`}
             >
-              <Icon className="w-6 h-6" />
-              <span className={`mt-1 ${isActive ? 'text-black' : 'text-[#9E9E9E]'}`}>
+              <Icon 
+                className="w-6 h-6 transition-transform duration-200" 
+                strokeWidth={isActive ? 2.5 : 2}
+              />
+              <span className={`text-xs ${isActive ? 'font-semibold' : 'font-normal'}`}>
                 {item.label}
               </span>
             </button>
           );
         })}
       </nav>
-      <div className="justify-center items-center flex w-full flex-col bg-white pt-[21px] pb-2 px-[75px]">
-        <div className="bg-black flex w-[148px] shrink-0 h-[5px] fill-black rounded-[100px]" />
+      <div className="flex justify-center items-center w-full py-2">
+        <div className="bg-gray-300 w-32 h-1 rounded-full" />
       </div>
     </footer>
   );
