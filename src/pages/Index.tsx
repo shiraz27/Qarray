@@ -34,6 +34,14 @@ const Index: React.FC = () => {
   const [userProfile, setUserProfile] = useState<{ full_name: string; class_id: number } | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
 
+  const handleTabChange = (tab: string) => {
+    if (tab === 'bookmarks') {
+      navigate('/bookmarks');
+    } else {
+      setActiveTab(tab);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -175,13 +183,6 @@ const Index: React.FC = () => {
             </>
           )}
 
-          {activeTab === 'bookmarks' && (
-            <div className="flex flex-col items-center justify-center h-full p-8">
-              <h2 className="text-2xl font-bold mb-4">Bookmarks</h2>
-              <p className="text-gray-600">Your saved bookmarks will appear here</p>
-            </div>
-          )}
-
           {activeTab === 'profile' && (
             <div className="flex flex-col items-center justify-start h-full p-8">
               <div className="w-full max-w-md space-y-6">
@@ -247,7 +248,7 @@ const Index: React.FC = () => {
           )}
         </div>
         
-        <BottomNavigation onTabChange={setActiveTab} activeTab={activeTab} />
+        <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
       </div>
     </div>
   );

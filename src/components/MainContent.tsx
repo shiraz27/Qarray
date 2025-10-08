@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
-import { BookOpen, MessageSquare, FileText, Bookmark } from 'lucide-react';
+import { MessageSquare, FileText, Bookmark } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
@@ -21,6 +22,7 @@ interface MainContentProps {
 
 export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -118,28 +120,22 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
 
     try {
       if (currentlyBookmarked) {
-        // Remove bookmark
-        const { error } = await supabase
+        await supabase
           .from('bookmarks')
           .delete()
           .eq('user_id', user.id)
           .eq('chapter_id', chapterId);
 
-        if (error) throw error;
-        
-        setChapters(prev => prev.map(ch => 
+        setChapters(prev => prev.map(ch =>
           ch.id === chapterId ? { ...ch, isBookmarked: false } : ch
         ));
         toast.success(t('bookmarkRemoved') || 'Bookmark removed');
       } else {
-        // Add bookmark
-        const { error } = await supabase
+        await supabase
           .from('bookmarks')
           .insert({ user_id: user.id, chapter_id: chapterId });
 
-        if (error) throw error;
-        
-        setChapters(prev => prev.map(ch => 
+        setChapters(prev => prev.map(ch =>
           ch.id === chapterId ? { ...ch, isBookmarked: true } : ch
         ));
         toast.success(t('bookmarkAdded') || 'Bookmark added');
@@ -195,6 +191,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
                   ? 'linear-gradient(to right, #FFFFFF 0%, #FDE6E6 100%)' 
                   : 'linear-gradient(to right, #FFFFFF 0%, #E0E0E0 100%)',
               }}
+              onClick={() => navigate(`/chapter/${chapter.id}`)}
             >
               {/* Pattern overlay */}
               <div 
@@ -212,27 +209,25 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
                   <h3 className="font-semibold text-sm tracking-wide text-foreground flex-1">
                     {chapter.name.toUpperCase()}
                   </h3>
-                  {hasContent && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleBookmark(chapter.id, chapter.isBookmarked);
-                      }}
-                      className="hover:scale-110 transition-transform"
-                    >
-                      <Bookmark
-                        size={20}
-                        className={`text-foreground ${chapter.isBookmarked ? 'fill-foreground' : ''}`}
-                      />
-                    </button>
-                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleBookmark(chapter.id, chapter.isBookmarked);
+                    }}
+                    className="hover:scale-110 transition-transform"
+                  >
+                    <Bookmark
+                      size={20}
+                      className={`text-foreground ${chapter.isBookmarked ? 'fill-foreground' : ''}`}
+                    />
+                  </button>
                 </div>
                 
                 <div className="flex gap-4 text-xs">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <MessageSquare size={14} className="text-muted-foreground" />
                     <span className="font-medium">
-                      {chapter.questionCount} {t('questions') || 'Questions'}/ {t('answers') || 'Answers'}
+                      {chapter.questionCount} {t('questions') || 'Questions'}/ {chapter.answerCount} {t('answers') || 'Answers'}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-muted-foreground">

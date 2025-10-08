@@ -8,6 +8,8 @@ import i18n from "./i18n/config";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import CompleteProfile from "./pages/CompleteProfile";
+import Bookmarks from "./pages/Bookmarks";
+import Chapter from "./pages/Chapter";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +25,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/complete-profile" element={<CompleteProfile />} />
+            <Route path="/bookmarks" element={<Bookmarks />} />
+            <Route path="/chapter/:id" element={<Chapter />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
