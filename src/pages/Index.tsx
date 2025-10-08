@@ -1,16 +1,26 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { StatusBar } from '@/components/StatusBar';
 import { Header } from '@/components/Header';
 import { ActionButtons } from '@/components/ActionButtons';
 import { SubjectTabs } from '@/components/SubjectTabs';
 import { MainContent } from '@/components/MainContent';
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { Button } from '@/components/ui/button';
 
 const Index: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <div className="w-full mx-auto flex flex-col min-h-screen">
         <StatusBar />
+        
+        <div className="p-4">
+          <Button onClick={() => navigate('/login')} className="w-full">
+            Go to Login Screen
+          </Button>
+        </div>
         
         <div className="flex-1 w-full overflow-auto">
           <section className="items-stretch flex w-full flex-col bg-white">
