@@ -32,6 +32,7 @@ const Index: React.FC = () => {
   const [activeTab, setActiveTab] = useState('subjects');
   const [isDeleting, setIsDeleting] = useState(false);
   const [userProfile, setUserProfile] = useState<{ full_name: string; class_id: number } | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
 
   const handleLogout = async () => {
     try {
@@ -166,8 +167,11 @@ const Index: React.FC = () => {
                 <ActionButtons />
               </section>
               
-              <SubjectTabs classId={userProfile?.class_id} />
-              <MainContent />
+              <SubjectTabs 
+                classId={userProfile?.class_id} 
+                onSubjectChange={setSelectedSubject}
+              />
+              <MainContent subjectId={selectedSubject} />
             </>
           )}
 

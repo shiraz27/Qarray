@@ -11,6 +11,7 @@ interface Subject {
 
 interface SubjectTabsProps {
   classId?: number;
+  onSubjectChange?: (subjectId: number) => void;
 }
 
 const iconMap: Record<string, LucideIcon> = {
@@ -41,7 +42,7 @@ const getIconForSubject = (logo: string | null, subjectName: string): LucideIcon
   return BookOpen; // Default icon
 };
 
-export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId }) => {
+export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChange }) => {
   const [activeSubject, setActiveSubject] = useState<number | null>(null);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,6 +65,7 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId }) => {
         setSubjects(data || []);
         if (data && data.length > 0) {
           setActiveSubject(data[0].id);
+          onSubjectChange?.(data[0].id);
         }
       } catch (error) {
         console.error('Error fetching subjects:', error);
@@ -77,7 +79,7 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId }) => {
 
   const handleSubjectClick = (subjectId: number) => {
     setActiveSubject(subjectId);
-    console.log(`Selected subject: ${subjectId}`);
+    onSubjectChange?.(subjectId);
   };
 
   if (loading) {
