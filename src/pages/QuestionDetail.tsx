@@ -235,13 +235,12 @@ export default function QuestionDetail() {
     console.log('Is Moderator:', isModerator);
     console.log('Question contributors:', question?.contributors);
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('questions')
       .update({ deleted: true })
-      .eq('id', questionId)
-      .select();
+      .eq('id', questionId);
 
-    console.log('Delete result:', { data, error });
+    console.log('Delete result:', { error });
 
     if (error) {
       console.error('Delete error details:', error);
