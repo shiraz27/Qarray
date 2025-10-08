@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { Card } from '@/components/ui/card';
+import { BookOpen, MessageSquare, FileText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface Chapter {
@@ -90,12 +92,8 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
   if (!subjectId) {
     return (
       <main className="w-full px-4 pb-4">
-        <div className="flex justify-center mt-8">
-          <img
-            src="https://api.builder.io/api/v1/image/assets/a6410069d4c34ccabf25d52a6064b0e1/3dbba9d5c0d85524fea10b037f6537bc93b685cb?placeholderIfAbsent=true"
-            className="aspect-[0.96] object-contain w-full max-w-md"
-            alt="Select a subject"
-          />
+        <div className="text-center py-8 text-gray-500">
+          {t('selectSubject') || 'Select a subject to view chapters'}
         </div>
       </main>
     );
@@ -104,7 +102,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
   if (loading) {
     return (
       <main className="w-full px-4 pb-4">
-        <div className="text-center py-8 text-[#9E9E9E]">
+        <div className="text-center py-8 text-gray-500">
           {t('loading') || 'Loading...'}
         </div>
       </main>
@@ -114,8 +112,8 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
   if (chapters.length === 0) {
     return (
       <main className="w-full px-4 pb-4">
-        <div className="text-center py-8 text-[#9E9E9E]">
-          {t('noChapters') || 'No chapters available'}
+        <div className="text-center py-8 text-gray-500">
+          {t('noChapters') || 'No chapters available for this subject'}
         </div>
       </main>
     );
@@ -123,30 +121,30 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
 
   return (
     <main className="w-full px-4 pb-4 mb-20">
-      <div className="flex flex-col gap-3 mt-4">
+      <div className="space-y-3 mt-4">
         {chapters.map((chapter) => (
-          <article 
+          <Card 
             key={chapter.id}
-            className="flex flex-col bg-white rounded-2xl shadow-sm border border-[#F5F5F5] p-4 hover:shadow-md transition-shadow cursor-pointer"
+            className="p-4 hover:shadow-md transition-shadow cursor-pointer"
           >
-            <h3 className="text-base font-semibold text-[#2C2C2C] mb-3 leading-tight">
+            <h3 className="font-semibold text-lg mb-3 text-gray-800">
               {chapter.name}
             </h3>
-            <div className="flex items-center gap-4 text-xs text-[#9E9E9E]">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#38A6FF]" />
-                <span>{chapter.questionCount} Q</span>
+            <div className="flex gap-6 text-sm">
+              <div className="flex items-center gap-2 text-gray-600">
+                <MessageSquare size={16} className="text-blue-500" />
+                <span>{chapter.questionCount} {t('questions') || 'questions'}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#4CAF50]" />
-                <span>{chapter.answerCount} A</span>
+              <div className="flex items-center gap-2 text-gray-600">
+                <BookOpen size={16} className="text-green-500" />
+                <span>{chapter.answerCount} {t('answers') || 'answers'}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#9C27B0]" />
-                <span>{chapter.resourceCount} R</span>
+              <div className="flex items-center gap-2 text-gray-600">
+                <FileText size={16} className="text-purple-500" />
+                <span>{chapter.resourceCount} {t('resources') || 'resources'}</span>
               </div>
             </div>
-          </article>
+          </Card>
         ))}
       </div>
     </main>
