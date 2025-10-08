@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
-import { BookOpen, MessageSquare, FileText } from 'lucide-react';
+import { BookOpen, MessageSquare, FileText, Star } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface Chapter {
@@ -120,32 +120,60 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
   }
 
   return (
-    <main className="w-full px-4 pb-4 mb-20">
+    <main className="w-full px-4 pb-4 mb-24">
       <div className="space-y-3 mt-4">
-        {chapters.map((chapter) => (
-          <Card 
-            key={chapter.id}
-            className="p-4 hover:shadow-md transition-shadow cursor-pointer"
-          >
-            <h3 className="font-semibold text-lg mb-3 text-gray-800">
-              {chapter.name}
-            </h3>
-            <div className="flex gap-6 text-sm">
-              <div className="flex items-center gap-2 text-gray-600">
-                <MessageSquare size={16} className="text-blue-500" />
-                <span>{chapter.questionCount} {t('questions') || 'questions'}</span>
+        {chapters.map((chapter) => {
+          const hasContent = chapter.questionCount > 0 || chapter.answerCount > 0 || chapter.resourceCount > 0;
+          
+          return (
+            <Card 
+              key={chapter.id}
+              className={`relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer ${
+                hasContent ? 'bg-gradient-to-br from-blue-50 to-purple-50' : 'bg-gray-50'
+              }`}
+            >
+              {/* Decorative pattern background */}
+              {hasContent && (
+                <div className="absolute -right-16 -bottom-80 w-96 h-96 opacity-10">
+                  <svg viewBox="0 0 200 200" className="w-full h-full">
+                    <defs>
+                      <pattern id="pattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <circle cx="20" cy="20" r="2" fill="currentColor" className="text-blue-500" />
+                      </pattern>
+                    </defs>
+                    <rect width="200" height="200" fill="url(#pattern)" />
+                  </svg>
+                </div>
+              )}
+              
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-3">
+                  {hasContent && (
+                    <Star size={20} className="text-orange-400 fill-orange-400" />
+                  )}
+                  <h3 className="font-semibold text-sm tracking-wide text-gray-900 flex-1">
+                    {chapter.name.toUpperCase()}
+                  </h3>
+                </div>
+                
+                <div className="flex gap-4 text-xs">
+                  <div className="flex items-center gap-1.5 text-gray-700">
+                    <MessageSquare size={14} className="text-blue-500" />
+                    <span className="font-medium">
+                      {chapter.questionCount} {t('questions') || 'Questions'}/ {t('answers') || 'Answers'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-gray-700">
+                    <FileText size={14} className="text-purple-500" />
+                    <span className="font-medium">
+                      {chapter.resourceCount} {t('resources') || 'Resources'}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-gray-600">
-                <BookOpen size={16} className="text-green-500" />
-                <span>{chapter.answerCount} {t('answers') || 'answers'}</span>
-              </div>
-              <div className="flex items-center gap-2 text-gray-600">
-                <FileText size={16} className="text-purple-500" />
-                <span>{chapter.resourceCount} {t('resources') || 'resources'}</span>
-              </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
     </main>
   );

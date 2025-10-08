@@ -14,7 +14,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ onTabChange,
   ];
 
   return (
-    <footer className="bg-white w-full border-t border-gray-100 shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
+    <footer className="fixed bottom-0 left-0 right-0 bg-white w-full border-t border-gray-100 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] z-50">
       <nav className="flex w-full items-center text-xs font-medium whitespace-nowrap text-center justify-around px-4 py-3" aria-label="Main navigation">
         {navigationItems.map((item) => {
           const isActive = activeTab === item.id;
@@ -32,10 +32,10 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ onTabChange,
               aria-label={`Navigate to ${item.label}`}
             >
               <Icon 
-                className="w-6 h-6 transition-transform duration-200" 
+                className={`w-6 h-6 transition-all duration-200 ${isActive ? 'scale-110' : ''}`}
                 strokeWidth={isActive ? 2.5 : 2}
               />
-              <span className={`text-xs ${isActive ? 'font-semibold' : 'font-normal'}`}>
+              <span className={`text-xs transition-all duration-200 ${isActive ? 'font-semibold' : 'font-normal'}`}>
                 {item.label}
               </span>
             </button>
