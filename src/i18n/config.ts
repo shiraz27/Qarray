@@ -78,4 +78,10 @@ i18n
     }
   });
 
+// Set initial RTL direction
+if (i18n.language === 'ar') {
+  document.documentElement.dir = 'rtl';
+  document.documentElement.lang = 'ar';
+}
+
 export default i18n;

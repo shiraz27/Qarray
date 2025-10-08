@@ -5,6 +5,7 @@ import { ActionButtons } from '@/components/ActionButtons';
 import { SubjectTabs } from '@/components/SubjectTabs';
 import { MainContent } from '@/components/MainContent';
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
@@ -106,6 +107,11 @@ const Index: React.FC = () => {
                       <h3 className="font-semibold text-lg">Osman</h3>
                       <p className="text-sm text-gray-600">{session?.user?.email}</p>
                     </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <p className="text-sm font-medium mb-3 text-gray-700">Language</p>
+                    <LanguageSwitcher />
                   </div>
 
                   <Button

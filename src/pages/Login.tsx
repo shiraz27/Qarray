@@ -92,15 +92,15 @@ const Login: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-        {/* Logo */}
-        <div className="mb-4">
+        {/* Logo with emphasis */}
+        <div className="mb-6 bg-white rounded-3xl p-8 shadow-lg">
           <img
             src={qarayLogo}
             alt="Qarray Logo"
-            className="w-32 h-32 object-contain"
+            className="w-48 h-48 object-contain"
           />
         </div>
-        <h2 className="text-xl font-semibold mb-8 text-gray-800">Qarray</h2>
+        <h2 className="text-2xl font-bold mb-8 text-gray-800">Qarray</h2>
 
         <h1 className="text-2xl font-bold mb-2">
           {isSignUp ? t('createAccount') : t('welcomeBack')}
