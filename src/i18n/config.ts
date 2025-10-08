@@ -20,7 +20,15 @@ const resources = {
       success: "Success!",
       accountCreated: "Account created successfully. You can now sign in.",
       welcomeBackMessage: "You've successfully signed in.",
-      error: "Error"
+      error: "Error",
+      profile: "Profile",
+      language: "Language",
+      logout: "Logout",
+      deleteAccount: "Delete Account",
+      deleteAccountConfirm: "Are you sure you want to delete your account? This action cannot be undone.",
+      cancel: "Cancel",
+      delete: "Delete",
+      accountDeleted: "Account deleted successfully"
     }
   },
   fr: {
@@ -41,7 +49,15 @@ const resources = {
       success: "Succès !",
       accountCreated: "Compte créé avec succès. Vous pouvez maintenant vous connecter.",
       welcomeBackMessage: "Vous êtes connecté avec succès.",
-      error: "Erreur"
+      error: "Erreur",
+      profile: "Profil",
+      language: "Langue",
+      logout: "Déconnexion",
+      deleteAccount: "Supprimer le compte",
+      deleteAccountConfirm: "Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.",
+      cancel: "Annuler",
+      delete: "Supprimer",
+      accountDeleted: "Compte supprimé avec succès"
     }
   },
   ar: {
@@ -62,7 +78,15 @@ const resources = {
       success: "نجح!",
       accountCreated: "تم إنشاء الحساب بنجاح. يمكنك الآن تسجيل الدخول.",
       welcomeBackMessage: "تم تسجيل الدخول بنجاح.",
-      error: "خطأ"
+      error: "خطأ",
+      profile: "الملف الشخصي",
+      language: "اللغة",
+      logout: "تسجيل الخروج",
+      deleteAccount: "حذف الحساب",
+      deleteAccountConfirm: "هل أنت متأكد من رغبتك في حذف حسابك؟ هذا الإجراء لا يمكن التراجع عنه.",
+      cancel: "إلغاء",
+      delete: "حذف",
+      accountDeleted: "تم حذف الحساب بنجاح"
     }
   }
 };
