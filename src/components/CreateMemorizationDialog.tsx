@@ -32,7 +32,7 @@ export const CreateMemorizationDialog = ({
 }: CreateMemorizationDialogProps) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [isPublic, setIsPublic] = useState(true);
+  // Removed isPublic - all memorizations are public by default
   const [flashcards, setFlashcards] = useState<Flashcard[]>([
     { front_data: { text: '', media: [] }, back_data: { text: '', media: [] }, order_index: 0 },
   ]);
@@ -193,7 +193,7 @@ export const CreateMemorizationDialog = ({
           subject_id: selectedSubjectId || subjectId || null,
           chapter_id: selectedChapterId || chapterId || null,
           class_id: classId,
-          is_public: isPublic,
+          is_public: true, // All memorizations are public by default
         })
         .select()
         .single();
@@ -332,14 +332,7 @@ export const CreateMemorizationDialog = ({
               />
             </div>
 
-            <div className="flex items-center justify-between">
-              <Label htmlFor="isPublic">Make Public</Label>
-              <Switch
-                id="isPublic"
-                checked={isPublic}
-                onCheckedChange={setIsPublic}
-              />
-            </div>
+            {/* Removed "Make Public" toggle - all memorizations are public by default */}
           </div>
 
           {/* Flashcards */}
