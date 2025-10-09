@@ -1,5 +1,8 @@
 import { Card } from '@/components/ui/card';
 import { AudioPlayer } from '@/components/AudioPlayer';
+import { Volume2 } from 'lucide-react';
+import { useState } from 'react';
+import { AudioPlayerModal } from '@/components/AudioPlayerModal';
 
 interface MediaPreviewProps {
   url: string;
@@ -12,6 +15,8 @@ function extractRecordingNumber(url: string): string | undefined {
 }
 
 export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
+  const [audioModalOpen, setAudioModalOpen] = useState(false);
+  
   // Check if it's a YouTube URL
   const getYouTubeEmbedUrl = (url: string) => {
     const patterns = [
@@ -43,7 +48,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   if (youtubeEmbedUrl) {
     return (
       <Card className={`overflow-hidden ${className}`}>
-        <div className="aspect-video w-full">
+        <div className="aspect-video w-full max-w-sm">
           <iframe
             width="100%"
             height="100%"
@@ -61,32 +66,19 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
 
   if (isPdf) {
     return (
-      <Card className={`overflow-hidden ${className} p-6`}>
-        <div className="flex flex-col items-center gap-4">
-          <div className="text-6xl">📄</div>
-          <div className="text-center space-y-2">
-            <h3 className="font-semibold text-lg">PDF Document</h3>
-            <p className="text-sm text-muted-foreground">Click below to view the PDF</p>
+      <Card className={`overflow-hidden ${className} p-4 hover:shadow-md transition-all cursor-pointer`}>
+        <a
+          href={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 text-sm"
+        >
+          <div className="text-3xl">📄</div>
+          <div className="flex-1">
+            <p className="font-medium">PDF Document</p>
+            <p className="text-xs text-muted-foreground">Click to view</p>
           </div>
-          <div className="flex gap-2 w-full justify-center">
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-            >
-              Open PDF in New Tab
-            </a>
-            <a
-              href={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
-            >
-              View in Google Docs
-            </a>
-          </div>
-        </div>
+        </a>
       </Card>
     );
   }
@@ -94,7 +86,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   if (isImage) {
     return (
       <Card className={`overflow-hidden ${className}`}>
-        <img src={url} alt="Media content" className="w-full h-auto object-contain max-h-[600px]" />
+        <img src={url} alt="Media content" className="w-full h-auto object-cover max-h-40 rounded-lg" />
       </Card>
     );
   }
@@ -102,11 +94,28 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   if (isAudio) {
     const recordingNumber = extractRecordingNumber(url);
     return (
-      <AudioPlayer 
-        url={url} 
-        recordingNumber={recordingNumber}
-        className={className}
-      />
+      <>
+        <Card 
+          className={`overflow-hidden ${className} p-3 hover:shadow-md transition-all cursor-pointer`}
+          onClick={() => setAudioModalOpen(true)}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <Volume2 className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm">Audio Recording</p>
+              <p className="text-xs text-muted-foreground">Click to play</p>
+            </div>
+          </div>
+        </Card>
+        <AudioPlayerModal
+          open={audioModalOpen}
+          onClose={() => setAudioModalOpen(false)}
+          url={url}
+          recordingNumber={recordingNumber}
+        />
+      </>
     );
   }
 
