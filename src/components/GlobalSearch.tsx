@@ -456,9 +456,9 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
                     onClick={() => handleResultClick(result)}
                     className="w-full p-4 text-left rounded-lg border-2 hover:border-foreground transition-all"
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1">{getIcon(result.type)}</div>
-                      <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-3 overflow-hidden">
+                      <div className="mt-1 flex-shrink-0">{getIcon(result.type)}</div>
+                      <div className="flex-1 min-w-0 overflow-hidden">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <Badge variant="secondary" className="text-xs">
                             {result.type}
@@ -481,7 +481,7 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
                         </div>
                         <p className="font-medium truncate">{result.title}</p>
                         {result.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1 break-words">
                             {result.description}
                           </p>
                         )}

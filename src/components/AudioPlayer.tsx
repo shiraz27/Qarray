@@ -114,7 +114,7 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
             max={duration || 100}
             step={0.1}
             onValueChange={handleSeek}
-            className="cursor-pointer [&_[role=slider]]:bg-border [&_[role=slider]]:border-border"
+            className="cursor-pointer [&_[role=slider]]:bg-muted [&_[role=slider]]:border-border"
           />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{formatTime(currentTime)}</span>
