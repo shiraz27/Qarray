@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { MessageSquare, FileText, ArrowLeft, Bookmark, ThumbsUp, ThumbsDown, Plus } from 'lucide-react';
+import { MessageSquare, FileText, ArrowLeft, Bookmark, ThumbsUp, ThumbsDown, Plus, Image as ImageIcon, Video, FileAudio } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
@@ -759,10 +759,16 @@ export default function Chapter() {
                 .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
                 .map((question) => {
                   const questionType = resourceTypes.find(t => t.id === question.type_id);
+                  const { text, media } = extractMediaFromText(question.data);
+                  const hasAudio = media.some(m => m.type === 'audio');
+                  const hasImages = media.some(m => m.type === 'image');
+                  const hasVideo = media.some(m => m.type === 'video');
+                  const hasPdf = media.some(m => m.type === 'pdf');
+                  
                   return (
                 <Card 
                   key={question.id} 
-                  className="p-4 cursor-pointer hover:bg-accent/50 transition-colors space-y-2"
+                  className="p-4 cursor-pointer hover:border-foreground transition-all space-y-2 border-2"
                   onClick={() => navigate(`/question/${question.id}`)}
                 >
                   {question.contributors && question.contributors.length > 0 && (
@@ -775,7 +781,7 @@ export default function Chapter() {
                     />
                   )}
                   <div className="flex items-start justify-between mb-2">
-                    <p className="text-foreground flex-1">{extractMediaFromText(question.data).text}</p>
+                    <p className="text-foreground flex-1">{text}</p>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {!question.verified && (
                         <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full whitespace-nowrap">
@@ -789,6 +795,37 @@ export default function Chapter() {
                       )}
                     </div>
                   </div>
+                  
+                  {/* Media indicators */}
+                  {media.length > 0 && (
+                    <div className="flex items-center gap-2 mb-2">
+                      {hasAudio && (
+                        <div className="flex items-center gap-1 text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+                          <FileAudio size={14} />
+                          <span>Audio</span>
+                        </div>
+                      )}
+                      {hasImages && (
+                        <div className="flex items-center gap-1 text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">
+                          <ImageIcon size={14} />
+                          <span>Image</span>
+                        </div>
+                      )}
+                      {hasVideo && (
+                        <div className="flex items-center gap-1 text-xs px-2 py-1 bg-red-100 text-red-700 rounded-full">
+                          <Video size={14} />
+                          <span>Video</span>
+                        </div>
+                      )}
+                      {hasPdf && (
+                        <div className="flex items-center gap-1 text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+                          <FileText size={14} />
+                          <span>PDF</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
                       {new Date(question.created_at).toLocaleDateString()}
@@ -923,10 +960,18 @@ export default function Chapter() {
                 .map((resource) => {
                   const resourceType = resourceTypes.find(t => t.id === resource.type_id);
                   const devoirType = devoirTypes.find(t => t.id === resource.devoir_type_id);
+                  
+                  // Check media types in resource data
+                  const allMediaFiles = resource.data.flatMap(dataStr => extractMediaFromText(dataStr).media);
+                  const hasAudio = allMediaFiles.some(m => m.type === 'audio');
+                  const hasImages = allMediaFiles.some(m => m.type === 'image');
+                  const hasVideo = allMediaFiles.some(m => m.type === 'video');
+                  const hasPdf = allMediaFiles.some(m => m.type === 'pdf');
+                  
                   return (
                 <Card 
                   key={resource.id} 
-                  className="p-4 cursor-pointer hover:bg-accent/50 transition-colors space-y-2"
+                  className="p-4 cursor-pointer hover:border-foreground transition-all space-y-2 border-2"
                   onClick={() => navigate(`/resource/${resource.id}`)}
                 >
                   {resource.published_by && (
@@ -964,6 +1009,37 @@ export default function Chapter() {
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground mb-3">{resource.description}</p>
+                  
+                  {/* Media indicators */}
+                  {allMediaFiles.length > 0 && (
+                    <div className="flex items-center gap-2 mb-2">
+                      {hasAudio && (
+                        <div className="flex items-center gap-1 text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+                          <FileAudio size={14} />
+                          <span>Audio</span>
+                        </div>
+                      )}
+                      {hasImages && (
+                        <div className="flex items-center gap-1 text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">
+                          <ImageIcon size={14} />
+                          <span>Image</span>
+                        </div>
+                      )}
+                      {hasVideo && (
+                        <div className="flex items-center gap-1 text-xs px-2 py-1 bg-red-100 text-red-700 rounded-full">
+                          <Video size={14} />
+                          <span>Video</span>
+                        </div>
+                      )}
+                      {hasPdf && (
+                        <div className="flex items-center gap-1 text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+                          <FileText size={14} />
+                          <span>PDF</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
                       {new Date(resource.created_at).toLocaleDateString()}
