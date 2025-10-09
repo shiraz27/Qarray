@@ -297,9 +297,6 @@ export default function ResourceDetail() {
           <div className="w-10" />
         </div>
       </div>
-        </Button>
-        <h1 className="text-lg font-semibold flex-1">{t('resource') || 'Resource'}</h1>
-      </div>
 
       {/* Resource Banner */}
       <Card 
