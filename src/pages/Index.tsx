@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { LogOut, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
+import qarayLogo from '@/assets/qarray-logo-new.png';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -166,9 +167,9 @@ const Index: React.FC = () => {
                 
                 <div className="flex justify-center mt-4">
                   <img
-                    src="https://api.builder.io/api/v1/image/assets/a6410069d4c34ccabf25d52a6064b0e1/690fbf551718dd4374bdf3773c038c355abbe5a5?placeholderIfAbsent=true"
-                    className="aspect-[0.83] object-contain w-[57px]"
-                    alt="Educational mascot logo"
+                    src={qarayLogo}
+                    className="h-16 w-16 object-contain"
+                    alt="Qarray Logo"
                   />
                 </div>
                 

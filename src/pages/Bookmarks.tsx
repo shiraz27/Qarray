@@ -1,29 +1,30 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { MessageSquare, FileText, Bookmark } from "lucide-react";
+import { MessageSquare, FileText, Bookmark, ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import chapterPattern from "@/assets/chapter-pattern.png";
-import { Header } from "@/components/Header";
+import { Button } from "@/components/ui/button";
 import { BottomNavigation } from "@/components/BottomNavigation";
 import { BookmarkSkeleton } from "@/components/LoadingSkeleton";
 import { EmptyState } from "@/components/EmptyState";
+import qarayLogo from "@/assets/qarray-logo-new.png";
 
-interface BookmarkedChapter {
-  id: number;
-  name: string;
-  questionCount: number;
-  answerCount: number;
-  resourceCount: number;
-  subjectName: string;
+interface BookmarkedItem {
+  id: string;
+  type: 'chapter' | 'question' | 'answer' | 'resource';
+  title: string;
+  description?: string;
+  chapterName?: string;
+  subjectName?: string;
+  created_at: string;
 }
 
 export default function Bookmarks() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [chapters, setChapters] = useState<BookmarkedChapter[]>([]);
+  const [bookmarkedItems, setBookmarkedItems] = useState<BookmarkedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("bookmarks");
@@ -31,6 +32,8 @@ export default function Bookmarks() {
   const handleTabChange = (tab: string) => {
     if (tab === "subjects") {
       navigate("/");
+    } else if (tab === "profile") {
+      navigate("/profile");
     } else {
       setActiveTab(tab);
     }
@@ -46,98 +49,119 @@ export default function Bookmarks() {
   }, [navigate]);
 
   useEffect(() => {
-    const fetchBookmarkedChapters = async () => {
+    const fetchBookmarks = async () => {
       if (!user) return;
 
       setLoading(true);
       try {
-        // Fetch bookmarked chapter IDs
         const { data: bookmarksData, error: bookmarksError } = await supabase
           .from("bookmarks")
-          .select("chapter_id")
-          .eq("user_id", user.id);
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
 
         if (bookmarksError) throw bookmarksError;
 
-        const chapterIds = bookmarksData?.map((b) => b.chapter_id) || [];
+        const items: BookmarkedItem[] = [];
 
-        if (chapterIds.length === 0) {
-          setChapters([]);
-          setLoading(false);
-          return;
+        for (const bookmark of bookmarksData || []) {
+          if (bookmark.chapter_id) {
+            // Fetch chapter
+            const { data: chapter } = await supabase
+              .from("chapters")
+              .select("id, name, subjects(name)")
+              .eq("id", bookmark.chapter_id)
+              .eq("deleted", false)
+              .single();
+
+            if (chapter) {
+              items.push({
+                id: `chapter-${bookmark.id}`,
+                type: 'chapter',
+                title: chapter.name,
+                subjectName: (chapter.subjects as any)?.name || "",
+                created_at: bookmark.created_at
+              });
+            }
+          } else if (bookmark.content_type === 'question') {
+            const { data: question } = await supabase
+              .from("questions")
+              .select("id, data, chapter_id, chapters(name, subjects(name))")
+              .eq("id", bookmark.content_id)
+              .eq("deleted", false)
+              .single();
+
+            if (question) {
+              items.push({
+                id: `question-${bookmark.id}`,
+                type: 'question',
+                title: question.data.substring(0, 100) + (question.data.length > 100 ? '...' : ''),
+                chapterName: (question.chapters as any)?.name,
+                subjectName: (question.chapters as any)?.subjects?.name,
+                created_at: bookmark.created_at
+              });
+            }
+          } else if (bookmark.content_type === 'answer') {
+            const { data: answer } = await supabase
+              .from("answers")
+              .select("id, data, question_id, questions(data, chapter_id, chapters(name, subjects(name)))")
+              .eq("id", bookmark.content_id)
+              .eq("deleted", false)
+              .single();
+
+            if (answer) {
+              items.push({
+                id: `answer-${bookmark.id}`,
+                type: 'answer',
+                title: answer.data.substring(0, 100) + (answer.data.length > 100 ? '...' : ''),
+                description: `Answer to: ${(answer.questions as any)?.data?.substring(0, 50)}...`,
+                chapterName: (answer.questions as any)?.chapters?.name,
+                subjectName: (answer.questions as any)?.chapters?.subjects?.name,
+                created_at: bookmark.created_at
+              });
+            }
+          } else if (bookmark.content_type === 'resource') {
+            const { data: resource } = await supabase
+              .from("resources")
+              .select("id, title, description, chapter_id, chapters(name, subjects(name))")
+              .eq("id", bookmark.content_id)
+              .eq("deleted", false)
+              .single();
+
+            if (resource) {
+              items.push({
+                id: `resource-${bookmark.id}`,
+                type: 'resource',
+                title: resource.title,
+                description: resource.description,
+                chapterName: (resource.chapters as any)?.name,
+                subjectName: (resource.chapters as any)?.subjects?.name,
+                created_at: bookmark.created_at
+              });
+            }
+          }
         }
 
-        // Fetch chapter details with subject names
-        const { data: chaptersData, error: chaptersError } = await supabase
-          .from("chapters")
-          .select("id, name, subject_id, subjects(name)")
-          .in("id", chapterIds)
-          .eq("deleted", false);
-
-        if (chaptersError) throw chaptersError;
-
-        // Fetch counts for each chapter
-        const chaptersWithCounts = await Promise.all(
-          (chaptersData || []).map(async (chapter: any) => {
-            // Count questions
-            const { count: questionCount } = await supabase
-              .from("questions")
-              .select("*", { count: "exact", head: true })
-              .eq("chapter_id", chapter.id)
-              .eq("deleted", false);
-
-            // Count answers
-            const { count: answerCount } = await supabase
-              .from("answers")
-              .select("*", { count: "exact", head: true })
-              .in(
-                "question_id",
-                await supabase
-                  .from("questions")
-                  .select("id")
-                  .eq("chapter_id", chapter.id)
-                  .eq("deleted", false)
-                  .then((res) => res.data?.map((q) => q.id) || []),
-              )
-              .eq("deleted", false);
-
-            // Count resources
-            const { count: resourceCount } = await supabase
-              .from("resources")
-              .select("*", { count: "exact", head: true })
-              .eq("chapter_id", chapter.id)
-              .eq("deleted", false);
-
-            return {
-              id: chapter.id,
-              name: chapter.name,
-              questionCount: questionCount || 0,
-              answerCount: answerCount || 0,
-              resourceCount: resourceCount || 0,
-              subjectName: chapter.subjects?.name || "",
-            };
-          }),
-        );
-
-        setChapters(chaptersWithCounts);
+        setBookmarkedItems(items);
       } catch (error) {
-        console.error("Error fetching bookmarked chapters:", error);
+        console.error("Error fetching bookmarks:", error);
         toast.error(t("errorLoadingBookmarks") || "Failed to load bookmarks");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchBookmarkedChapters();
+    fetchBookmarks();
   }, [user, t]);
 
-  const removeBookmark = async (chapterId: number) => {
+  const removeBookmark = async (itemId: string) => {
     if (!user) return;
 
     try {
-      await supabase.from("bookmarks").delete().eq("user_id", user.id).eq("chapter_id", chapterId);
+      const bookmarkId = itemId.split('-')[1];
+      await supabase.from("bookmarks").delete().eq("id", bookmarkId).eq("user_id", user.id);
 
-      setChapters((prev) => prev.filter((ch) => ch.id !== chapterId));
+      setBookmarkedItems((prev) => prev.filter((item) => item.id !== itemId));
       toast.success(t("bookmarkRemoved") || "Bookmark removed");
     } catch (error) {
       console.error("Error removing bookmark:", error);
@@ -145,80 +169,135 @@ export default function Bookmarks() {
     }
   };
 
+  const handleItemClick = (item: BookmarkedItem) => {
+    const [type, bookmarkId] = item.id.split('-');
+    if (type === 'chapter') {
+      // Extract the actual chapter ID from the bookmark
+      const bookmark = bookmarkedItems.find(b => b.id === item.id);
+      // We'll need to navigate to the chapter page
+      navigate(`/chapter/${item.title}`); // This needs the actual chapter ID
+    } else if (type === 'question') {
+      navigate(`/question/${bookmarkId}`);
+    } else if (type === 'answer') {
+      // Navigate to question detail with answer highlighted
+      navigate(`/question/${bookmarkId}`);
+    } else if (type === 'resource') {
+      navigate(`/resource/${bookmarkId}`);
+    }
+  };
+
+  const groupedItems = {
+    chapters: bookmarkedItems.filter(item => item.type === 'chapter'),
+    questions: bookmarkedItems.filter(item => item.type === 'question'),
+    answers: bookmarkedItems.filter(item => item.type === 'answer'),
+    resources: bookmarkedItems.filter(item => item.type === 'resource'),
+  };
+
+  const renderBookmarkCard = (item: BookmarkedItem) => (
+    <Card
+      key={item.id}
+      className="p-4 hover:shadow-md transition-all cursor-pointer"
+      onClick={() => handleItemClick(item)}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          {item.subjectName && (
+            <p className="text-xs text-muted-foreground mb-1">{item.subjectName}</p>
+          )}
+          {item.chapterName && (
+            <p className="text-xs text-muted-foreground mb-1">{item.chapterName}</p>
+          )}
+          <h3 className="font-semibold text-sm mb-1">{item.title}</h3>
+          {item.description && (
+            <p className="text-xs text-muted-foreground">{item.description}</p>
+          )}
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            removeBookmark(item.id);
+          }}
+          className="hover:scale-110 transition-transform ml-2"
+        >
+          <Bookmark size={20} className="text-foreground fill-foreground" />
+        </button>
+      </div>
+    </Card>
+  );
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {/* Top Navigation */}
+      <div className="sticky top-0 z-50 bg-white border-b">
+        <div className="flex items-center justify-between px-4 py-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+            <ArrowLeft size={20} />
+          </Button>
+          <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+          <div className="w-10" />
+        </div>
+      </div>
+
       <main className="flex-1 w-full px-4 pb-4 mb-24 mt-4">
         <h1 className="text-2xl font-bold text-foreground mb-6">{t("bookmarks") || "Bookmarks"}</h1>
 
         {loading ? (
           <BookmarkSkeleton />
-        ) : chapters.length === 0 ? (
-          <EmptyState type="bookmarks" message={t("noBookmarks") || "You haven't bookmarked any chapters yet"} />
+        ) : bookmarkedItems.length === 0 ? (
+          <EmptyState type="bookmarks" message={t("noBookmarks") || "You haven't bookmarked anything yet"} />
         ) : (
-          <div className="space-y-3">
-            {chapters.map((chapter) => {
-              const hasContent = chapter.questionCount > 0 || chapter.answerCount > 0 || chapter.resourceCount > 0;
+          <div className="space-y-8">
+            {/* Chapters Section */}
+            {groupedItems.chapters.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <FileText size={20} className="text-primary" />
+                  {t("chapters") || "Chapters"} ({groupedItems.chapters.length})
+                </h2>
+                <div className="space-y-3">
+                  {groupedItems.chapters.map(renderBookmarkCard)}
+                </div>
+              </div>
+            )}
 
-              return (
-                <Card
-                  key={chapter.id}
-                  className="relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer border-none"
-                  style={{
-                    background: hasContent
-                      ? "linear-gradient(to right, #FFFFFF 0%, #FDE6E6 100%)"
-                      : "linear-gradient(to right, #FFFFFF 0%, #E0E0E0 100%)",
-                  }}
-                  onClick={() => navigate(`/chapter/${chapter.id}`)}
-                >
-                  {/* Pattern overlay */}
-                  <div
-                    className="absolute inset-0 opacity-40"
-                    style={{
-                      backgroundImage: `url(${chapterPattern})`,
-                      backgroundSize: "auto",
-                      backgroundRepeat: "repeat",
-                      imageRendering: "crisp-edges",
-                    }}
-                  />
+            {/* Questions Section */}
+            {groupedItems.questions.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <MessageSquare size={20} className="text-primary" />
+                  {t("questions") || "Questions"} ({groupedItems.questions.length})
+                </h2>
+                <div className="space-y-3">
+                  {groupedItems.questions.map(renderBookmarkCard)}
+                </div>
+              </div>
+            )}
 
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex-1">
-                        <p className="text-xs text-muted-foreground mb-1">{chapter.subjectName}</p>
-                        <h3 className="font-semibold text-sm tracking-wide text-foreground">
-                          {chapter.name.toUpperCase()}
-                        </h3>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeBookmark(chapter.id);
-                        }}
-                        className="hover:scale-110 transition-transform"
-                      >
-                        <Bookmark size={20} className="text-foreground fill-foreground" />
-                      </button>
-                    </div>
+            {/* Answers Section */}
+            {groupedItems.answers.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <MessageSquare size={20} className="text-green-600" />
+                  {t("answers") || "Answers"} ({groupedItems.answers.length})
+                </h2>
+                <div className="space-y-3">
+                  {groupedItems.answers.map(renderBookmarkCard)}
+                </div>
+              </div>
+            )}
 
-                    <div className="flex gap-4 text-xs">
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <MessageSquare size={14} className="text-muted-foreground" />
-                        <span className="font-medium">
-                          {chapter.questionCount} {t("questions") || "Questions"}/ {chapter.answerCount}{" "}
-                          {t("answers") || "Answers"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <FileText size={14} className="text-muted-foreground" />
-                        <span className="font-medium">
-                          {chapter.resourceCount} {t("resources") || "Resources"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
+            {/* Resources Section */}
+            {groupedItems.resources.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <FileText size={20} className="text-blue-600" />
+                  {t("resources") || "Resources"} ({groupedItems.resources.length})
+                </h2>
+                <div className="space-y-3">
+                  {groupedItems.resources.map(renderBookmarkCard)}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

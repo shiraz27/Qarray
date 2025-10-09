@@ -9,6 +9,7 @@ import { MessageSquare, FileText, ArrowLeft, Bookmark, ThumbsUp, ThumbsDown, Plu
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
+import qarayLogo from '@/assets/qarray-logo-new.png';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { ContentSkeleton } from '@/components/LoadingSkeleton';
 import { EmptyState } from '@/components/EmptyState';
@@ -479,11 +480,14 @@ export default function Chapter() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col pb-24">
-        <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft size={20} />
-          </Button>
-          <h1 className="text-lg font-semibold flex-1">{t('chapter') || 'Chapter'}</h1>
+        <div className="sticky top-0 z-50 bg-white border-b">
+          <div className="flex items-center justify-between px-4 py-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+              <ArrowLeft size={20} />
+            </Button>
+            <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+            <div className="w-10" />
+          </div>
         </div>
         <div className="flex-1 p-4">
           <ContentSkeleton />
@@ -496,11 +500,14 @@ export default function Chapter() {
   if (!chapter) {
     return (
       <div className="min-h-screen bg-background flex flex-col pb-24">
-        <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft size={20} />
-          </Button>
-          <h1 className="text-lg font-semibold flex-1">{t('chapter') || 'Chapter'}</h1>
+        <div className="sticky top-0 z-50 bg-white border-b">
+          <div className="flex items-center justify-between px-4 py-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+              <ArrowLeft size={20} />
+            </Button>
+            <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+            <div className="w-10" />
+          </div>
         </div>
         <EmptyState
           type="chapters"
@@ -515,27 +522,24 @@ export default function Chapter() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
-      {/* Header with back button */}
-      <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/')}
-        >
-          <ArrowLeft size={20} />
-        </Button>
-        <h1 className="text-lg font-semibold flex-1">{t('chapter') || 'Chapter'}</h1>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleBookmark}
-        >
-          <Bookmark
-            size={20}
-            className={chapter.isBookmarked ? 'fill-primary' : ''}
-            style={chapter.isBookmarked ? { color: '#F6A18A' } : undefined}
-          />
-        </Button>
+      {/* Header with back button and logo */}
+      <div className="sticky top-0 z-50 bg-white border-b">
+        <div className="flex items-center justify-between px-4 py-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+            <ArrowLeft size={20} />
+          </Button>
+          <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleBookmark}
+          >
+            <Bookmark
+              size={20}
+              className={chapter.isBookmarked ? 'fill-current text-primary' : ''}
+            />
+          </Button>
+        </div>
       </div>
 
       {/* Chapter Banner - Reusing chapter card design */}

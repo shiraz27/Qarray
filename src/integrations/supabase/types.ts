@@ -57,19 +57,25 @@ export type Database = {
       }
       bookmarks: {
         Row: {
-          chapter_id: number
+          chapter_id: number | null
+          content_id: number | null
+          content_type: string | null
           created_at: string | null
           id: string
           user_id: string
         }
         Insert: {
-          chapter_id: number
+          chapter_id?: number | null
+          content_id?: number | null
+          content_type?: string | null
           created_at?: string | null
           id?: string
           user_id: string
         }
         Update: {
-          chapter_id?: number
+          chapter_id?: number | null
+          content_id?: number | null
+          content_type?: string | null
           created_at?: string | null
           id?: string
           user_id?: string
