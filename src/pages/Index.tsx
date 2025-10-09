@@ -159,22 +159,22 @@ const Index: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col bg-background">
       <div className="w-full mx-auto flex flex-col min-h-screen">
-        <div className="flex-1 w-full overflow-auto">
+        <div className="flex-1 w-full overflow-auto pb-24">
           {activeTab === 'subjects' && (
             <>
               <section className="items-stretch flex w-full flex-col bg-background">
                 <Header userName={userProfile?.full_name || 'User'} />
                 
                 <div className="flex flex-col items-center mt-6 mb-4 gap-4">
-                  <div className="flex items-center gap-3 hover-scale">
+                  <div className="flex items-center gap-3 hover-scale cursor-pointer">
                     <img
                       src={qarayLogo}
                       className="h-16 w-16 object-contain"
                       alt="Qarray Logo"
                     />
-                    <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                    <h1 className="text-3xl font-bold gradient-primary bg-clip-text text-transparent">
                       Qarray
                     </h1>
                   </div>

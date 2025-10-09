@@ -82,12 +82,12 @@ export const Header: React.FC<HeaderProps> = ({ userName = "Osman" }) => {
           </button>
           <button 
             aria-label="Notifications" 
-            className="relative"
+            className="relative hover-scale"
             onClick={() => setShowNotifications(true)}
           >
-            <BellDot className="h-8 w-8 text-black" />
+            <Bell size={24} className="text-gray-700" />
             {notificationCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[11px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
+              <span className="absolute -top-1 -right-1 w-6 h-6 gradient-primary text-white rounded-full text-xs flex items-center justify-center font-bold shadow-lg animate-pulse">
                 {notificationCount > 9 ? '9+' : notificationCount}
               </span>
             )}

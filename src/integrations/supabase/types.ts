@@ -248,6 +248,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_color: string | null
           class_id: number | null
           created_at: string | null
           deleted: boolean
@@ -262,6 +263,7 @@ export type Database = {
           verified: boolean
         }
         Insert: {
+          avatar_color?: string | null
           class_id?: number | null
           created_at?: string | null
           deleted?: boolean
@@ -276,6 +278,7 @@ export type Database = {
           verified?: boolean
         }
         Update: {
+          avatar_color?: string | null
           class_id?: number | null
           created_at?: string | null
           deleted?: boolean

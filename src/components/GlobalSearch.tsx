@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -158,6 +159,9 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
             <Search className="w-5 h-5" />
             Global Search
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Search across chapters, resources, questions, and answers
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

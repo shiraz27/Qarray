@@ -292,12 +292,15 @@ export default function Bookmarks() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Top Navigation */}
-      <div className="sticky top-0 z-50 bg-white border-b">
+      <div className="sticky top-0 z-50 bg-background border-b">
         <div className="flex items-center justify-between px-4 py-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="hover-scale">
             <ArrowLeft size={20} />
           </Button>
-          <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+          <div className="flex items-center gap-2">
+            <img src={qarayLogo} alt="Qarray Logo" className="h-10 w-10 object-contain" />
+            <span className="text-lg font-bold gradient-primary bg-clip-text text-transparent">Qarray</span>
+          </div>
           <div className="w-10" />
         </div>
       </div>

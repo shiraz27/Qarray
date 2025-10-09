@@ -142,40 +142,30 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
   return (
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent className="w-full sm:max-w-md">
-        <SheetHeader className="space-y-4">
-          <div className="flex items-center justify-between">
-            <SheetTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              Notifications
-              {unreadCount > 0 && (
-                <span className="bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
-                  {unreadCount}
-                </span>
-              )}
-            </SheetTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          {unreadCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={markAllAsRead}
-              className="w-full"
-            >
-              <CheckCheck className="h-4 w-4 mr-2" />
-              Mark all as read
-            </Button>
-          )}
-        </SheetHeader>
+        <div className="flex items-center justify-between mb-6">
+          <SheetTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Notifications
+            {unreadCount > 0 && (
+              <span className="bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
+                {unreadCount}
+              </span>
+            )}
+          </SheetTitle>
+        </div>
+        {unreadCount > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={markAllAsRead}
+            className="w-full mb-4"
+          >
+            <CheckCheck className="h-4 w-4 mr-2" />
+            Mark all as read
+          </Button>
+        )}
 
-        <ScrollArea className="h-[calc(100vh-140px)] mt-6">
+        <ScrollArea className="h-[calc(100vh-200px)]">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />

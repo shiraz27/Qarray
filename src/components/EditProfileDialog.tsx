@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -80,6 +81,9 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit Profile</DialogTitle>
+          <DialogDescription className="sr-only">
+            Update your profile information including name and avatar color
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
