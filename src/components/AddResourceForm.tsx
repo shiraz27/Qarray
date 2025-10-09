@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
@@ -42,6 +43,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+  const { isModerator, isAdmin } = useUserRole();
   
   const form = useForm<ResourceFormData>({
     resolver: zodResolver(resourceSchema),
@@ -104,6 +106,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           data: mediaUrls,
           published_by: user.id,
           contributors: [user.id],
+          verified: isModerator || isAdmin,
         });
 
       if (error) throw error;

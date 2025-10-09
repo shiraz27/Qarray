@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Trash2 } from 'lucide-react';
 import { FlashcardEditor } from './FlashcardEditor';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface CreateMemorizationDialogProps {
   open: boolean;
@@ -44,6 +45,7 @@ export const CreateMemorizationDialog = ({
   const [selectedChapterId, setSelectedChapterId] = useState<number | null>(null);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [chapters, setChapters] = useState<any[]>([]);
+  const { isModerator, isAdmin } = useUserRole();
 
   // Fetch user's class and subjects
   useEffect(() => {
@@ -193,6 +195,7 @@ export const CreateMemorizationDialog = ({
           chapter_id: selectedChapterId || chapterId || null,
           class_id: classId,
           is_public: true, // All memorizations are public by default
+          verified: isModerator || isAdmin,
         })
         .select()
         .single();

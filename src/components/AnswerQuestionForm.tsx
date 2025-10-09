@@ -9,6 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const answerSchema = z.object({
   answer: z.string().min(10, 'Answer must be at least 10 characters').max(1000, 'Answer must be less than 1000 characters'),
@@ -29,6 +30,7 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+  const { isModerator, isAdmin } = useUserRole();
   
   const form = useForm<AnswerFormData>({
     resolver: zodResolver(answerSchema),
@@ -67,6 +69,7 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
           question_id: questionId,
           data: answerData,
           contributors: [user.id],
+          verified: isModerator || isAdmin,
         });
 
       if (error) throw error;

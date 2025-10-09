@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const questionSchema = z.object({
   question: z.string().min(10, 'Question must be at least 10 characters').max(500, 'Question must be less than 500 characters'),
@@ -34,6 +35,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+  const { isModerator, isAdmin } = useUserRole();
   
   const form = useForm<QuestionFormData>({
     resolver: zodResolver(questionSchema),
@@ -94,6 +96,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
           data: questionData,
           type_id: typeId,
           contributors: [user.id],
+          verified: isModerator || isAdmin,
         })
         .select();
 
