@@ -156,6 +156,11 @@ export const CreateMemorizationDialog = ({
       return;
     }
 
+    if (!subjectId && !selectedSubjectId) {
+      toast.error('Please select a subject');
+      return;
+    }
+
     if (flashcards.length === 0) {
       toast.error('Please add at least one flashcard');
       return;
@@ -252,7 +257,7 @@ export const CreateMemorizationDialog = ({
             {/* Show subject selector if no subjectId provided */}
             {!subjectId && subjects.length > 0 && (
               <div>
-                <Label htmlFor="subject">Subject (Optional)</Label>
+                <Label htmlFor="subject">Subject *</Label>
                 <Select
                   value={selectedSubjectId?.toString()}
                   onValueChange={(value) => {
