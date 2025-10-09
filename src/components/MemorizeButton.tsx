@@ -15,7 +15,7 @@ export const MemorizeButton = ({ subjectId, chapterId }: MemorizeButtonProps) =>
     <>
       <Button
         onClick={() => setModalOpen(true)}
-        className="gap-2 text-white hover:opacity-90"
+        className="gap-2 text-white hover:opacity-90 w-full"
         style={{ backgroundColor: '#703627' }}
       >
         <Brain className="w-4 h-4" />

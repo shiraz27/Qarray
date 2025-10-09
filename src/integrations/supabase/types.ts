@@ -342,11 +342,13 @@ export type Database = {
           creator_id: string
           deleted: boolean
           description: string | null
+          downvotes: number | null
           id: number
           is_public: boolean
           subject_id: number | null
           title: string
           updated_at: string
+          upvotes: number | null
         }
         Insert: {
           chapter_id?: number | null
@@ -355,11 +357,13 @@ export type Database = {
           creator_id: string
           deleted?: boolean
           description?: string | null
+          downvotes?: number | null
           id?: number
           is_public?: boolean
           subject_id?: number | null
           title: string
           updated_at?: string
+          upvotes?: number | null
         }
         Update: {
           chapter_id?: number | null
@@ -368,11 +372,13 @@ export type Database = {
           creator_id?: string
           deleted?: boolean
           description?: string | null
+          downvotes?: number | null
           id?: number
           is_public?: boolean
           subject_id?: number | null
           title?: string
           updated_at?: string
+          upvotes?: number | null
         }
         Relationships: [
           {
