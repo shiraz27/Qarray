@@ -14,6 +14,9 @@ import { GlobalSearch } from '@/components/GlobalSearch';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import qarayLogo from '@/assets/qarray-logo-new.png';
+import Bookmarks from './Bookmarks';
+import Classmates from './Classmates';
+import Profile from './Profile';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,9 +40,11 @@ const Index: React.FC = () => {
   const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  const handleTabChange = (tab: string) => {
+   const handleTabChange = (tab: string) => {
     if (tab === 'bookmarks') {
       navigate('/bookmarks');
+    } else if (tab === 'classmates') {
+      navigate('/classmates');
     } else {
       setActiveTab(tab);
     }
@@ -166,23 +171,32 @@ const Index: React.FC = () => {
             <>
               {/* Animated Background Pattern */}
               <div className="absolute inset-0 -z-10 overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-[#F6A18A]/5 via-background to-[hsl(207,89%,54%)]/5" />
+                <div className="absolute inset-0 bg-gradient-to-br from-[#F6A18A]/15 via-background to-[hsl(207,89%,54%)]/15" />
                 
                 {/* Geometric shapes for e-learning theme */}
-                <div className="absolute top-20 left-10 w-32 h-32 bg-[#F6A18A]/10 rounded-full blur-3xl animate-pulse" />
-                <div className="absolute top-40 right-20 w-40 h-40 bg-[hsl(207,89%,54%)]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-                <div className="absolute top-96 left-1/4 w-36 h-36 bg-[#F6A18A]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+                <div className="absolute top-20 left-10 w-48 h-48 bg-[#F6A18A]/25 rounded-full blur-3xl animate-pulse" />
+                <div className="absolute top-40 right-20 w-56 h-56 bg-[hsl(207,89%,54%)]/25 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+                <div className="absolute top-96 left-1/4 w-52 h-52 bg-[#F6A18A]/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+                <div className="absolute top-[600px] right-1/3 w-48 h-48 bg-[hsl(207,89%,54%)]/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '3s' }} />
                 
-                {/* Book/Study icons pattern */}
-                <div className="absolute top-10 right-10 text-6xl opacity-5">📚</div>
-                <div className="absolute top-60 left-20 text-5xl opacity-5">✏️</div>
-                <div className="absolute top-[500px] right-1/4 text-6xl opacity-5">🎓</div>
-                <div className="absolute top-96 left-1/3 text-5xl opacity-5">📖</div>
-                <div className="absolute top-[700px] left-10 text-6xl opacity-5">💡</div>
-                <div className="absolute top-80 right-1/3 text-5xl opacity-5">🏆</div>
+                {/* Decorative pattern */}
+                <div className="absolute inset-0 opacity-5" style={{
+                  backgroundImage: 'radial-gradient(circle at 1px 1px, hsl(var(--primary)) 1px, transparent 0)',
+                  backgroundSize: '40px 40px'
+                }} />
+                
+                {/* Book/Study icons pattern with better visibility */}
+                <div className="absolute top-10 right-10 text-7xl opacity-15">📚</div>
+                <div className="absolute top-60 left-20 text-6xl opacity-10">✏️</div>
+                <div className="absolute top-[500px] right-1/4 text-8xl opacity-15">🎓</div>
+                <div className="absolute top-96 left-1/3 text-6xl opacity-10">📖</div>
+                <div className="absolute top-[700px] left-10 text-7xl opacity-15">💡</div>
+                <div className="absolute top-80 right-1/3 text-6xl opacity-10">🏆</div>
+                <div className="absolute top-[400px] left-10 text-5xl opacity-8">🌟</div>
+                <div className="absolute top-[800px] right-20 text-6xl opacity-12">🚀</div>
               </div>
 
-              <section className="items-stretch flex w-full flex-col bg-background/80 backdrop-blur-sm relative z-10">
+              <section className="items-stretch flex w-full flex-col bg-background/90 backdrop-blur-sm relative z-10">
                 <Header userName={userProfile?.full_name || 'User'} />
                 
                 <div className="flex flex-col items-center mt-6 mb-4 gap-4">

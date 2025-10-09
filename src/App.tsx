@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import CompleteProfile from "./pages/CompleteProfile";
 import Bookmarks from "./pages/Bookmarks";
+import Classmates from "./pages/Classmates";
 import Chapter from "./pages/Chapter";
 import QuestionDetail from "./pages/QuestionDetail";
 import ResourceDetail from "./pages/ResourceDetail";
@@ -28,6 +29,7 @@ const AppContent = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/complete-profile" element={<CompleteProfile />} />
       <Route path="/bookmarks" element={<Bookmarks />} />
+      <Route path="/classmates" element={<Classmates />} />
       <Route path="/chapter/:id" element={<Chapter />} />
       <Route path="/question/:id" element={<QuestionDetail />} />
       <Route path="/resource/:id" element={<ResourceDetail />} />

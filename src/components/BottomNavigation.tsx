@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Bookmark, User } from 'lucide-react';
+import { Home, Bookmark, User, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 
@@ -29,6 +29,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ onTabChange,
 
   const navigationItems = [
     { id: 'subjects', label: 'Subjects', Icon: Home },
+    { id: 'classmates', label: 'Classmates', Icon: Users },
     { id: 'bookmarks', label: 'Bookmarks', Icon: Bookmark, badge: bookmarkCount },
     { id: 'profile', label: 'Profile', Icon: User }
   ];
