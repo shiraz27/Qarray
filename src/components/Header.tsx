@@ -7,7 +7,7 @@ interface HeaderProps {
   userName?: string;
 }
 
-export const Header: React.FC<HeaderProps> = ({ userName = "Osman" }) => {
+export const Header: React.FC<HeaderProps> = ({ userName = "User" }) => {
   const [notificationCount, setNotificationCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
 

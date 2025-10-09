@@ -159,12 +159,30 @@ const Index: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background relative">
       <div className="w-full mx-auto flex flex-col min-h-screen">
         <div className="flex-1 w-full overflow-auto pb-24">
           {activeTab === 'subjects' && (
             <>
-              <section className="items-stretch flex w-full flex-col bg-background">
+              {/* Animated Background Pattern */}
+              <div className="absolute inset-0 -z-10 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#F6A18A]/5 via-background to-[hsl(207,89%,54%)]/5" />
+                
+                {/* Geometric shapes for e-learning theme */}
+                <div className="absolute top-20 left-10 w-32 h-32 bg-[#F6A18A]/10 rounded-full blur-3xl animate-pulse" />
+                <div className="absolute top-40 right-20 w-40 h-40 bg-[hsl(207,89%,54%)]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+                <div className="absolute top-96 left-1/4 w-36 h-36 bg-[#F6A18A]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+                
+                {/* Book/Study icons pattern */}
+                <div className="absolute top-10 right-10 text-6xl opacity-5">📚</div>
+                <div className="absolute top-60 left-20 text-5xl opacity-5">✏️</div>
+                <div className="absolute top-[500px] right-1/4 text-6xl opacity-5">🎓</div>
+                <div className="absolute top-96 left-1/3 text-5xl opacity-5">📖</div>
+                <div className="absolute top-[700px] left-10 text-6xl opacity-5">💡</div>
+                <div className="absolute top-80 right-1/3 text-5xl opacity-5">🏆</div>
+              </div>
+
+              <section className="items-stretch flex w-full flex-col bg-background/80 backdrop-blur-sm relative z-10">
                 <Header userName={userProfile?.full_name || 'User'} />
                 
                 <div className="flex flex-col items-center mt-6 mb-4 gap-4">

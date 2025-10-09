@@ -174,14 +174,32 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col relative overflow-hidden">
+      {/* Animated Background Pattern */}
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#F6A18A]/5 via-background to-[hsl(207,89%,54%)]/5" />
+        
+        {/* Geometric shapes for e-learning theme */}
+        <div className="absolute top-20 left-10 w-32 h-32 bg-[#F6A18A]/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-40 right-20 w-40 h-40 bg-[hsl(207,89%,54%)]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute bottom-40 left-1/4 w-36 h-36 bg-[#F6A18A]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        
+        {/* Book/Study icons pattern */}
+        <div className="absolute top-10 right-10 text-6xl opacity-5">📚</div>
+        <div className="absolute top-1/3 left-20 text-5xl opacity-5">✏️</div>
+        <div className="absolute bottom-1/4 right-1/4 text-6xl opacity-5">🎓</div>
+        <div className="absolute top-2/3 left-1/3 text-5xl opacity-5">📖</div>
+        <div className="absolute bottom-20 left-10 text-6xl opacity-5">💡</div>
+        <div className="absolute top-1/2 right-1/3 text-5xl opacity-5">🏆</div>
+      </div>
+
       {/* Language Switcher */}
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-4 right-4 z-10">
         <LanguageSwitcher />
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
         {/* Logo with emphasis */}
         <div className="mb-6 bg-white rounded-3xl p-8 shadow-sm">
           <img
