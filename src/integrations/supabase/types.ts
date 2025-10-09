@@ -349,6 +349,7 @@ export type Database = {
           title: string
           updated_at: string
           upvotes: number | null
+          verified: boolean
         }
         Insert: {
           chapter_id?: number | null
@@ -364,6 +365,7 @@ export type Database = {
           title: string
           updated_at?: string
           upvotes?: number | null
+          verified?: boolean
         }
         Update: {
           chapter_id?: number | null
@@ -379,6 +381,7 @@ export type Database = {
           title?: string
           updated_at?: string
           upvotes?: number | null
+          verified?: boolean
         }
         Relationships: [
           {

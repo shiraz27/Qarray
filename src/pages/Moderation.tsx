@@ -123,8 +123,31 @@ export default function Moderation() {
           break;
 
         case 'memorizations':
-          // Memorizations don't have verified column yet
-          items = [];
+          const { data: memorizations } = await supabase
+            .from('memorizations')
+            .select(`
+              id,
+              title,
+              description,
+              created_at,
+              verified,
+              creator_id,
+              subjects(name),
+              chapters(name)
+            `)
+            .eq('deleted', false)
+            .eq('verified', false)
+            .order('created_at', { ascending: false });
+
+          items = (memorizations || []).map(m => ({
+            id: m.id,
+            type: 'memorizations' as ContentType,
+            title: m.title,
+            description: m.description,
+            created_at: m.created_at,
+            subject_name: (m.subjects as any)?.name,
+            chapter_name: (m.chapters as any)?.name,
+          }));
           break;
       }
 
