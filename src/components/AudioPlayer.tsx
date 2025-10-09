@@ -87,7 +87,7 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
   };
 
   const formatTime = (time: number) => {
-    if (isNaN(time)) return '0:00';
+    if (!time || isNaN(time) || !isFinite(time)) return '0:00';
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -114,7 +114,7 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
             max={duration || 100}
             step={0.1}
             onValueChange={handleSeek}
-            className="cursor-pointer"
+            className="cursor-pointer [&_[role=slider]]:bg-border [&_[role=slider]]:border-border"
           />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{formatTime(currentTime)}</span>

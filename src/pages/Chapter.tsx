@@ -37,6 +37,7 @@ interface Question {
   type_id: number | null;
   verified: boolean;
   contributors: string[];
+  isBookmarked?: boolean;
 }
 
 interface Resource {
@@ -53,6 +54,7 @@ interface Resource {
   with_correction: boolean;
   verified: boolean;
   published_by: string | null;
+  isBookmarked?: boolean;
 }
 
 interface ResourceType {
@@ -215,43 +217,55 @@ export default function Chapter() {
           .order('created_at', { ascending: false });
 
         // Fetch vote counts and user votes for questions
-        const questionsWithVotes = await Promise.all(
-          (questionsData || []).map(async (question) => {
-            const { count: upvotes } = await supabase
+      const questionsWithVotes = await Promise.all(
+        (questionsData || []).map(async (question) => {
+          const { count: upvotes } = await supabase
+            .from('votes')
+            .select('*', { count: 'exact', head: true })
+            .eq('content_id', question.id)
+            .eq('content_type', 'question')
+            .eq('vote_type', 'upvote');
+
+          const { count: downvotes } = await supabase
+            .from('votes')
+            .select('*', { count: 'exact', head: true })
+            .eq('content_id', question.id)
+            .eq('content_type', 'question')
+            .eq('vote_type', 'downvote');
+
+          let userVote = null;
+          let isBookmarked = false;
+          if (user) {
+            const { data: voteData } = await supabase
               .from('votes')
-              .select('*', { count: 'exact', head: true })
+              .select('vote_type')
               .eq('content_id', question.id)
               .eq('content_type', 'question')
-              .eq('vote_type', 'upvote');
+              .eq('user_id', user.id)
+              .maybeSingle();
 
-            const { count: downvotes } = await supabase
-              .from('votes')
-              .select('*', { count: 'exact', head: true })
-              .eq('content_id', question.id)
+            userVote = voteData?.vote_type || null;
+
+            const { data: bookmarkData } = await supabase
+              .from('bookmarks')
+              .select('id')
+              .eq('user_id', user.id)
               .eq('content_type', 'question')
-              .eq('vote_type', 'downvote');
+              .eq('content_id', question.id)
+              .maybeSingle();
 
-            let userVote = null;
-            if (user) {
-              const { data: voteData } = await supabase
-                .from('votes')
-                .select('vote_type')
-                .eq('content_id', question.id)
-                .eq('content_type', 'question')
-                .eq('user_id', user.id)
-                .maybeSingle();
+            isBookmarked = !!bookmarkData;
+          }
 
-              userVote = voteData?.vote_type || null;
-            }
-
-            return {
-              ...question,
-              upvotes: upvotes || 0,
-              downvotes: downvotes || 0,
-              userVote,
-            };
-          })
-        );
+          return {
+            ...question,
+            upvotes: upvotes || 0,
+            downvotes: downvotes || 0,
+            userVote,
+            isBookmarked,
+          };
+        })
+      );
 
         setQuestions(questionsWithVotes);
 
@@ -264,43 +278,55 @@ export default function Chapter() {
           .order('created_at', { ascending: false });
 
         // Fetch vote counts and user votes for resources
-        const resourcesWithVotes = await Promise.all(
-          (resourcesData || []).map(async (resource) => {
-            const { count: upvotes } = await supabase
+      const resourcesWithVotes = await Promise.all(
+        (resourcesData || []).map(async (resource) => {
+          const { count: upvotes } = await supabase
+            .from('votes')
+            .select('*', { count: 'exact', head: true })
+            .eq('content_id', resource.id)
+            .eq('content_type', 'resource')
+            .eq('vote_type', 'upvote');
+
+          const { count: downvotes } = await supabase
+            .from('votes')
+            .select('*', { count: 'exact', head: true })
+            .eq('content_id', resource.id)
+            .eq('content_type', 'resource')
+            .eq('vote_type', 'downvote');
+
+          let userVote = null;
+          let isBookmarked = false;
+          if (user) {
+            const { data: voteData } = await supabase
               .from('votes')
-              .select('*', { count: 'exact', head: true })
+              .select('vote_type')
               .eq('content_id', resource.id)
               .eq('content_type', 'resource')
-              .eq('vote_type', 'upvote');
+              .eq('user_id', user.id)
+              .maybeSingle();
 
-            const { count: downvotes } = await supabase
-              .from('votes')
-              .select('*', { count: 'exact', head: true })
-              .eq('content_id', resource.id)
+            userVote = voteData?.vote_type || null;
+
+            const { data: bookmarkData } = await supabase
+              .from('bookmarks')
+              .select('id')
+              .eq('user_id', user.id)
               .eq('content_type', 'resource')
-              .eq('vote_type', 'downvote');
+              .eq('content_id', resource.id)
+              .maybeSingle();
 
-            let userVote = null;
-            if (user) {
-              const { data: voteData } = await supabase
-                .from('votes')
-                .select('vote_type')
-                .eq('content_id', resource.id)
-                .eq('content_type', 'resource')
-                .eq('user_id', user.id)
-                .maybeSingle();
+            isBookmarked = !!bookmarkData;
+          }
 
-              userVote = voteData?.vote_type || null;
-            }
-
-            return {
-              ...resource,
-              upvotes: upvotes || 0,
-              downvotes: downvotes || 0,
-              userVote,
-            };
-          })
-        );
+          return {
+            ...resource,
+            upvotes: upvotes || 0,
+            downvotes: downvotes || 0,
+            userVote,
+            isBookmarked,
+          };
+        })
+      );
 
         setResources(resourcesWithVotes);
       } catch (error) {
@@ -338,6 +364,84 @@ export default function Chapter() {
           .insert({ user_id: user.id, chapter_id: chapter.id });
 
         setChapter({ ...chapter, isBookmarked: true });
+        toast.success(t('bookmarkAdded') || 'Bookmark added');
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      toast.error(t('bookmarkError') || 'Failed to update bookmark');
+    }
+  };
+
+  const toggleQuestionBookmark = async (questionId: number, isBookmarked: boolean) => {
+    if (!user) {
+      toast.error(t('pleaseLogin') || 'Please login to bookmark');
+      return;
+    }
+
+    try {
+      if (isBookmarked) {
+        await supabase
+          .from('bookmarks')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('content_type', 'question')
+          .eq('content_id', questionId);
+
+        setQuestions(prev => prev.map(q => 
+          q.id === questionId ? { ...q, isBookmarked: false } : q
+        ));
+        toast.success(t('bookmarkRemoved') || 'Bookmark removed');
+      } else {
+        await supabase
+          .from('bookmarks')
+          .insert({ 
+            user_id: user.id, 
+            content_type: 'question',
+            content_id: questionId 
+          });
+
+        setQuestions(prev => prev.map(q => 
+          q.id === questionId ? { ...q, isBookmarked: true } : q
+        ));
+        toast.success(t('bookmarkAdded') || 'Bookmark added');
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      toast.error(t('bookmarkError') || 'Failed to update bookmark');
+    }
+  };
+
+  const toggleResourceBookmark = async (resourceId: number, isBookmarked: boolean) => {
+    if (!user) {
+      toast.error(t('pleaseLogin') || 'Please login to bookmark');
+      return;
+    }
+
+    try {
+      if (isBookmarked) {
+        await supabase
+          .from('bookmarks')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('content_type', 'resource')
+          .eq('content_id', resourceId);
+
+        setResources(prev => prev.map(r => 
+          r.id === resourceId ? { ...r, isBookmarked: false } : r
+        ));
+        toast.success(t('bookmarkRemoved') || 'Bookmark removed');
+      } else {
+        await supabase
+          .from('bookmarks')
+          .insert({ 
+            user_id: user.id, 
+            content_type: 'resource',
+            content_id: resourceId 
+          });
+
+        setResources(prev => prev.map(r => 
+          r.id === resourceId ? { ...r, isBookmarked: true } : r
+        ));
         toast.success(t('bookmarkAdded') || 'Bookmark added');
       }
     } catch (error) {
@@ -834,6 +938,18 @@ export default function Chapter() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          toggleQuestionBookmark(question.id, question.isBookmarked ?? false);
+                        }}
+                        className="flex items-center gap-1.5 transition-colors"
+                      >
+                        <Bookmark
+                          size={16}
+                          className={question.isBookmarked ? 'fill-current text-primary' : ''}
+                        />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           handleVote(question.id, 'question', 'upvote', question.userVote);
                         }}
                         className="flex items-center gap-1.5 transition-colors hover:text-green-600"
@@ -1045,6 +1161,18 @@ export default function Chapter() {
                       {new Date(resource.created_at).toLocaleDateString()}
                     </p>
                     <div className="flex items-center gap-4">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleResourceBookmark(resource.id, resource.isBookmarked ?? false);
+                        }}
+                        className="flex items-center gap-1.5 transition-colors"
+                      >
+                        <Bookmark
+                          size={16}
+                          className={resource.isBookmarked ? 'fill-current text-primary' : ''}
+                        />
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

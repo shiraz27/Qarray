@@ -298,8 +298,8 @@ export default function Bookmarks() {
             <ArrowLeft size={20} />
           </Button>
           <div className="flex items-center gap-2">
-            <img src={qarayLogo} alt="Qarray Logo" className="h-10 w-10 object-contain" />
-            <span className="text-lg font-bold gradient-primary bg-clip-text text-transparent">Qarray</span>
+            <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+            <span className="text-xl font-bold text-foreground">Qarray</span>
           </div>
           <div className="w-10" />
         </div>
