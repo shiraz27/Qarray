@@ -30,7 +30,7 @@ export default function Classmates() {
   const [schoolmates, setSchoolmates] = useState<StudentStat[]>([]);
   const [currentUserClassId, setCurrentUserClassId] = useState<number | null>(null);
   const [currentUserInstituteId, setCurrentUserInstituteId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('classmates');
+  const [activeTab] = useState('classmates');
 
   const handleTabChange = (tab: string) => {
     if (tab === 'subjects') {
@@ -39,9 +39,8 @@ export default function Classmates() {
       navigate('/bookmarks');
     } else if (tab === 'profile') {
       navigate('/profile');
-    } else {
-      setActiveTab(tab);
     }
+    // Stay on classmates page if tab === 'classmates'
   };
 
   useEffect(() => {
@@ -110,12 +109,23 @@ export default function Classmates() {
           .eq('published_by', p.user_id)
           .eq('deleted', false);
 
-        // Count memorizations created
-        const { count: memorizationsCount } = await supabase
+        // Count memorizations (created + subscribed)
+        const { count: createdMemorizations } = await supabase
           .from('memorizations')
           .select('*', { count: 'exact', head: true })
           .eq('creator_id', p.user_id)
           .eq('deleted', false);
+
+        const { count: subscribedMemorizations } = await supabase
+          .from('memorization_subscriptions')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', p.user_id);
+
+        // Get flashcard review stats (quality scores)
+        const { data: reviewData } = await supabase
+          .from('flashcard_reviews')
+          .select('quality, review_count, memorization_id')
+          .eq('user_id', p.user_id);
 
         // Count upvotes and downvotes
         const { count: upvotesCount } = await supabase
@@ -130,22 +140,32 @@ export default function Classmates() {
           .eq('user_id', p.user_id)
           .eq('vote_type', 'down');
 
-      // Count memorization reviews (cards studied)
-      const { count: reviewsCount } = await supabase
-        .from('flashcard_reviews')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', p.user_id);
-
       const questions = questionsCount || 0;
       const answers = answersCount || 0;
       const resources = resourcesCount || 0;
-      const memorizations = memorizationsCount || 0;
+      const totalMemorizations = (createdMemorizations || 0) + (subscribedMemorizations || 0);
       const upvotes = upvotesCount || 0;
       const downvotes = downvotesCount || 0;
-      const reviews = reviewsCount || 0;
 
-      // Calculate total score: contributions + upvotes - downvotes + reviews
-      const totalScore = questions + answers + resources + memorizations + upvotes - downvotes + Math.floor(reviews / 10);
+      // Calculate memorization performance score
+      let memorizationScore = 0;
+      if (reviewData && reviewData.length > 0) {
+        // Get average quality across all reviews
+        const totalQuality = reviewData.reduce((sum, review) => sum + review.quality, 0);
+        const avgQuality = totalQuality / reviewData.length;
+        
+        // Get unique memorizations studied
+        const uniqueMemorizations = new Set(reviewData.map(r => r.memorization_id)).size;
+        
+        // Score = (memorization count × 10) + (avg quality × 20) + (unique studied × 5)
+        memorizationScore = (totalMemorizations * 10) + (avgQuality * 20) + (uniqueMemorizations * 5);
+      } else {
+        // If no reviews, just count memorizations
+        memorizationScore = totalMemorizations * 5;
+      }
+
+      // Calculate total score: base contributions + upvotes - downvotes + memorization score
+      const totalScore = questions + answers + resources + upvotes - downvotes + Math.round(memorizationScore);
 
         return {
           user_id: p.user_id,
@@ -155,7 +175,7 @@ export default function Classmates() {
           questions_count: questions,
           answers_count: answers,
           resources_count: resources,
-          memorizations_count: memorizations,
+          memorizations_count: totalMemorizations,
           upvotes: upvotes,
           downvotes: downvotes,
           total_score: totalScore,
