@@ -69,9 +69,9 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    // Process multiple files
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    if (files.length === 1) {
+      // Single file - show preview
+      const file = files[0];
       const reader = new FileReader();
       reader.onload = (event) => {
         setPreviewUrl(event.target?.result as string);
@@ -80,10 +80,18 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
         setFromCamera(false);
       };
       reader.readAsDataURL(file);
-      
-      // Only show preview for first file, upload others directly
-      if (i > 0) {
-        await uploadToArchive(file, 'image');
+    } else {
+      // Multiple files - upload all directly
+      setIsUploading(true);
+      try {
+        for (let i = 0; i < files.length; i++) {
+          await uploadToArchive(files[i], 'image');
+        }
+      } catch (error) {
+        console.error('Error uploading images:', error);
+        toast.error('Failed to upload some images');
+      } finally {
+        setIsUploading(false);
       }
     }
     
@@ -110,25 +118,22 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    // Process multiple files
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setPreviewUrl(event.target?.result as string);
-        setPreviewFile(file);
-        setPreviewType('pdf');
-      };
-      reader.readAsDataURL(file);
-      
-      // Only show preview for first file, upload others directly
-      if (i > 0) {
+    setIsUploading(true);
+    
+    try {
+      // Process all PDF files directly without preview (since iframe doesn't support data URLs)
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         await uploadToArchive(file, 'pdf');
       }
+    } catch (error) {
+      console.error('Error uploading PDFs:', error);
+      toast.error('Failed to upload some PDF files');
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      e.target.value = '';
     }
-    
-    // Reset input
-    e.target.value = '';
   };
 
   const handleKeepFile = async () => {

@@ -54,12 +54,12 @@ export const MediaPreviewDialog: React.FC<MediaPreviewDialogProps> = ({
       
       case 'pdf':
         return (
-          <div className="w-full h-[60vh]">
-            <iframe
-              src={`${mediaUrl}#view=FitH`}
-              className="w-full h-full border rounded-lg"
-              title="PDF Preview"
-            />
+          <div className="flex flex-col items-center gap-4 py-8">
+            <div className="text-4xl">📄</div>
+            <p className="text-sm text-muted-foreground">PDF files are uploaded directly</p>
+            <p className="text-xs text-muted-foreground max-w-md text-center">
+              Note: PDF preview is not available in the browser. The file will be uploaded and can be viewed after submission.
+            </p>
           </div>
         );
       
