@@ -341,12 +341,22 @@ export default function ResourceDetail() {
             <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
             <span className="text-xl font-bold text-foreground">Qarray</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={toggleBookmark}>
-            <Bookmark
-              size={20}
-              className={resource?.isBookmarked ? 'fill-current text-primary' : ''}
-            />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleShare}
+              className="hover:bg-primary/10"
+            >
+              <Share2 size={20} className="text-primary" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={toggleBookmark}>
+              <Bookmark
+                size={20}
+                className={resource?.isBookmarked ? 'fill-current text-primary' : 'text-primary'}
+              />
+            </Button>
+          </div>
         </div>
       </div>
         <div className="flex-1 p-4">
@@ -363,11 +373,36 @@ export default function ResourceDetail() {
     <div className="min-h-screen bg-background flex flex-col pb-24">
       <div className="sticky top-0 z-50 bg-white border-b">
         <div className="flex items-center justify-between px-4 py-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" onClick={() => {
+            const chapterId = resource?.chapter_id;
+            if (chapterId) {
+              navigate(`/chapter/${chapterId}`);
+            } else {
+              navigate('/');
+            }
+          }}>
             <ArrowLeft size={20} />
           </Button>
-          <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
-          <div className="w-10" />
+          <div className="flex items-center gap-2">
+            <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+            <span className="text-xl font-bold text-foreground">Qarray</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleShare}
+              className="hover:bg-primary/10"
+            >
+              <Share2 size={20} className="text-primary" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={toggleBookmark}>
+              <Bookmark
+                size={20}
+                className={resource?.isBookmarked ? 'fill-current text-primary' : 'text-primary'}
+              />
+            </Button>
+          </div>
         </div>
       </div>
 
