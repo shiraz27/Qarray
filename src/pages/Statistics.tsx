@@ -27,14 +27,37 @@ export default function Statistics() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [selectedChapter, setSelectedChapter] = useState<string>('all');
   const [classes, setClasses] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [chapters, setChapters] = useState<any[]>([]);
 
   useEffect(() => {
     if (!roleLoading && (isModerator || isAdmin)) {
       fetchClasses();
-      fetchStats(selectedClass);
+      fetchStats(selectedClass, selectedSubject, selectedChapter);
     }
-  }, [selectedClass, isModerator, isAdmin, roleLoading]);
+  }, [selectedClass, selectedSubject, selectedChapter, isModerator, isAdmin, roleLoading]);
+
+  useEffect(() => {
+    if (selectedClass !== 'all') {
+      fetchSubjects(selectedClass);
+    } else {
+      setSubjects([]);
+      setSelectedSubject('all');
+    }
+    setSelectedChapter('all');
+  }, [selectedClass]);
+
+  useEffect(() => {
+    if (selectedSubject !== 'all') {
+      fetchChapters(selectedSubject);
+    } else {
+      setChapters([]);
+      setSelectedChapter('all');
+    }
+  }, [selectedSubject]);
 
   const fetchClasses = async () => {
     try {
@@ -50,19 +73,57 @@ export default function Statistics() {
     }
   };
 
-  const fetchStats = async (classId: string) => {
+  const fetchSubjects = async (classId: string) => {
+    try {
+      const { data } = await supabase
+        .from('subjects')
+        .select('id, name')
+        .eq('class_id', parseInt(classId))
+        .eq('deleted', false)
+        .order('name');
+      
+      setSubjects(data || []);
+    } catch (error) {
+      console.error('Error fetching subjects:', error);
+    }
+  };
+
+  const fetchChapters = async (subjectId: string) => {
+    try {
+      const { data } = await supabase
+        .from('chapters')
+        .select('id, name')
+        .eq('subject_id', parseInt(subjectId))
+        .eq('deleted', false)
+        .order('name');
+      
+      setChapters(data || []);
+    } catch (error) {
+      console.error('Error fetching chapters:', error);
+    }
+  };
+
+  const fetchStats = async (classId: string, subjectId: string, chapterId: string) => {
     setLoading(true);
     try {
       const classFilter = classId !== 'all' ? parseInt(classId) : null;
+      const subjectFilter = subjectId !== 'all' ? parseInt(subjectId) : null;
+      const chapterFilter = chapterId !== 'all' ? parseInt(chapterId) : null;
 
       // Questions
       let questionsQuery = supabase
         .from('questions')
-        .select('id, verified, chapters!inner(class_id)', { count: 'exact' })
+        .select('id, verified, chapter_id, chapters!inner(class_id, subject_id)', { count: 'exact' })
         .eq('deleted', false);
       
       if (classFilter) {
         questionsQuery = questionsQuery.eq('chapters.class_id', classFilter);
+      }
+      if (subjectFilter) {
+        questionsQuery = questionsQuery.eq('chapters.subject_id', subjectFilter);
+      }
+      if (chapterFilter) {
+        questionsQuery = questionsQuery.eq('chapter_id', chapterFilter);
       }
 
       const { count: totalQuestions } = await questionsQuery;
@@ -71,11 +132,17 @@ export default function Statistics() {
       // Answers
       let answersQuery = supabase
         .from('answers')
-        .select('id, verified, questions!inner(chapters!inner(class_id))', { count: 'exact' })
+        .select('id, verified, questions!inner(chapter_id, chapters!inner(class_id, subject_id))', { count: 'exact' })
         .eq('deleted', false);
       
       if (classFilter) {
         answersQuery = answersQuery.eq('questions.chapters.class_id', classFilter);
+      }
+      if (subjectFilter) {
+        answersQuery = answersQuery.eq('questions.chapters.subject_id', subjectFilter);
+      }
+      if (chapterFilter) {
+        answersQuery = answersQuery.eq('questions.chapter_id', chapterFilter);
       }
 
       const { count: totalAnswers } = await answersQuery;
@@ -84,11 +151,17 @@ export default function Statistics() {
       // Resources
       let resourcesQuery = supabase
         .from('resources')
-        .select('id, verified, with_correction, devoir_type_id, chapters!inner(class_id)', { count: 'exact' })
+        .select('id, verified, with_correction, devoir_type_id, chapter_id, subject_id, chapters!inner(class_id, subject_id)', { count: 'exact' })
         .eq('deleted', false);
       
       if (classFilter) {
         resourcesQuery = resourcesQuery.eq('chapters.class_id', classFilter);
+      }
+      if (subjectFilter) {
+        resourcesQuery = resourcesQuery.eq('subject_id', subjectFilter);
+      }
+      if (chapterFilter) {
+        resourcesQuery = resourcesQuery.eq('chapter_id', chapterFilter);
       }
 
       const { count: totalResources } = await resourcesQuery;
@@ -96,15 +169,26 @@ export default function Statistics() {
       const { count: resourcesWithCorrection } = await resourcesQuery.eq('with_correction', true);
 
       // Resources by devoir type
-      const { data: resourcesData } = await supabase
+      let resourcesTypeQuery = supabase
         .from('resources')
-        .select('devoir_type_id, devoir_types(devoir_type), chapters!inner(class_id)')
+        .select('devoir_type_id, devoir_types(devoir_type), chapter_id, subject_id, chapters!inner(class_id, subject_id)')
         .eq('deleted', false)
         .not('devoir_type_id', 'is', null);
 
+      if (classFilter) {
+        resourcesTypeQuery = resourcesTypeQuery.eq('chapters.class_id', classFilter);
+      }
+      if (subjectFilter) {
+        resourcesTypeQuery = resourcesTypeQuery.eq('subject_id', subjectFilter);
+      }
+      if (chapterFilter) {
+        resourcesTypeQuery = resourcesTypeQuery.eq('chapter_id', chapterFilter);
+      }
+
+      const { data: resourcesData } = await resourcesTypeQuery;
+
       const devoirCounts: { [key: string]: number } = {};
       resourcesData?.forEach((r: any) => {
-        if (classFilter && r.chapters?.class_id !== classFilter) return;
         const type = r.devoir_types?.devoir_type || 'Unknown';
         devoirCounts[type] = (devoirCounts[type] || 0) + 1;
       });
@@ -170,9 +254,9 @@ export default function Statistics() {
             <p className="text-muted-foreground">Overview of platform content</p>
           </div>
 
-          <div className="w-64">
+          <div className="flex gap-2">
             <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger>
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by class" />
               </SelectTrigger>
               <SelectContent>
@@ -184,6 +268,38 @@ export default function Statistics() {
                 ))}
               </SelectContent>
             </Select>
+
+            {subjects.length > 0 && (
+              <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subjects</SelectItem>
+                  {subjects.map((subject) => (
+                    <SelectItem key={subject.id} value={subject.id.toString()}>
+                      {subject.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {chapters.length > 0 && (
+              <Select value={selectedChapter} onValueChange={setSelectedChapter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by chapter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Chapters</SelectItem>
+                  {chapters.map((chapter) => (
+                    <SelectItem key={chapter.id} value={chapter.id.toString()}>
+                      {chapter.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
 

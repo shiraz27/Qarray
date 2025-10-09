@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { CheckCircle2, XCircle, BookOpen, MessageCircle, Brain, FileText } from 'lucide-react';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
@@ -30,22 +31,95 @@ export default function Moderation() {
   const [items, setItems] = useState<UnverifiedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ContentType>('questions');
+  const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [selectedChapter, setSelectedChapter] = useState<string>('all');
+  const [classes, setClasses] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [chapters, setChapters] = useState<any[]>([]);
 
   useEffect(() => {
     if (!roleLoading && (isModerator || isAdmin)) {
+      fetchClasses();
       fetchUnverifiedItems(activeTab);
     }
-  }, [activeTab, isModerator, isAdmin, roleLoading]);
+  }, [activeTab, selectedClass, selectedSubject, selectedChapter, isModerator, isAdmin, roleLoading]);
+
+  useEffect(() => {
+    if (selectedClass !== 'all') {
+      fetchSubjects(selectedClass);
+    } else {
+      setSubjects([]);
+      setSelectedSubject('all');
+    }
+    setSelectedChapter('all');
+  }, [selectedClass]);
+
+  useEffect(() => {
+    if (selectedSubject !== 'all') {
+      fetchChapters(selectedSubject);
+    } else {
+      setChapters([]);
+      setSelectedChapter('all');
+    }
+  }, [selectedSubject]);
+
+  const fetchClasses = async () => {
+    try {
+      const { data } = await supabase
+        .from('classes')
+        .select('id, name')
+        .eq('hidden', false)
+        .order('name');
+      
+      setClasses(data || []);
+    } catch (error) {
+      console.error('Error fetching classes:', error);
+    }
+  };
+
+  const fetchSubjects = async (classId: string) => {
+    try {
+      const { data } = await supabase
+        .from('subjects')
+        .select('id, name')
+        .eq('class_id', parseInt(classId))
+        .eq('deleted', false)
+        .order('name');
+      
+      setSubjects(data || []);
+    } catch (error) {
+      console.error('Error fetching subjects:', error);
+    }
+  };
+
+  const fetchChapters = async (subjectId: string) => {
+    try {
+      const { data } = await supabase
+        .from('chapters')
+        .select('id, name')
+        .eq('subject_id', parseInt(subjectId))
+        .eq('deleted', false)
+        .order('name');
+      
+      setChapters(data || []);
+    } catch (error) {
+      console.error('Error fetching chapters:', error);
+    }
+  };
 
   const fetchUnverifiedItems = async (type: ContentType) => {
     setLoading(true);
     try {
-      let query;
+      const classFilter = selectedClass !== 'all' ? parseInt(selectedClass) : null;
+      const subjectFilter = selectedSubject !== 'all' ? parseInt(selectedSubject) : null;
+      const chapterFilter = selectedChapter !== 'all' ? parseInt(selectedChapter) : null;
+      
       let items: UnverifiedItem[] = [];
 
       switch (type) {
         case 'questions':
-          const { data: questions } = await supabase
+          let questionsQuery = supabase
             .from('questions')
             .select(`
               id,
@@ -53,11 +127,24 @@ export default function Moderation() {
               created_at,
               verified,
               contributors,
-              chapters(name, subjects(name))
+              chapter_id,
+              chapters(name, class_id, subject_id, subjects(name))
             `)
             .eq('deleted', false)
             .eq('verified', false)
             .order('created_at', { ascending: false });
+
+          if (classFilter) {
+            questionsQuery = questionsQuery.eq('chapters.class_id', classFilter);
+          }
+          if (subjectFilter) {
+            questionsQuery = questionsQuery.eq('chapters.subject_id', subjectFilter);
+          }
+          if (chapterFilter) {
+            questionsQuery = questionsQuery.eq('chapter_id', chapterFilter);
+          }
+
+          const { data: questions } = await questionsQuery;
 
           items = (questions || []).map(q => ({
             id: q.id,
@@ -70,7 +157,7 @@ export default function Moderation() {
           break;
 
         case 'answers':
-          const { data: answers } = await supabase
+          let answersQuery = supabase
             .from('answers')
             .select(`
               id,
@@ -79,11 +166,23 @@ export default function Moderation() {
               verified,
               contributors,
               question_id,
-              questions(data, chapters(name, subjects(name)))
+              questions(chapter_id, data, chapters(name, class_id, subject_id, subjects(name)))
             `)
             .eq('deleted', false)
             .eq('verified', false)
             .order('created_at', { ascending: false });
+
+          if (classFilter) {
+            answersQuery = answersQuery.eq('questions.chapters.class_id', classFilter);
+          }
+          if (subjectFilter) {
+            answersQuery = answersQuery.eq('questions.chapters.subject_id', subjectFilter);
+          }
+          if (chapterFilter) {
+            answersQuery = answersQuery.eq('questions.chapter_id', chapterFilter);
+          }
+
+          const { data: answers } = await answersQuery;
 
           items = (answers || []).map(a => ({
             id: a.id,
@@ -96,7 +195,7 @@ export default function Moderation() {
           break;
 
         case 'resources':
-          const { data: resources } = await supabase
+          let resourcesQuery = supabase
             .from('resources')
             .select(`
               id,
@@ -105,11 +204,25 @@ export default function Moderation() {
               created_at,
               verified,
               published_by,
-              chapters(name, subjects(name))
+              chapter_id,
+              subject_id,
+              chapters(name, class_id, subject_id, subjects(name))
             `)
             .eq('deleted', false)
             .eq('verified', false)
             .order('created_at', { ascending: false });
+
+          if (classFilter) {
+            resourcesQuery = resourcesQuery.eq('chapters.class_id', classFilter);
+          }
+          if (subjectFilter) {
+            resourcesQuery = resourcesQuery.eq('subject_id', subjectFilter);
+          }
+          if (chapterFilter) {
+            resourcesQuery = resourcesQuery.eq('chapter_id', chapterFilter);
+          }
+
+          const { data: resources } = await resourcesQuery;
 
           items = (resources || []).map(r => ({
             id: r.id,
@@ -195,8 +308,60 @@ export default function Moderation() {
       
       <main className="flex-1 container mx-auto px-4 py-6">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Content Moderation</h1>
-          <p className="text-muted-foreground">Review and approve pending content</p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Content Moderation</h1>
+              <p className="text-muted-foreground">Review and approve pending content</p>
+            </div>
+            
+            <div className="flex gap-2">
+              <Select value={selectedClass} onValueChange={setSelectedClass}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="All Classes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Classes</SelectItem>
+                  {classes.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.id.toString()}>
+                      {cls.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {subjects.length > 0 && (
+                <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="All Subjects" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Subjects</SelectItem>
+                    {subjects.map((subject) => (
+                      <SelectItem key={subject.id} value={subject.id.toString()}>
+                        {subject.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {chapters.length > 0 && (
+                <Select value={selectedChapter} onValueChange={setSelectedChapter}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="All Chapters" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Chapters</SelectItem>
+                    {chapters.map((chapter) => (
+                      <SelectItem key={chapter.id} value={chapter.id.toString()}>
+                        {chapter.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ContentType)}>
