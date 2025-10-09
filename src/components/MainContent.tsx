@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
-import { MessageSquare, FileText, Bookmark } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MessageSquare, FileText, Bookmark, Plus, Edit } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
 import { ChapterSkeleton } from '@/components/LoadingSkeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { MemorizationsList } from '@/components/MemorizationsList';
+import { ManageChapterDialog } from '@/components/ManageChapterDialog';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface Chapter {
   id: number;
@@ -29,6 +32,10 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [manageDialogOpen, setManageDialogOpen] = useState(false);
+  const [editingChapterId, setEditingChapterId] = useState<number | null>(null);
+  const [classId, setClassId] = useState<number | null>(null);
+  const { isModerator, isAdmin } = useUserRole();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -42,6 +49,17 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
 
       setLoading(true);
       try {
+        // Fetch subject to get class_id
+        const { data: subjectData } = await supabase
+          .from('subjects')
+          .select('class_id')
+          .eq('id', subjectId)
+          .maybeSingle();
+
+        if (subjectData) {
+          setClassId(subjectData.class_id);
+        }
+
         // Fetch chapters
         const { data: chaptersData, error: chaptersError } = await supabase
           .from('chapters')
@@ -149,6 +167,95 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
     }
   };
 
+  const handleAddChapter = () => {
+    setEditingChapterId(null);
+    setManageDialogOpen(true);
+  };
+
+  const handleEditChapter = (chapterId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingChapterId(chapterId);
+    setManageDialogOpen(true);
+  };
+
+  const handleDialogClose = () => {
+    setManageDialogOpen(false);
+    setEditingChapterId(null);
+  };
+
+  const handleSuccess = () => {
+    // Refetch chapters
+    const refetch = async () => {
+      if (!subjectId) return;
+      
+      setLoading(true);
+      try {
+        const { data: chaptersData, error: chaptersError } = await supabase
+          .from('chapters')
+          .select('id, name')
+          .eq('subject_id', subjectId)
+          .eq('deleted', false)
+          .order('name');
+
+        if (chaptersError) throw chaptersError;
+
+        let bookmarkedChapterIds: number[] = [];
+        if (user) {
+          const { data: bookmarksData } = await supabase
+            .from('bookmarks')
+            .select('chapter_id')
+            .eq('user_id', user.id);
+          bookmarkedChapterIds = bookmarksData?.map(b => b.chapter_id) || [];
+        }
+
+        const chaptersWithCounts = await Promise.all(
+          (chaptersData || []).map(async (chapter) => {
+            const { count: questionCount } = await supabase
+              .from('questions')
+              .select('*', { count: 'exact', head: true })
+              .eq('chapter_id', chapter.id)
+              .eq('deleted', false);
+
+            const { count: answerCount } = await supabase
+              .from('answers')
+              .select('*', { count: 'exact', head: true })
+              .in('question_id', 
+                await supabase
+                  .from('questions')
+                  .select('id')
+                  .eq('chapter_id', chapter.id)
+                  .eq('deleted', false)
+                  .then(res => res.data?.map(q => q.id) || [])
+              )
+              .eq('deleted', false);
+
+            const { count: resourceCount } = await supabase
+              .from('resources')
+              .select('*', { count: 'exact', head: true })
+              .eq('chapter_id', chapter.id)
+              .eq('deleted', false);
+
+            return {
+              id: chapter.id,
+              name: chapter.name,
+              questionCount: questionCount || 0,
+              answerCount: answerCount || 0,
+              resourceCount: resourceCount || 0,
+              isBookmarked: bookmarkedChapterIds.includes(chapter.id),
+            };
+          })
+        );
+
+        setChapters(chaptersWithCounts);
+      } catch (error) {
+        console.error('Error fetching chapters:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    refetch();
+  };
+
   if (!subjectId) {
     return (
       <main className="w-full px-4 pb-4">
@@ -183,13 +290,23 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
       <MemorizationsList subjectId={subjectId} />
       
       <div className="space-y-3 mt-4 px-4">
+        {(isModerator || isAdmin) && (
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            onClick={handleAddChapter}
+          >
+            <Plus size={20} />
+            Add Chapter
+          </Button>
+        )}
         {chapters.map((chapter) => {
           const hasContent = chapter.questionCount > 0 || chapter.answerCount > 0 || chapter.resourceCount > 0;
           
           return (
             <Card 
               key={chapter.id}
-              className="relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer border-none"
+              className="relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer border-none group"
               style={{
                 background: hasContent 
                   ? 'linear-gradient(to right, #FFFFFF 0%, #FDE6E6 100%)' 
@@ -213,18 +330,29 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
                   <h3 className="font-semibold text-sm tracking-wide text-foreground flex-1">
                     {chapter.name.toUpperCase()}
                   </h3>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleBookmark(chapter.id, chapter.isBookmarked);
-                    }}
-                    className="hover:scale-110 transition-transform"
-                  >
-                    <Bookmark
-                      size={20}
-                      className={`text-foreground ${chapter.isBookmarked ? 'fill-foreground' : ''}`}
-                    />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {(isModerator || isAdmin) && (
+                      <button
+                        onClick={(e) => handleEditChapter(chapter.id, e)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
+                        title="Edit Chapter"
+                      >
+                        <Edit size={16} className="text-foreground" />
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleBookmark(chapter.id, chapter.isBookmarked);
+                      }}
+                      className="hover:scale-110 transition-transform"
+                    >
+                      <Bookmark
+                        size={20}
+                        className={`text-foreground ${chapter.isBookmarked ? 'fill-foreground' : ''}`}
+                      />
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="flex gap-4 text-xs">
@@ -246,6 +374,17 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
           );
         })}
       </div>
+
+      {subjectId && classId && (
+        <ManageChapterDialog
+          open={manageDialogOpen}
+          onClose={handleDialogClose}
+          subjectId={subjectId}
+          classId={classId}
+          chapterId={editingChapterId}
+          onSuccess={handleSuccess}
+        />
+      )}
     </main>
   );
 };
