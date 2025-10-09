@@ -10,6 +10,7 @@ import { BottomNavigation } from "@/components/BottomNavigation";
 import { BookmarkSkeleton } from "@/components/LoadingSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import qarayLogo from "@/assets/qarray-logo-new.png";
+import { extractMediaFromText } from "@/utils/mediaHelpers";
 
 interface BookmarkedItem {
   id: string;
@@ -116,10 +117,11 @@ export default function Bookmarks() {
                 subjectName = subject?.name || "";
               }
 
+              const { text } = extractMediaFromText(question.data);
               items.push({
                 id: `question-${bookmark.id}`,
                 type: 'question',
-                title: question.data.substring(0, 100) + (question.data.length > 100 ? '...' : ''),
+                title: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
                 chapterName: chapter?.name,
                 subjectName,
                 created_at: bookmark.created_at,
@@ -161,11 +163,13 @@ export default function Bookmarks() {
                 }
               }
 
+              const { text: answerText } = extractMediaFromText(answer.data);
+              const { text: questionText } = question ? extractMediaFromText(question.data) : { text: '' };
               items.push({
                 id: `answer-${bookmark.id}`,
                 type: 'answer',
-                title: answer.data.substring(0, 100) + (answer.data.length > 100 ? '...' : ''),
-                description: question ? `Answer to: ${question.data.substring(0, 50)}...` : undefined,
+                title: answerText.substring(0, 100) + (answerText.length > 100 ? '...' : ''),
+                description: question ? `Answer to: ${questionText.substring(0, 50)}...` : undefined,
                 chapterName,
                 subjectName,
                 created_at: bookmark.created_at,
@@ -260,7 +264,7 @@ export default function Bookmarks() {
   const renderBookmarkCard = (item: BookmarkedItem) => (
     <Card
       key={item.id}
-      className="p-4 hover:shadow-md transition-all cursor-pointer"
+      className="p-4 hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all cursor-pointer"
       onClick={() => handleItemClick(item)}
     >
       <div className="flex items-start justify-between">

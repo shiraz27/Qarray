@@ -454,7 +454,7 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
                   <button
                     key={`${result.type}-${result.id}`}
                     onClick={() => handleResultClick(result)}
-                    className="w-full p-4 text-left rounded-lg border-2 hover:border-foreground transition-all"
+                    className="w-full p-4 text-left rounded-lg border-2 hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all"
                   >
                     <div className="flex items-start gap-3 overflow-hidden">
                       <div className="mt-1 flex-shrink-0">{getIcon(result.type)}</div>

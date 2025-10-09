@@ -818,7 +818,7 @@ export default function Chapter() {
                   return (
                 <Card 
                   key={question.id} 
-                  className="p-4 cursor-pointer hover:border-foreground transition-all space-y-2 border border-border"
+                  className="p-4 cursor-pointer hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all space-y-2 border border-border"
                   onClick={() => navigate(`/question/${question.id}`)}
                 >
                   {question.contributors && question.contributors.length > 0 && (
@@ -1094,7 +1094,7 @@ export default function Chapter() {
                   return (
                 <Card 
                   key={resource.id} 
-                  className="p-4 cursor-pointer hover:border-foreground transition-all space-y-2 border border-border"
+                  className="p-4 cursor-pointer hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all space-y-2 border border-border"
                   onClick={() => navigate(`/resource/${resource.id}`)}
                 >
                   {resource.published_by && (
