@@ -117,7 +117,7 @@ export default function Statistics() {
       // Memorizations
       let memorizationsQuery = supabase
         .from('memorizations')
-        .select('id, verified, class_id', { count: 'exact' })
+        .select('id, class_id', { count: 'exact' })
         .eq('deleted', false);
       
       if (classFilter) {
@@ -125,7 +125,6 @@ export default function Statistics() {
       }
 
       const { count: totalMemorizations } = await memorizationsQuery;
-      const { count: verifiedMemorizations } = await memorizationsQuery.eq('verified', true);
 
       setStats({
         total_questions: totalQuestions || 0,
@@ -135,7 +134,7 @@ export default function Statistics() {
         verified_questions: verifiedQuestions || 0,
         verified_answers: verifiedAnswers || 0,
         verified_resources: verifiedResources || 0,
-        verified_memorizations: verifiedMemorizations || 0,
+        verified_memorizations: 0, // Verified column not yet added to memorizations
         resources_with_correction: resourcesWithCorrection || 0,
         devoirs_by_type: devoirsByType,
       });

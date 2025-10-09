@@ -32,7 +32,6 @@ export const CreateMemorizationDialog = ({
 }: CreateMemorizationDialogProps) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  // Removed isPublic - all memorizations are public by default
   const [flashcards, setFlashcards] = useState<Flashcard[]>([
     { front_data: { text: '', media: [] }, back_data: { text: '', media: [] }, order_index: 0 },
   ]);
@@ -332,7 +331,7 @@ export const CreateMemorizationDialog = ({
               />
             </div>
 
-            {/* Removed "Make Public" toggle - all memorizations are public by default */}
+            
           </div>
 
           {/* Flashcards */}
