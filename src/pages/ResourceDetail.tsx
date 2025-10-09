@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, ThumbsUp, ThumbsDown, FileText, Edit, Trash2, AlertCircle, Share2 } from 'lucide-react';
+import { ArrowLeft, ThumbsUp, ThumbsDown, FileText, Edit, Trash2, AlertCircle, Share2, Bookmark } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { ContentSkeleton } from '@/components/LoadingSkeleton';
@@ -34,6 +34,7 @@ interface Resource {
   upvotes: number;
   downvotes: number;
   userVote: string | null;
+  isBookmarked?: boolean;
 }
 
 export default function ResourceDetail() {
@@ -101,6 +102,7 @@ export default function ResourceDetail() {
 
       // Get user's vote
       let userVote = null;
+      let isBookmarked = false;
       if (user) {
         const { data: voteData } = await supabase
           .from('votes')
@@ -111,6 +113,17 @@ export default function ResourceDetail() {
           .maybeSingle();
 
         userVote = voteData?.vote_type || null;
+
+        // Check if bookmarked
+        const { data: bookmarkData } = await supabase
+          .from('bookmarks')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('content_type', 'resource')
+          .eq('content_id', resourceData.id)
+          .maybeSingle();
+
+        isBookmarked = !!bookmarkData;
       }
 
       setResource({
@@ -118,6 +131,7 @@ export default function ResourceDetail() {
         upvotes: upvotes || 0,
         downvotes: downvotes || 0,
         userVote,
+        isBookmarked,
       });
 
       setLoading(false);
@@ -252,6 +266,57 @@ export default function ResourceDetail() {
     });
   };
 
+  const toggleBookmark = async () => {
+    if (!user) {
+      toast({
+        title: 'Authentication required',
+        description: 'Please log in to bookmark',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!resource) return;
+
+    try {
+      if (resource.isBookmarked) {
+        await supabase
+          .from('bookmarks')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('content_type', 'resource')
+          .eq('content_id', resource.id);
+
+        setResource({ ...resource, isBookmarked: false });
+        toast({
+          title: 'Success',
+          description: 'Bookmark removed',
+        });
+      } else {
+        await supabase
+          .from('bookmarks')
+          .insert({ 
+            user_id: user.id, 
+            content_type: 'resource',
+            content_id: resource.id 
+          });
+
+        setResource({ ...resource, isBookmarked: true });
+        toast({
+          title: 'Success',
+          description: 'Bookmark added',
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update bookmark',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const getDisplayName = (url: string) => {
     if (url.includes('youtube.com') || url.includes('youtu.be')) return '📹 YouTube Video';
     if (url.includes('.pdf')) return '📄 PDF Document';
@@ -267,18 +332,23 @@ export default function ResourceDetail() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col pb-24">
-        <div className="sticky top-0 z-50 bg-white border-b">
-          <div className="flex items-center justify-between px-4 py-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft size={20} />
-            </Button>
-            <div className="flex items-center gap-2">
-              <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
-              <span className="text-xl font-bold text-foreground">Qarray</span>
-            </div>
-            <div className="w-10" />
+      <div className="sticky top-0 z-50 bg-white border-b">
+        <div className="flex items-center justify-between px-4 py-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft size={20} />
+          </Button>
+          <div className="flex items-center gap-2">
+            <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+            <span className="text-xl font-bold text-foreground">Qarray</span>
           </div>
+          <Button variant="ghost" size="icon" onClick={toggleBookmark}>
+            <Bookmark
+              size={20}
+              className={resource?.isBookmarked ? 'fill-current text-primary' : ''}
+            />
+          </Button>
         </div>
+      </div>
         <div className="flex-1 p-4">
           <ContentSkeleton />
         </div>

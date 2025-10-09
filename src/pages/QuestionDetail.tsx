@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, ThumbsUp, ThumbsDown, MessageSquare, Edit, Trash2, AlertCircle, Share2 } from 'lucide-react';
+import { ArrowLeft, ThumbsUp, ThumbsDown, MessageSquare, Edit, Trash2, AlertCircle, Share2, Bookmark } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { ContentSkeleton } from '@/components/LoadingSkeleton';
@@ -32,6 +32,7 @@ interface Question {
   downvotes: number;
   userVote: string | null;
   answerCount: number;
+  isBookmarked?: boolean;
 }
 
 interface Answer {
@@ -112,6 +113,7 @@ export default function QuestionDetail() {
 
       // Get user's vote
       let userVote = null;
+      let isBookmarked = false;
       if (user) {
         const { data: voteData } = await supabase
           .from('votes')
@@ -122,6 +124,17 @@ export default function QuestionDetail() {
           .maybeSingle();
 
         userVote = voteData?.vote_type || null;
+
+        // Check if bookmarked
+        const { data: bookmarkData } = await supabase
+          .from('bookmarks')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('content_type', 'question')
+          .eq('content_id', questionData.id)
+          .maybeSingle();
+
+        isBookmarked = !!bookmarkData;
       }
 
       // Get answer count
@@ -137,6 +150,7 @@ export default function QuestionDetail() {
         downvotes: downvotes || 0,
         userVote,
         answerCount: answerCount || 0,
+        isBookmarked,
       });
 
       // Fetch answers
@@ -348,6 +362,57 @@ export default function QuestionDetail() {
     });
   };
 
+  const toggleBookmark = async () => {
+    if (!user) {
+      toast({
+        title: 'Authentication required',
+        description: 'Please log in to bookmark',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!question) return;
+
+    try {
+      if (question.isBookmarked) {
+        await supabase
+          .from('bookmarks')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('content_type', 'question')
+          .eq('content_id', question.id);
+
+        setQuestion({ ...question, isBookmarked: false });
+        toast({
+          title: 'Success',
+          description: 'Bookmark removed',
+        });
+      } else {
+        await supabase
+          .from('bookmarks')
+          .insert({ 
+            user_id: user.id, 
+            content_type: 'question',
+            content_id: question.id 
+          });
+
+        setQuestion({ ...question, isBookmarked: true });
+        toast({
+          title: 'Success',
+          description: 'Bookmark added',
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update bookmark',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleDeleteAnswer = async (answerId: number) => {
     const { error } = await supabase
       .from('answers')
@@ -427,7 +492,12 @@ export default function QuestionDetail() {
             <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
             <span className="text-xl font-bold text-foreground">Qarray</span>
           </div>
-          <div className="w-10" />
+          <Button variant="ghost" size="icon" onClick={toggleBookmark}>
+            <Bookmark
+              size={20}
+              className={question?.isBookmarked ? 'fill-current text-primary' : ''}
+            />
+          </Button>
         </div>
       </div>
 
