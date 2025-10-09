@@ -23,10 +23,10 @@ All colors MUST be HSL.
     --primary-light: 207 89% 86%;
     --primary-dark: 207 89% 30%;
 
-    --secondary: 280 70% 60%;
+    --secondary: 0 0% 20%;
     --secondary-foreground: 0 0% 100%;
     
-    --tertiary: 340 75% 55%;
+    --tertiary: 207 89% 30%;
     --tertiary-foreground: 0 0% 100%;
 
     --muted: 0 0% 96%;

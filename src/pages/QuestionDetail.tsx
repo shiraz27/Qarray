@@ -24,6 +24,7 @@ interface Question {
   id: number;
   data: string;
   type_id: number | null;
+  chapter_id: number;
   created_at: string;
   verified: boolean;
   contributors: string[];
@@ -409,10 +410,20 @@ export default function QuestionDetail() {
     <div className="min-h-screen bg-background flex flex-col pb-24">
       <div className="sticky top-0 z-50 bg-white border-b">
         <div className="flex items-center justify-between px-4 py-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" onClick={() => {
+            const chapterId = question?.chapter_id;
+            if (chapterId) {
+              navigate(`/chapter/${chapterId}`);
+            } else {
+              navigate('/');
+            }
+          }}>
             <ArrowLeft size={20} />
           </Button>
-          <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+          <div className="flex items-center gap-2">
+            <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+            <span className="text-xl font-bold text-foreground">Qarray</span>
+          </div>
           <div className="w-10" />
         </div>
       </div>

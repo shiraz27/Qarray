@@ -244,7 +244,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       return <FileText className="h-4 w-4 text-blue-500" />;
     }
     if (url.includes('audio') || url.includes('.mp3') || url.includes('.wav') || url.includes('.webm')) {
-      return <FileAudio className="h-4 w-4 text-purple-500" />;
+      return <FileAudio className="h-4 w-4 text-primary" />;
     }
     return <Image className="h-4 w-4 text-green-500" />;
   };

@@ -26,8 +26,8 @@ interface EditProfileDialogProps {
 
 const avatarColors = [
   { name: 'Blue', value: 'from-blue-400 to-blue-600' },
-  { name: 'Purple', value: 'from-purple-400 to-purple-600' },
-  { name: 'Pink', value: 'from-pink-400 to-pink-600' },
+  { name: 'Grey', value: 'from-gray-400 to-gray-600' },
+  { name: 'Black', value: 'from-gray-700 to-gray-900' },
   { name: 'Green', value: 'from-green-400 to-green-600' },
   { name: 'Orange', value: 'from-orange-400 to-orange-600' },
   { name: 'Red', value: 'from-red-400 to-red-600' },

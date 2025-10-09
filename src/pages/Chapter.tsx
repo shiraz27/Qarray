@@ -529,7 +529,10 @@ export default function Chapter() {
           <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
             <ArrowLeft size={20} />
           </Button>
-          <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+          <div className="flex items-center gap-2">
+            <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+            <span className="text-xl font-bold text-foreground">Qarray</span>
+          </div>
           <Button
             variant="ghost"
             size="icon"
