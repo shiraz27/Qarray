@@ -14,7 +14,14 @@ export default function Profile() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [session, setSession] = useState<Session | null>(null);
-  const [userProfile, setUserProfile] = useState<{ full_name: string; avatar_color?: string } | null>(null);
+  const [userProfile, setUserProfile] = useState<{ 
+    full_name: string; 
+    avatar_color?: string;
+    phone_number?: string;
+    state_id?: number;
+    class_id?: number;
+    institute_id?: string;
+  } | null>(null);
   const [activeTab, setActiveTab] = useState('profile');
   const [isDeleting, setIsDeleting] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -124,7 +131,7 @@ export default function Profile() {
   const fetchUserProfile = async (userId: string) => {
     const { data } = await supabase
       .from('profiles')
-      .select('full_name, avatar_color')
+      .select('full_name, avatar_color, phone_number, state_id, class_id, institute_id')
       .eq('user_id', userId)
       .single();
     
@@ -312,6 +319,11 @@ export default function Profile() {
         currentFirstName={userProfile?.full_name.split(' ')[0] || ''}
         currentLastName={userProfile?.full_name.split(' ').slice(1).join(' ') || ''}
         currentAvatarColor={userProfile?.avatar_color || 'gradient-primary'}
+        currentEmail={session?.user?.email || ''}
+        currentPhoneNumber={userProfile?.phone_number || ''}
+        currentStateId={userProfile?.state_id || null}
+        currentClassId={userProfile?.class_id || null}
+        currentInstituteId={userProfile?.institute_id || null}
         userId={session?.user?.id || ''}
         onUpdate={() => {
           if (session) {
