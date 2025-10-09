@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Trash2 } from 'lucide-react';
@@ -40,32 +41,89 @@ export const CreateMemorizationDialog = ({
   const [classId, setClassId] = useState<number | null>(null);
   const [subjectName, setSubjectName] = useState<string>('');
   const [className, setClassName] = useState<string>('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedChapterId, setSelectedChapterId] = useState<number | null>(null);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [chapters, setChapters] = useState<any[]>([]);
 
-  // Fetch class_id from subject when subjectId is provided
+  // Fetch user's class and subjects
   useEffect(() => {
-    const fetchSubjectDetails = async () => {
-      if (!subjectId) return;
+    const fetchUserData = async () => {
+      if (!open) return;
 
-      const { data: subject, error } = await supabase
-        .from('subjects')
-        .select('name, class_id, classes(name)')
-        .eq('id', subjectId)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get user's class
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('class_id, classes(name)')
+        .eq('user_id', user.id)
         .maybeSingle();
 
-      if (error) {
-        console.error('Error fetching subject:', error);
-        return;
+      if (profile?.class_id) {
+        setClassId(profile.class_id);
+        setClassName((profile.classes as any)?.name || '');
+
+        // If no subjectId provided, fetch subjects for the class
+        if (!subjectId) {
+          const { data: subjectsData } = await supabase
+            .from('subjects')
+            .select('id, name')
+            .eq('class_id', profile.class_id)
+            .eq('deleted', false)
+            .order('name');
+          
+          setSubjects(subjectsData || []);
+        }
       }
 
-      if (subject) {
-        setClassId(subject.class_id);
-        setSubjectName(subject.name);
-        setClassName((subject.classes as any)?.name || '');
+      // If subjectId is provided, fetch subject details
+      if (subjectId) {
+        const { data: subject } = await supabase
+          .from('subjects')
+          .select('name, class_id, classes(name)')
+          .eq('id', subjectId)
+          .maybeSingle();
+
+        if (subject) {
+          setClassId(subject.class_id);
+          setSubjectName(subject.name);
+          setClassName((subject.classes as any)?.name || '');
+          setSelectedSubjectId(subjectId);
+        }
+      }
+
+      // Set selected chapter if provided
+      if (chapterId) {
+        setSelectedChapterId(chapterId);
       }
     };
 
-    fetchSubjectDetails();
-  }, [subjectId]);
+    fetchUserData();
+  }, [open, subjectId, chapterId]);
+
+  // Fetch chapters when subject is selected
+  useEffect(() => {
+    const fetchChapters = async () => {
+      const targetSubjectId = selectedSubjectId || subjectId;
+      if (!targetSubjectId) {
+        setChapters([]);
+        return;
+      }
+
+      const { data: chaptersData } = await supabase
+        .from('chapters')
+        .select('id, name')
+        .eq('subject_id', targetSubjectId)
+        .eq('deleted', false)
+        .order('name');
+      
+      setChapters(chaptersData || []);
+    };
+
+    fetchChapters();
+  }, [selectedSubjectId, subjectId]);
 
   const handleAddFlashcard = () => {
     setFlashcards([
@@ -127,8 +185,8 @@ export const CreateMemorizationDialog = ({
           title: title.trim(),
           description: description.trim() || null,
           creator_id: user.id,
-          subject_id: subjectId || null,
-          chapter_id: chapterId || null,
+          subject_id: selectedSubjectId || subjectId || null,
+          chapter_id: selectedChapterId || chapterId || null,
           class_id: classId,
           is_public: isPublic,
         })
@@ -160,6 +218,8 @@ export const CreateMemorizationDialog = ({
       onClose();
       setTitle('');
       setDescription('');
+      setSelectedSubjectId(null);
+      setSelectedChapterId(null);
       setFlashcards([{ front_data: { text: '', media: [] }, back_data: { text: '', media: [] }, order_index: 0 }]);
     } catch (error: any) {
       console.error('Error creating memorization:', error);
@@ -179,16 +239,70 @@ export const CreateMemorizationDialog = ({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Basic Info */}
           <div className="space-y-4">
-            {subjectId && (
-              <div className="p-3 bg-muted rounded-lg space-y-1">
+            {/* Always show class */}
+            {className && (
+              <div className="p-3 bg-muted rounded-lg">
                 <div className="text-sm">
                   <span className="text-muted-foreground">Class: </span>
                   <span className="font-medium">{className}</span>
                 </div>
+              </div>
+            )}
+
+            {/* Show subject selector if no subjectId provided */}
+            {!subjectId && subjects.length > 0 && (
+              <div>
+                <Label htmlFor="subject">Subject (Optional)</Label>
+                <Select
+                  value={selectedSubjectId?.toString()}
+                  onValueChange={(value) => {
+                    setSelectedSubjectId(value ? parseInt(value) : null);
+                    setSelectedChapterId(null);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a subject" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subjects.map((subject) => (
+                      <SelectItem key={subject.id} value={subject.id.toString()}>
+                        {subject.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Show subject name if subjectId provided */}
+            {subjectId && subjectName && (
+              <div className="p-3 bg-muted rounded-lg">
                 <div className="text-sm">
                   <span className="text-muted-foreground">Subject: </span>
                   <span className="font-medium">{subjectName}</span>
                 </div>
+              </div>
+            )}
+
+            {/* Show chapter selector if chapters available */}
+            {chapters.length > 0 && !chapterId && (
+              <div>
+                <Label htmlFor="chapter">Chapter (Optional)</Label>
+                <Select
+                  value={selectedChapterId?.toString()}
+                  onValueChange={(value) => setSelectedChapterId(value ? parseInt(value) : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a chapter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {chapters.map((chapter) => (
+                      <SelectItem key={chapter.id} value={chapter.id.toString()}>
+                        {chapter.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
