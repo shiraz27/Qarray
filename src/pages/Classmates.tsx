@@ -17,6 +17,7 @@ interface StudentStat {
   questions_count: number;
   answers_count: number;
   resources_count: number;
+  memorizations_count: number;
   upvotes: number;
   downvotes: number;
   total_score: number;
@@ -109,6 +110,13 @@ export default function Classmates() {
           .eq('published_by', p.user_id)
           .eq('deleted', false);
 
+        // Count memorizations created
+        const { count: memorizationsCount } = await supabase
+          .from('memorizations')
+          .select('*', { count: 'exact', head: true })
+          .eq('creator_id', p.user_id)
+          .eq('deleted', false);
+
         // Count upvotes and downvotes
         const { count: upvotesCount } = await supabase
           .from('votes')
@@ -126,17 +134,18 @@ export default function Classmates() {
       const { count: reviewsCount } = await supabase
         .from('flashcard_reviews')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
+        .eq('user_id', p.user_id);
 
       const questions = questionsCount || 0;
       const answers = answersCount || 0;
       const resources = resourcesCount || 0;
+      const memorizations = memorizationsCount || 0;
       const upvotes = upvotesCount || 0;
       const downvotes = downvotesCount || 0;
       const reviews = reviewsCount || 0;
 
       // Calculate total score: contributions + upvotes - downvotes + reviews
-      const totalScore = questions + answers + resources + upvotes - downvotes + Math.floor(reviews / 10);
+      const totalScore = questions + answers + resources + memorizations + upvotes - downvotes + Math.floor(reviews / 10);
 
         return {
           user_id: p.user_id,
@@ -146,6 +155,7 @@ export default function Classmates() {
           questions_count: questions,
           answers_count: answers,
           resources_count: resources,
+          memorizations_count: memorizations,
           upvotes: upvotes,
           downvotes: downvotes,
           total_score: totalScore,
@@ -186,7 +196,7 @@ export default function Classmates() {
         <div className="flex-shrink-0">
           {rank <= 3 ? (
             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white shadow-lg ${
-              rank === 1 ? 'bg-gradient-to-br from-pink-400 to-pink-600' : rank === 2 ? 'bg-gradient-to-br from-gray-300 to-gray-500' : 'bg-gradient-to-br from-orange-400 to-orange-600'
+              rank === 1 ? 'bg-gradient-to-br from-[#F6A18A] to-[#e08870]' : rank === 2 ? 'bg-gradient-to-br from-gray-300 to-gray-500' : 'bg-gradient-to-br from-orange-400 to-orange-600'
             }`}>
               {rank === 1 && <Trophy className="w-4 h-4" />}
               {rank !== 1 && <span className="text-sm">{rank}</span>}
@@ -218,6 +228,9 @@ export default function Classmates() {
             <span className="text-xs px-1.5 py-0 border border-border rounded-md bg-card">
               📚 {student.resources_count}
             </span>
+            <span className="text-xs px-1.5 py-0 border border-border rounded-md bg-card">
+              🧠 {student.memorizations_count}
+            </span>
           </div>
           <div className="flex gap-2 mt-1">
             <span className="text-xs text-muted-foreground flex items-center gap-0.5">
@@ -231,7 +244,7 @@ export default function Classmates() {
 
         {/* Total Score */}
         <div className="flex-shrink-0 text-right">
-          <div className="text-xl font-bold bg-gradient-to-r from-pink-500 to-primary bg-clip-text text-transparent">{student.total_score}</div>
+          <div className="text-xl font-bold bg-gradient-to-r from-[#F6A18A] to-primary bg-clip-text text-transparent">{student.total_score}</div>
           <div className="text-[10px] text-muted-foreground">points</div>
         </div>
       </div>
@@ -270,7 +283,7 @@ export default function Classmates() {
           {schoolmates.length > 0 && (
             <div className="space-y-3">
               <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <School size={20} className="text-pink-500" />
+                <School size={20} style={{ color: '#F6A18A' }} />
                 Same School ({schoolmates.length})
               </h2>
               <div className="space-y-2">
