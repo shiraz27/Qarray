@@ -19,6 +19,7 @@ interface BookmarkedItem {
   chapterName?: string;
   subjectName?: string;
   created_at: string;
+  actualId: number;
 }
 
 export default function Bookmarks() {
@@ -66,77 +67,145 @@ export default function Bookmarks() {
 
         for (const bookmark of bookmarksData || []) {
           if (bookmark.chapter_id) {
-            // Fetch chapter
+            // Fetch chapter with subject
             const { data: chapter } = await supabase
               .from("chapters")
-              .select("id, name, subjects(name)")
+              .select("id, name, subject_id")
               .eq("id", bookmark.chapter_id)
               .eq("deleted", false)
-              .single();
+              .maybeSingle();
 
             if (chapter) {
+              const { data: subject } = await supabase
+                .from("subjects")
+                .select("name")
+                .eq("id", chapter.subject_id)
+                .maybeSingle();
+
               items.push({
                 id: `chapter-${bookmark.id}`,
                 type: 'chapter',
                 title: chapter.name,
-                subjectName: (chapter.subjects as any)?.name || "",
-                created_at: bookmark.created_at
+                subjectName: subject?.name || "",
+                created_at: bookmark.created_at,
+                actualId: chapter.id
               });
             }
           } else if (bookmark.content_type === 'question') {
             const { data: question } = await supabase
               .from("questions")
-              .select("id, data, chapter_id, chapters(name, subjects(name))")
+              .select("id, data, chapter_id")
               .eq("id", bookmark.content_id)
               .eq("deleted", false)
-              .single();
+              .maybeSingle();
 
             if (question) {
+              const { data: chapter } = await supabase
+                .from("chapters")
+                .select("name, subject_id")
+                .eq("id", question.chapter_id)
+                .maybeSingle();
+
+              let subjectName = "";
+              if (chapter) {
+                const { data: subject } = await supabase
+                  .from("subjects")
+                  .select("name")
+                  .eq("id", chapter.subject_id)
+                  .maybeSingle();
+                subjectName = subject?.name || "";
+              }
+
               items.push({
                 id: `question-${bookmark.id}`,
                 type: 'question',
                 title: question.data.substring(0, 100) + (question.data.length > 100 ? '...' : ''),
-                chapterName: (question.chapters as any)?.name,
-                subjectName: (question.chapters as any)?.subjects?.name,
-                created_at: bookmark.created_at
+                chapterName: chapter?.name,
+                subjectName,
+                created_at: bookmark.created_at,
+                actualId: question.id
               });
             }
           } else if (bookmark.content_type === 'answer') {
             const { data: answer } = await supabase
               .from("answers")
-              .select("id, data, question_id, questions(data, chapter_id, chapters(name, subjects(name)))")
+              .select("id, data, question_id")
               .eq("id", bookmark.content_id)
               .eq("deleted", false)
-              .single();
+              .maybeSingle();
 
             if (answer) {
+              const { data: question } = await supabase
+                .from("questions")
+                .select("data, chapter_id")
+                .eq("id", answer.question_id)
+                .maybeSingle();
+
+              let chapterName = "";
+              let subjectName = "";
+              if (question) {
+                const { data: chapter } = await supabase
+                  .from("chapters")
+                  .select("name, subject_id")
+                  .eq("id", question.chapter_id)
+                  .maybeSingle();
+
+                if (chapter) {
+                  chapterName = chapter.name;
+                  const { data: subject } = await supabase
+                    .from("subjects")
+                    .select("name")
+                    .eq("id", chapter.subject_id)
+                    .maybeSingle();
+                  subjectName = subject?.name || "";
+                }
+              }
+
               items.push({
                 id: `answer-${bookmark.id}`,
                 type: 'answer',
                 title: answer.data.substring(0, 100) + (answer.data.length > 100 ? '...' : ''),
-                description: `Answer to: ${(answer.questions as any)?.data?.substring(0, 50)}...`,
-                chapterName: (answer.questions as any)?.chapters?.name,
-                subjectName: (answer.questions as any)?.chapters?.subjects?.name,
-                created_at: bookmark.created_at
+                description: question ? `Answer to: ${question.data.substring(0, 50)}...` : undefined,
+                chapterName,
+                subjectName,
+                created_at: bookmark.created_at,
+                actualId: answer.id
               });
             }
           } else if (bookmark.content_type === 'resource') {
             const { data: resource } = await supabase
               .from("resources")
-              .select("id, title, description, chapter_id, chapters(name, subjects(name))")
+              .select("id, title, description, chapter_id")
               .eq("id", bookmark.content_id)
               .eq("deleted", false)
-              .single();
+              .maybeSingle();
 
             if (resource) {
+              const { data: chapter } = await supabase
+                .from("chapters")
+                .select("name, subject_id")
+                .eq("id", resource.chapter_id)
+                .maybeSingle();
+
+              let subjectName = "";
+              if (chapter) {
+                const { data: subject } = await supabase
+                  .from("subjects")
+                  .select("name")
+                  .eq("id", chapter.subject_id)
+                  .maybeSingle();
+                subjectName = subject?.name || "";
+              }
+
               items.push({
                 id: `resource-${bookmark.id}`,
                 type: 'resource',
                 title: resource.title,
                 description: resource.description,
-                chapterName: (resource.chapters as any)?.name,
-                subjectName: (resource.chapters as any)?.subjects?.name,
-                created_at: bookmark.created_at
+                chapterName: chapter?.name,
+                subjectName,
+                created_at: bookmark.created_at,
+                actualId: resource.id
               });
             }
           }
@@ -170,19 +239,14 @@ export default function Bookmarks() {
   };
 
   const handleItemClick = (item: BookmarkedItem) => {
-    const [type, bookmarkId] = item.id.split('-');
-    if (type === 'chapter') {
-      // Extract the actual chapter ID from the bookmark
-      const bookmark = bookmarkedItems.find(b => b.id === item.id);
-      // We'll need to navigate to the chapter page
-      navigate(`/chapter/${item.title}`); // This needs the actual chapter ID
-    } else if (type === 'question') {
-      navigate(`/question/${bookmarkId}`);
-    } else if (type === 'answer') {
-      // Navigate to question detail with answer highlighted
-      navigate(`/question/${bookmarkId}`);
-    } else if (type === 'resource') {
-      navigate(`/resource/${bookmarkId}`);
+    if (item.type === 'chapter') {
+      navigate(`/chapter/${item.actualId}`);
+    } else if (item.type === 'question') {
+      navigate(`/question/${item.actualId}`);
+    } else if (item.type === 'answer') {
+      navigate(`/question/${item.actualId}`);
+    } else if (item.type === 'resource') {
+      navigate(`/resource/${item.actualId}`);
     }
   };
 
