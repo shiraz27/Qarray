@@ -108,15 +108,27 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
 
   useEffect(() => {
     if (open) {
+      // Reset form with current values whenever dialog opens
+      setFirstName(currentFirstName);
+      setLastName(currentLastName);
+      setAvatarColor(currentAvatarColor);
+      setEmail(currentEmail);
+      setPhoneNumber(currentPhoneNumber?.replace('+216', '') || '');
+      setStateId(currentStateId?.toString() || '');
+      setClassId(currentClassId?.toString() || '');
+      setInstituteId(currentInstituteId || '');
+      
       fetchStates();
       fetchClasses();
       fetchInstitutes();
     }
-  }, [open]);
+  }, [open, currentFirstName, currentLastName, currentAvatarColor, currentEmail, currentPhoneNumber, currentStateId, currentClassId, currentInstituteId]);
 
   useEffect(() => {
-    setInstituteId('');
-  }, [stateId]);
+    if (stateId !== currentStateId?.toString()) {
+      setInstituteId('');
+    }
+  }, [stateId, currentStateId]);
 
   const fetchStates = async () => {
     try {
