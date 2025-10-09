@@ -61,14 +61,32 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
 
   if (isPdf) {
     return (
-      <Card className={`overflow-hidden ${className}`}>
-        <iframe
-          src={`${url}#view=FitH`}
-          width="100%"
-          height="500"
-          title="PDF viewer"
-          className="w-full border-0"
-        />
+      <Card className={`overflow-hidden ${className} p-6`}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="text-6xl">📄</div>
+          <div className="text-center space-y-2">
+            <h3 className="font-semibold text-lg">PDF Document</h3>
+            <p className="text-sm text-muted-foreground">Click below to view the PDF</p>
+          </div>
+          <div className="flex gap-2 w-full justify-center">
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+            >
+              Open PDF in New Tab
+            </a>
+            <a
+              href={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+            >
+              View in Google Docs
+            </a>
+          </div>
+        </div>
       </Card>
     );
   }
