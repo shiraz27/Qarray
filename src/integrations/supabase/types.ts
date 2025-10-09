@@ -172,6 +172,101 @@ export type Database = {
         }
         Relationships: []
       }
+      flashcard_reviews: {
+        Row: {
+          created_at: string
+          ease_factor: number
+          flashcard_id: number
+          id: string
+          interval: number
+          memorization_id: number
+          next_review_date: string
+          quality: number
+          review_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          ease_factor?: number
+          flashcard_id: number
+          id?: string
+          interval?: number
+          memorization_id: number
+          next_review_date?: string
+          quality: number
+          review_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          ease_factor?: number
+          flashcard_id?: number
+          id?: string
+          interval?: number
+          memorization_id?: number
+          next_review_date?: string
+          quality?: number
+          review_count?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flashcard_reviews_flashcard_id_fkey"
+            columns: ["flashcard_id"]
+            isOneToOne: false
+            referencedRelation: "flashcards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flashcard_reviews_memorization_id_fkey"
+            columns: ["memorization_id"]
+            isOneToOne: false
+            referencedRelation: "memorizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flashcards: {
+        Row: {
+          back_data: Json
+          created_at: string
+          deleted: boolean
+          front_data: Json
+          id: number
+          memorization_id: number
+          order_index: number
+          updated_at: string
+        }
+        Insert: {
+          back_data: Json
+          created_at?: string
+          deleted?: boolean
+          front_data: Json
+          id?: number
+          memorization_id: number
+          order_index?: number
+          updated_at?: string
+        }
+        Update: {
+          back_data?: Json
+          created_at?: string
+          deleted?: boolean
+          front_data?: Json
+          id?: number
+          memorization_id?: number
+          order_index?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flashcards_memorization_id_fkey"
+            columns: ["memorization_id"]
+            isOneToOne: false
+            referencedRelation: "memorizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       institutes: {
         Row: {
           added_by: string | null
@@ -206,6 +301,89 @@ export type Database = {
             columns: ["state_id"]
             isOneToOne: false
             referencedRelation: "states"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      memorization_subscriptions: {
+        Row: {
+          id: string
+          memorization_id: number
+          subscribed_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          memorization_id: number
+          subscribed_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          memorization_id?: number
+          subscribed_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memorization_subscriptions_memorization_id_fkey"
+            columns: ["memorization_id"]
+            isOneToOne: false
+            referencedRelation: "memorizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      memorizations: {
+        Row: {
+          chapter_id: number | null
+          created_at: string
+          creator_id: string
+          deleted: boolean
+          description: string | null
+          id: number
+          is_public: boolean
+          subject_id: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          chapter_id?: number | null
+          created_at?: string
+          creator_id: string
+          deleted?: boolean
+          description?: string | null
+          id?: number
+          is_public?: boolean
+          subject_id?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          chapter_id?: number | null
+          created_at?: string
+          creator_id?: string
+          deleted?: boolean
+          description?: string | null
+          id?: number
+          is_public?: boolean
+          subject_id?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memorizations_chapter_id_fkey"
+            columns: ["chapter_id"]
+            isOneToOne: false
+            referencedRelation: "chapters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memorizations_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
             referencedColumns: ["id"]
           },
         ]

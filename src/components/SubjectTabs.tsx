@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calculator, Atom, Code, BookOpen, Globe, Beaker, TestTube, FlaskConical } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { MemorizeButton } from './MemorizeButton';
 
 interface Subject {
   id: number;

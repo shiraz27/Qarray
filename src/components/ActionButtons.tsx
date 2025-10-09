@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AskQuestionGlobalForm } from './AskQuestionGlobalForm';
 import { AddResourceGlobalForm } from './AddResourceGlobalForm';
 import { supabase } from '@/integrations/supabase/client';
+import { MemorizeButton } from './MemorizeButton';
 
 export const ActionButtons: React.FC = () => {
   const [isAskDialogOpen, setIsAskDialogOpen] = useState(false);
@@ -44,15 +45,9 @@ export const ActionButtons: React.FC = () => {
               Ask
             </span>
           </button>
-          {/* <button
-            className="justify-center items-center flex gap-0.5 whitespace-nowrap bg-[#38A6FF] px-2.5 py-2 rounded-lg hover:bg-[#2B8FE8] transition-colors flex-1 sm:flex-none"
-            aria-label="Find answers"
-          >
-            <MessageSquare className="w-6 h-6" />
-            <span className="text-white">
-              Answer
-            </span>
-          </button> */}
+          <div className="flex-1 sm:flex-none">
+            <MemorizeButton />
+          </div>
           <button
             className="justify-center items-center flex gap-0.5 bg-[#F6A18A] px-2.5 py-2 rounded-lg hover:bg-[#F4927A] transition-colors flex-1 sm:flex-none"
             onClick={() => setIsAddResourceDialogOpen(true)}

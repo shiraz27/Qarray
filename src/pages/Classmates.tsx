@@ -122,14 +122,21 @@ export default function Classmates() {
           .eq('user_id', p.user_id)
           .eq('vote_type', 'down');
 
-        const questions = questionsCount || 0;
-        const answers = answersCount || 0;
-        const resources = resourcesCount || 0;
-        const upvotes = upvotesCount || 0;
-        const downvotes = downvotesCount || 0;
+      // Count memorization reviews (cards studied)
+      const { count: reviewsCount } = await supabase
+        .from('flashcard_reviews')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
 
-        // Calculate total score: contributions + upvotes - downvotes
-        const totalScore = questions + answers + resources + upvotes - downvotes;
+      const questions = questionsCount || 0;
+      const answers = answersCount || 0;
+      const resources = resourcesCount || 0;
+      const upvotes = upvotesCount || 0;
+      const downvotes = downvotesCount || 0;
+      const reviews = reviewsCount || 0;
+
+      // Calculate total score: contributions + upvotes - downvotes + reviews
+      const totalScore = questions + answers + resources + upvotes - downvotes + Math.floor(reviews / 10);
 
         return {
           user_id: p.user_id,
