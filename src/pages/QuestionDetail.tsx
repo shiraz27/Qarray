@@ -570,8 +570,13 @@ export default function QuestionDetail() {
                 />
                 <span className="text-sm font-medium">{question.downvotes}</span>
               </button>
-              <Button variant="outline" size="sm" onClick={handleShare}>
-                <Share2 size={16} className="mr-1" />
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleShare}
+                className="gap-1.5 hover:bg-primary/10 text-primary"
+              >
+                <Share2 size={16} />
                 Share
               </Button>
             </div>

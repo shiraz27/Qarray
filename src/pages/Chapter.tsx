@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { MessageSquare, FileText, ArrowLeft, Bookmark, ThumbsUp, ThumbsDown, Plus, Image as ImageIcon, Video, FileAudio } from 'lucide-react';
+import { MessageSquare, FileText, ArrowLeft, Bookmark, ThumbsUp, ThumbsDown, Plus, Image as ImageIcon, Video, FileAudio, Share2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
@@ -96,6 +96,13 @@ export default function Chapter() {
     } else {
       setActiveTab(tab);
     }
+  };
+
+  const handleShare = () => {
+    const url = window.location.href;
+    const message = `Check out this chapter on Qarray - A free e-learning platform for student collaboration! 🎓\n\n${url}`;
+    navigator.clipboard.writeText(message);
+    toast.success('Link copied! Share this chapter with your friends');
   };
 
   useEffect(() => {
@@ -637,16 +644,27 @@ export default function Chapter() {
             <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
             <span className="text-xl font-bold text-foreground">Qarray</span>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleBookmark}
-          >
-            <Bookmark
-              size={20}
-              className={chapter.isBookmarked ? 'fill-current text-primary' : ''}
-            />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleShare}
+              className="hover:bg-primary/10"
+            >
+              <Share2 size={20} className="text-primary" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleBookmark}
+              className="hover:bg-primary/10"
+            >
+              <Bookmark
+                size={20}
+                className={chapter.isBookmarked ? 'fill-current text-primary' : 'text-primary'}
+              />
+            </Button>
+          </div>
         </div>
       </div>
 
