@@ -47,6 +47,7 @@ export const AskQuestionGlobalForm: React.FC<AskQuestionGlobalFormProps> = ({
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<string>('');
+  const [userClassId, setUserClassId] = useState<number | null>(null);
   
   const form = useForm<QuestionFormData>({
     resolver: zodResolver(questionSchema),
@@ -58,23 +59,36 @@ export const AskQuestionGlobalForm: React.FC<AskQuestionGlobalFormProps> = ({
   });
 
   useEffect(() => {
-    fetchSubjects();
+    fetchUserClass();
   }, []);
 
   useEffect(() => {
-    if (selectedSubject) {
-      fetchChapters(parseInt(selectedSubject));
-    } else {
-      setChapters([]);
-      form.setValue('chapter_id', '');
+    if (userClassId) {
+      fetchSubjects();
     }
-  }, [selectedSubject]);
+  }, [userClassId]);
+
+  const fetchUserClass = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('class_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profile) {
+      setUserClassId(profile.class_id);
+    }
+  };
 
   const fetchSubjects = async () => {
     try {
       const { data, error } = await supabase
         .from('subjects')
         .select('id, name, class_id')
+        .eq('class_id', userClassId)
         .eq('deleted', false)
         .order('name');
 
@@ -85,6 +99,15 @@ export const AskQuestionGlobalForm: React.FC<AskQuestionGlobalFormProps> = ({
       toast.error('Failed to load subjects');
     }
   };
+
+  useEffect(() => {
+    if (selectedSubject) {
+      fetchChapters(parseInt(selectedSubject));
+    } else {
+      setChapters([]);
+      form.setValue('chapter_id', '');
+    }
+  }, [selectedSubject]);
 
   const fetchChapters = async (subjectId: number) => {
     try {

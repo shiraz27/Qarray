@@ -183,7 +183,7 @@ const Index: React.FC = () => {
                     variant="outline"
                     size="lg"
                     onClick={() => setSearchOpen(true)}
-                    className="w-[90%] max-w-md justify-start gap-2 hover-glow"
+                    className="w-[90%] max-w-md justify-start gap-2 hover:border-foreground transition-all"
                   >
                     <Search className="w-4 h-4" />
                     <span className="text-muted-foreground">Search anything...</span>

@@ -11,8 +11,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 interface SearchResult {
   id: number;
@@ -21,6 +30,9 @@ interface SearchResult {
   description?: string;
   chapterId?: number;
   questionId?: number;
+  subjectName?: string;
+  resourceType?: string;
+  hasCorrection?: boolean;
 }
 
 export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
@@ -28,7 +40,38 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'chapters' | 'resources' | 'questions' | 'answers'>('all');
+  const [subjectFilter, setSubjectFilter] = useState<string>('all');
+  const [resourceTypeFilter, setResourceTypeFilter] = useState<string>('all');
+  const [fileTypeFilters, setFileTypeFilters] = useState({
+    pdf: false,
+    audio: false,
+    video: false,
+    image: false,
+  });
+  const [withCorrectionOnly, setWithCorrectionOnly] = useState(false);
+  const [subjects, setSubjects] = useState<Array<{ id: number; name: string }>>([]);
+  const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchFilters();
+  }, []);
+
+  const fetchFilters = async () => {
+    const { data: subjectsData } = await supabase
+      .from('subjects')
+      .select('id, name')
+      .eq('deleted', false)
+      .order('name');
+    
+    const { data: typesData } = await supabase
+      .from('resource_types')
+      .select('id, type')
+      .order('id');
+
+    setSubjects(subjectsData || []);
+    setResourceTypes(typesData || []);
+  };
 
   useEffect(() => {
     if (query.length < 2) {
@@ -43,57 +86,99 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
 
         // Search chapters
         if (filter === 'all' || filter === 'chapters') {
-          const { data: chapters } = await supabase
+          let chaptersQuery = supabase
             .from('chapters')
-            .select('id, name')
+            .select('id, name, subject_id, subjects(name)')
             .ilike('name', `%${query}%`)
-            .eq('deleted', false)
-            .limit(5);
+            .eq('deleted', false);
+
+          if (subjectFilter !== 'all') {
+            chaptersQuery = chaptersQuery.eq('subject_id', parseInt(subjectFilter));
+          }
+
+          const { data: chapters } = await chaptersQuery.limit(5);
 
           if (chapters) {
-            searchResults.push(...chapters.map(ch => ({
+            searchResults.push(...chapters.map((ch: any) => ({
               id: ch.id,
               type: 'chapter' as const,
               title: ch.name,
+              subjectName: ch.subjects?.name,
             })));
           }
         }
 
         // Search resources
         if (filter === 'all' || filter === 'resources') {
-          const { data: resources } = await supabase
+          let resourcesQuery = supabase
             .from('resources')
-            .select('id, title, description, chapter_id')
+            .select('id, title, description, chapter_id, type_id, with_correction, data, resource_types(type), chapters(subject_id, subjects(name))')
             .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
-            .eq('deleted', false)
-            .limit(5);
+            .eq('deleted', false);
+
+          if (subjectFilter !== 'all') {
+            resourcesQuery = resourcesQuery.eq('chapters.subject_id', parseInt(subjectFilter));
+          }
+
+          if (resourceTypeFilter !== 'all') {
+            resourcesQuery = resourcesQuery.eq('type_id', parseInt(resourceTypeFilter));
+          }
+
+          if (withCorrectionOnly) {
+            resourcesQuery = resourcesQuery.eq('with_correction', true);
+          }
+
+          const { data: resources } = await resourcesQuery.limit(5);
 
           if (resources) {
-            searchResults.push(...resources.map(r => ({
+            const filteredResources = resources.filter((r: any) => {
+              // Check file type filters
+              if (fileTypeFilters.pdf || fileTypeFilters.audio || fileTypeFilters.video || fileTypeFilters.image) {
+                const dataStr = r.data?.join(' ').toLowerCase() || '';
+                const hasPdf = fileTypeFilters.pdf && dataStr.includes('.pdf');
+                const hasAudio = fileTypeFilters.audio && (dataStr.includes('audio') || dataStr.includes('.mp3') || dataStr.includes('archive.org'));
+                const hasVideo = fileTypeFilters.video && (dataStr.includes('youtube') || dataStr.includes('youtu.be'));
+                const hasImage = fileTypeFilters.image && (dataStr.includes('.jpg') || dataStr.includes('.png') || dataStr.includes('.gif') || dataStr.includes('image'));
+                
+                return hasPdf || hasAudio || hasVideo || hasImage;
+              }
+              return true;
+            });
+
+            searchResults.push(...filteredResources.map((r: any) => ({
               id: r.id,
               type: 'resource' as const,
               title: r.title,
               description: r.description,
               chapterId: r.chapter_id,
+              resourceType: r.resource_types?.type,
+              hasCorrection: r.with_correction,
+              subjectName: r.chapters?.subjects?.name,
             })));
           }
         }
 
         // Search questions
         if (filter === 'all' || filter === 'questions') {
-          const { data: questions } = await supabase
+          let questionsQuery = supabase
             .from('questions')
-            .select('id, data, chapter_id')
+            .select('id, data, chapter_id, chapters(subject_id, subjects(name))')
             .ilike('data', `%${query}%`)
-            .eq('deleted', false)
-            .limit(5);
+            .eq('deleted', false);
+
+          if (subjectFilter !== 'all') {
+            questionsQuery = questionsQuery.eq('chapters.subject_id', parseInt(subjectFilter));
+          }
+
+          const { data: questions } = await questionsQuery.limit(5);
 
           if (questions) {
-            searchResults.push(...questions.map(q => ({
+            searchResults.push(...questions.map((q: any) => ({
               id: q.id,
               type: 'question' as const,
               title: q.data.substring(0, 100),
               chapterId: q.chapter_id,
+              subjectName: q.chapters?.subjects?.name,
             })));
           }
         }
@@ -126,7 +211,7 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
     }, 300);
 
     return () => clearTimeout(searchTimeout);
-  }, [query, filter]);
+  }, [query, filter, subjectFilter, resourceTypeFilter, fileTypeFilters, withCorrectionOnly]);
 
   const handleResultClick = (result: SearchResult) => {
     if (result.type === 'chapter') {
@@ -214,6 +299,102 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
             </Button>
           </div>
 
+          {/* Additional Filters */}
+          <div className="space-y-3 p-3 border rounded-lg bg-muted/20">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Subject</Label>
+                <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="All subjects" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All subjects</SelectItem>
+                    {subjects.map((subject) => (
+                      <SelectItem key={subject.id} value={subject.id.toString()}>
+                        {subject.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs">Resource Type</Label>
+                <Select value={resourceTypeFilter} onValueChange={setResourceTypeFilter}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="All types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All types</SelectItem>
+                    {resourceTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id.toString()}>
+                        {type.type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">File Types</Label>
+              <div className="flex flex-wrap gap-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="pdf"
+                    checked={fileTypeFilters.pdf}
+                    onCheckedChange={(checked) => 
+                      setFileTypeFilters(prev => ({ ...prev, pdf: !!checked }))
+                    }
+                  />
+                  <label htmlFor="pdf" className="text-xs cursor-pointer">PDF</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="audio"
+                    checked={fileTypeFilters.audio}
+                    onCheckedChange={(checked) => 
+                      setFileTypeFilters(prev => ({ ...prev, audio: !!checked }))
+                    }
+                  />
+                  <label htmlFor="audio" className="text-xs cursor-pointer">Audio</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="video"
+                    checked={fileTypeFilters.video}
+                    onCheckedChange={(checked) => 
+                      setFileTypeFilters(prev => ({ ...prev, video: !!checked }))
+                    }
+                  />
+                  <label htmlFor="video" className="text-xs cursor-pointer">Video</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="image"
+                    checked={fileTypeFilters.image}
+                    onCheckedChange={(checked) => 
+                      setFileTypeFilters(prev => ({ ...prev, image: !!checked }))
+                    }
+                  />
+                  <label htmlFor="image" className="text-xs cursor-pointer">Image</label>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="withCorrection"
+                checked={withCorrectionOnly}
+                onCheckedChange={(checked) => setWithCorrectionOnly(!!checked)}
+              />
+              <label htmlFor="withCorrection" className="text-xs cursor-pointer">
+                With correction only
+              </label>
+            </div>
+          </div>
+
           <ScrollArea className="h-[400px]">
             {loading ? (
               <div className="text-center py-8 text-muted-foreground">Searching...</div>
@@ -225,15 +406,30 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
                   <button
                     key={`${result.type}-${result.id}`}
                     onClick={() => handleResultClick(result)}
-                    className="w-full p-4 text-left rounded-lg border hover:bg-accent transition-colors"
+                    className="w-full p-4 text-left rounded-lg border-2 hover:border-foreground transition-all"
                   >
                     <div className="flex items-start gap-3">
                       <div className="mt-1">{getIcon(result.type)}</div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <Badge variant="secondary" className="text-xs">
                             {result.type}
                           </Badge>
+                          {result.subjectName && (
+                            <Badge variant="outline" className="text-xs">
+                              {result.subjectName}
+                            </Badge>
+                          )}
+                          {result.resourceType && (
+                            <Badge variant="outline" className="text-xs">
+                              {result.resourceType}
+                            </Badge>
+                          )}
+                          {result.hasCorrection && (
+                            <Badge className="text-xs bg-green-100 text-green-700">
+                              With correction
+                            </Badge>
+                          )}
                         </div>
                         <p className="font-medium truncate">{result.title}</p>
                         {result.description && (
