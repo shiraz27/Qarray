@@ -8,54 +8,55 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 207 89% 98%;
-    --foreground: 18 43% 21%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
 
     --card: 0 0% 100%;
-    --card-foreground: 18 43% 21%;
+    --card-foreground: 0 0% 0%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 18 43% 21%;
+    --popover-foreground: 0 0% 0%;
 
-    --primary: 207 89% 61%;
+    --primary: 207 89% 54%;
     --primary-foreground: 0 0% 100%;
     
     --primary-light: 207 89% 86%;
-    --primary-dark: 18 43% 21%;
+    --primary-dark: 207 89% 30%;
 
-    --secondary: 31 94% 73%;
-    --secondary-foreground: 18 43% 21%;
+    --secondary: 280 70% 60%;
+    --secondary-foreground: 0 0% 100%;
     
-    --tertiary: 13 87% 84%;
-    --tertiary-foreground: 18 43% 21%;
+    --tertiary: 340 75% 55%;
+    --tertiary-foreground: 0 0% 100%;
 
-    --muted: 207 89% 96%;
-    --muted-foreground: 18 43% 50%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
 
-    --accent: 207 89% 61%;
+    --accent: 207 89% 54%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 207 89% 90%;
-    --input: 207 89% 95%;
-    --ring: 207 89% 61%;
+    --border: 0 0% 90%;
+    --input: 0 0% 95%;
+    --ring: 207 89% 54%;
 
     --radius: 1rem;
     
-    --gradient-primary: linear-gradient(135deg, hsl(207 89% 61%), hsl(207 89% 75%));
-    --gradient-secondary: linear-gradient(135deg, hsl(31 94% 73%), hsl(207 89% 86%));
-    --gradient-accent: linear-gradient(135deg, hsl(18 43% 21%), hsl(207 89% 61%));
+    --gradient-primary: linear-gradient(135deg, hsl(207 89% 54%), hsl(280 70% 60%));
+    --gradient-secondary: linear-gradient(135deg, hsl(280 70% 60%), hsl(340 75% 55%));
+    --gradient-accent: linear-gradient(135deg, hsl(340 75% 55%), hsl(207 89% 54%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(207 89% 98%));
 
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 0 0% 0%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 207 89% 61%;
+    --sidebar-accent: 0 0% 96%;
+    --sidebar-accent-foreground: 0 0% 0%;
+    --sidebar-border: 0 0% 90%;
+    --sidebar-ring: 207 89% 54%;
   }
 
   .dark {
@@ -135,5 +136,13 @@ All colors MUST be HSL.
   
   .gamified-card {
     @apply rounded-2xl border-2 border-border bg-card shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300;
+    background: linear-gradient(145deg, hsl(0 0% 100%), hsl(207 89% 98%));
+  }
+  
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 }

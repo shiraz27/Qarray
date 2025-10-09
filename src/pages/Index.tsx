@@ -168,13 +168,13 @@ const Index: React.FC = () => {
                 <Header userName={userProfile?.full_name || 'User'} />
                 
                 <div className="flex flex-col items-center mt-6 mb-4 gap-4">
-                  <div className="flex items-center gap-3 hover-scale cursor-pointer">
+                  <div className="flex items-center gap-3">
                     <img
                       src={qarayLogo}
-                      className="h-16 w-16 object-contain"
+                      className="h-16 w-16 object-contain hover-scale"
                       alt="Qarray Logo"
                     />
-                    <h1 className="text-3xl font-bold gradient-primary bg-clip-text text-transparent">
+                    <h1 className="text-4xl font-bold text-foreground">
                       Qarray
                     </h1>
                   </div>

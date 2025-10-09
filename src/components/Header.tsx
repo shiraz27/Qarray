@@ -67,8 +67,8 @@ export const Header: React.FC<HeaderProps> = ({ userName = "Osman" }) => {
   return (
     <>
       <header className="flex w-full items-center gap-[40px_100px] justify-between px-4 py-3">
-        <div className="self-stretch text-base text-[#2C2C2C] font-medium tracking-[0.2px] my-auto">
-          <h1 className="text-[#2C2C2C]">
+        <div className="self-stretch text-base text-foreground font-medium tracking-[0.2px] my-auto">
+          <h1 className="text-foreground">
             Welcome, {userName} 👋
           </h1>
         </div>
@@ -85,9 +85,9 @@ export const Header: React.FC<HeaderProps> = ({ userName = "Osman" }) => {
             className="relative hover-scale"
             onClick={() => setShowNotifications(true)}
           >
-            <Bell size={24} className="text-gray-700" />
+            <Bell size={24} className="text-foreground" />
             {notificationCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-6 h-6 gradient-primary text-white rounded-full text-xs flex items-center justify-center font-bold shadow-lg animate-pulse">
+              <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center font-bold shadow-lg animate-pulse">
                 {notificationCount > 9 ? '9+' : notificationCount}
               </span>
             )}

@@ -228,9 +228,14 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <MessageSquare size={14} className="text-muted-foreground" />
                     <span className="font-medium">
-                      {chapter.questionCount} {t('questions') || 'Questions'}/ {chapter.answerCount} {t('answers') || 'Answers'}
+                      {chapter.questionCount} {t('questions') || 'Questions'}
                     </span>
                   </div>
+                  {/* <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <span className="font-medium">
+                      / {chapter.answerCount} {t('answers') || 'Answers'}
+                    </span>
+                  </div> */}
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <FileText size={14} className="text-muted-foreground" />
                     <span className="font-medium">

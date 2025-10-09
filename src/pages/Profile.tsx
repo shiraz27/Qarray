@@ -227,31 +227,31 @@ export default function Profile() {
               Your Statistics
             </h3>
             <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="p-3 rounded-lg bg-gradient-primary text-white hover-glow text-center">
+              <div className="p-3 rounded-lg gradient-primary text-white hover-glow text-center shadow-lg">
                 <MessageSquare className="w-5 h-5 mx-auto mb-1" />
                 <p className="text-2xl font-bold">{stats.questionsAsked}</p>
                 <span className="text-xs">Questions</span>
               </div>
-              <div className="p-3 rounded-lg bg-gradient-secondary text-white hover-glow text-center">
+              <div className="p-3 rounded-lg gradient-secondary text-white hover-glow text-center shadow-lg">
                 <MessageSquare className="w-5 h-5 mx-auto mb-1" />
                 <p className="text-2xl font-bold">{stats.answersGiven}</p>
                 <span className="text-xs">Answers</span>
               </div>
-              <div className="p-3 rounded-lg bg-purple-500 text-white hover-glow text-center">
+              <div className="p-3 rounded-lg gradient-accent text-white hover-glow text-center shadow-lg">
                 <FileText className="w-5 h-5 mx-auto mb-1" />
                 <p className="text-2xl font-bold">{stats.resourcesAdded}</p>
                 <span className="text-xs">Resources</span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-4 rounded-lg bg-green-500 text-white hover-glow">
+              <div className="p-4 rounded-lg bg-green-500 text-white hover-glow shadow-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <ThumbsUp className="w-5 h-5" />
                   <span className="text-sm font-medium">Upvotes Received</span>
                 </div>
                 <p className="text-3xl font-bold">{stats.upvotes}</p>
               </div>
-              <div className="p-4 rounded-lg bg-red-500 text-white hover-glow">
+              <div className="p-4 rounded-lg bg-red-500 text-white hover-glow shadow-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <ThumbsDown className="w-5 h-5" />
                   <span className="text-sm font-medium">Downvotes Received</span>

@@ -59,9 +59,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ onTabChange,
                 {item.label}
               </span>
               {item.id === 'bookmarks' && bookmarkCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-6 min-w-[1.5rem] gradient-primary text-white border-0 flex items-center justify-center px-1.5 font-bold shadow-lg">
-                  {bookmarkCount}
-                </Badge>
+            <Badge className="absolute -top-1 -right-1 h-6 min-w-[1.5rem] bg-red-500 hover:bg-red-600 text-white border-0 flex items-center justify-center px-1.5 font-bold shadow-lg">
+              {bookmarkCount}
+            </Badge>
               )}
             </button>
           );
