@@ -197,7 +197,7 @@ const Login: React.FC = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
         {/* Logo with emphasis */}
-        <div className="mb-6 bg-white rounded-3xl p-8 shadow-sm">
+        <div className="mb-6">
           <img
             src={qarayLogo}
             alt="Qarray Logo"
