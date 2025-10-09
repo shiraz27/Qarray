@@ -108,13 +108,13 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {
       case 'answer_added':
-        return <MessageSquare className="h-5 w-5" />;
+        return <MessageSquare className="h-6 w-6" />;
       case 'bookmark_content':
-        return <BookmarkPlus className="h-5 w-5" />;
+        return <BookmarkPlus className="h-6 w-6" />;
       case 'new_resource':
-        return <FileText className="h-5 w-5" />;
+        return <FileText className="h-6 w-6" />;
       default:
-        return <Bell className="h-5 w-5" />;
+        return <Bell className="h-6 w-6" />;
     }
   };
 
@@ -269,7 +269,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
       )}
     >
       <div className="flex gap-3">
-        <div className={cn("flex-shrink-0 rounded-full p-2", colorClass)}>
+        <div className={cn("flex-shrink-0 rounded-full p-3", colorClass)}>
           {icon}
         </div>
         <div className="flex-1 min-w-0">
