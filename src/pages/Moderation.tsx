@@ -8,9 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { CheckCircle2, XCircle, BookOpen, MessageCircle, Brain, FileText } from 'lucide-react';
+import { CheckCircle2, XCircle, BookOpen, MessageCircle, Brain, FileText, ExternalLink } from 'lucide-react';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 
 type ContentType = 'questions' | 'answers' | 'resources' | 'memorizations';
 
@@ -24,6 +24,7 @@ interface UnverifiedItem {
   contributor_name?: string;
   subject_name?: string;
   chapter_name?: string;
+  question_id?: number; // For answers
 }
 
 export default function Moderation() {
@@ -191,6 +192,7 @@ export default function Moderation() {
             created_at: a.created_at,
             chapter_name: (a.questions as any)?.chapters?.name,
             subject_name: (a.questions as any)?.chapters?.subjects?.name,
+            question_id: a.question_id,
           }));
           break;
 
@@ -287,6 +289,21 @@ export default function Moderation() {
     } catch (error) {
       console.error('Error updating verification:', error);
       toast.error('Failed to update item');
+    }
+  };
+
+  const getViewLink = (item: UnverifiedItem) => {
+    switch (item.type) {
+      case 'questions':
+        return `/question/${item.id}`;
+      case 'answers':
+        return `/question/${item.question_id}`;
+      case 'resources':
+        return `/resource/${item.id}`;
+      case 'memorizations':
+        return `/`; // Memorizations are viewed in modals, so go to home
+      default:
+        return '/';
     }
   };
 
@@ -420,6 +437,17 @@ export default function Moderation() {
                       </div>
 
                       <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-2"
+                          asChild
+                        >
+                          <Link to={getViewLink(item)} target="_blank">
+                            <ExternalLink className="w-4 h-4" />
+                            View
+                          </Link>
+                        </Button>
                         <Button
                           size="sm"
                           variant="default"
