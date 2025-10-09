@@ -103,7 +103,7 @@ export const AskQuestionGlobalForm: React.FC<AskQuestionGlobalFormProps> = ({
     }
   };
 
-  const handleMediaUploaded = (url: string) => {
+  const handleMediaUploaded = (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => {
     setMediaUrls(prev => [...prev, url]);
     toast.success('Media added successfully');
   };
