@@ -41,36 +41,88 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'chapters' | 'resources' | 'questions' | 'answers'>('all');
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
-  const [resourceTypeFilter, setResourceTypeFilter] = useState<string>('all');
-  const [fileTypeFilters, setFileTypeFilters] = useState({
-    pdf: false,
-    audio: false,
-    video: false,
-    image: false,
-  });
+  const [chapterFilter, setChapterFilter] = useState<string>('all');
+  const [resourceTypeFilters, setResourceTypeFilters] = useState<Record<number, boolean>>({});
   const [withCorrectionOnly, setWithCorrectionOnly] = useState(false);
   const [subjects, setSubjects] = useState<Array<{ id: number; name: string }>>([]);
+  const [chapters, setChapters] = useState<Array<{ id: number; name: string }>>([]);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
+  const [userClassId, setUserClassId] = useState<number | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchFilters();
-  }, []);
+    if (open) {
+      fetchUserClass();
+    }
+  }, [open]);
 
-  const fetchFilters = async () => {
+  useEffect(() => {
+    if (userClassId) {
+      fetchSubjects();
+      fetchResourceTypes();
+    }
+  }, [userClassId]);
+
+  useEffect(() => {
+    if (subjectFilter !== 'all') {
+      fetchChapters(parseInt(subjectFilter));
+    } else {
+      setChapters([]);
+      setChapterFilter('all');
+    }
+  }, [subjectFilter]);
+
+  const fetchUserClass = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('class_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profile) {
+      setUserClassId(profile.class_id);
+    }
+  };
+
+  const fetchSubjects = async () => {
     const { data: subjectsData } = await supabase
       .from('subjects')
       .select('id, name')
+      .eq('class_id', userClassId)
       .eq('deleted', false)
       .order('name');
-    
+
+    setSubjects(subjectsData || []);
+  };
+
+  const fetchChapters = async (subjectId: number) => {
+    const { data: chaptersData } = await supabase
+      .from('chapters')
+      .select('id, name')
+      .eq('subject_id', subjectId)
+      .eq('deleted', false)
+      .order('name');
+
+    setChapters(chaptersData || []);
+  };
+
+  const fetchResourceTypes = async () => {
     const { data: typesData } = await supabase
       .from('resource_types')
       .select('id, type')
       .order('id');
 
-    setSubjects(subjectsData || []);
     setResourceTypes(typesData || []);
+    
+    // Initialize all resource types as unchecked
+    const initialFilters: Record<number, boolean> = {};
+    typesData?.forEach(type => {
+      initialFilters[type.id] = false;
+    });
+    setResourceTypeFilters(initialFilters);
   };
 
   useEffect(() => {
@@ -88,12 +140,21 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
         if (filter === 'all' || filter === 'chapters') {
           let chaptersQuery = supabase
             .from('chapters')
-            .select('id, name, subject_id, subjects(name)')
+            .select('id, name, subject_id, subjects(name, class_id)')
             .ilike('name', `%${query}%`)
             .eq('deleted', false);
 
           if (subjectFilter !== 'all') {
             chaptersQuery = chaptersQuery.eq('subject_id', parseInt(subjectFilter));
+          }
+
+          if (chapterFilter !== 'all') {
+            chaptersQuery = chaptersQuery.eq('id', parseInt(chapterFilter));
+          }
+
+          // Filter by user's class
+          if (userClassId) {
+            chaptersQuery = chaptersQuery.eq('subjects.class_id', userClassId);
           }
 
           const { data: chapters } = await chaptersQuery.limit(5);
@@ -112,7 +173,7 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
         if (filter === 'all' || filter === 'resources') {
           let resourcesQuery = supabase
             .from('resources')
-            .select('id, title, description, chapter_id, type_id, with_correction, data, resource_types(type), chapters(subject_id, subjects(name))')
+            .select('id, title, description, chapter_id, type_id, with_correction, data, resource_types(type), chapters(subject_id, subjects(name, class_id))')
             .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
             .eq('deleted', false);
 
@@ -120,8 +181,22 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
             resourcesQuery = resourcesQuery.eq('chapters.subject_id', parseInt(subjectFilter));
           }
 
-          if (resourceTypeFilter !== 'all') {
-            resourcesQuery = resourcesQuery.eq('type_id', parseInt(resourceTypeFilter));
+          if (chapterFilter !== 'all') {
+            resourcesQuery = resourcesQuery.eq('chapter_id', parseInt(chapterFilter));
+          }
+
+          // Filter by user's class
+          if (userClassId) {
+            resourcesQuery = resourcesQuery.eq('chapters.subjects.class_id', userClassId);
+          }
+
+          // Filter by resource types
+          const selectedResourceTypes = Object.entries(resourceTypeFilters)
+            .filter(([_, checked]) => checked)
+            .map(([id, _]) => parseInt(id));
+
+          if (selectedResourceTypes.length > 0) {
+            resourcesQuery = resourcesQuery.in('type_id', selectedResourceTypes);
           }
 
           if (withCorrectionOnly) {
@@ -131,21 +206,7 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
           const { data: resources } = await resourcesQuery.limit(5);
 
           if (resources) {
-            const filteredResources = resources.filter((r: any) => {
-              // Check file type filters
-              if (fileTypeFilters.pdf || fileTypeFilters.audio || fileTypeFilters.video || fileTypeFilters.image) {
-                const dataStr = r.data?.join(' ').toLowerCase() || '';
-                const hasPdf = fileTypeFilters.pdf && dataStr.includes('.pdf');
-                const hasAudio = fileTypeFilters.audio && (dataStr.includes('audio') || dataStr.includes('.mp3') || dataStr.includes('archive.org'));
-                const hasVideo = fileTypeFilters.video && (dataStr.includes('youtube') || dataStr.includes('youtu.be'));
-                const hasImage = fileTypeFilters.image && (dataStr.includes('.jpg') || dataStr.includes('.png') || dataStr.includes('.gif') || dataStr.includes('image'));
-                
-                return hasPdf || hasAudio || hasVideo || hasImage;
-              }
-              return true;
-            });
-
-            searchResults.push(...filteredResources.map((r: any) => ({
+            searchResults.push(...resources.map((r: any) => ({
               id: r.id,
               type: 'resource' as const,
               title: r.title,
@@ -162,12 +223,21 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
         if (filter === 'all' || filter === 'questions') {
           let questionsQuery = supabase
             .from('questions')
-            .select('id, data, chapter_id, chapters(subject_id, subjects(name))')
+            .select('id, data, chapter_id, chapters(subject_id, subjects(name, class_id))')
             .ilike('data', `%${query}%`)
             .eq('deleted', false);
 
           if (subjectFilter !== 'all') {
             questionsQuery = questionsQuery.eq('chapters.subject_id', parseInt(subjectFilter));
+          }
+
+          if (chapterFilter !== 'all') {
+            questionsQuery = questionsQuery.eq('chapter_id', parseInt(chapterFilter));
+          }
+
+          // Filter by user's class
+          if (userClassId) {
+            questionsQuery = questionsQuery.eq('chapters.subjects.class_id', userClassId);
           }
 
           const { data: questions } = await questionsQuery.limit(5);
@@ -211,7 +281,7 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
     }, 300);
 
     return () => clearTimeout(searchTimeout);
-  }, [query, filter, subjectFilter, resourceTypeFilter, fileTypeFilters, withCorrectionOnly]);
+  }, [query, filter, subjectFilter, chapterFilter, resourceTypeFilters, withCorrectionOnly, userClassId]);
 
   const handleResultClick = (result: SearchResult) => {
     if (result.type === 'chapter') {
@@ -320,16 +390,20 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
               </div>
 
               <div>
-                <Label className="text-xs">Resource Type</Label>
-                <Select value={resourceTypeFilter} onValueChange={setResourceTypeFilter}>
+                <Label className="text-xs">Chapter</Label>
+                <Select 
+                  value={chapterFilter} 
+                  onValueChange={setChapterFilter}
+                  disabled={subjectFilter === 'all'}
+                >
                   <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="All types" />
+                    <SelectValue placeholder={subjectFilter === 'all' ? 'Select subject first' : 'All chapters'} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All types</SelectItem>
-                    {resourceTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id.toString()}>
-                        {type.type}
+                    <SelectItem value="all">All chapters</SelectItem>
+                    {chapters.map((chapter) => (
+                      <SelectItem key={chapter.id} value={chapter.id.toString()}>
+                        {chapter.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -338,48 +412,22 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs">File Types</Label>
+              <Label className="text-xs">Resource Types</Label>
               <div className="flex flex-wrap gap-3">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="pdf"
-                    checked={fileTypeFilters.pdf}
-                    onCheckedChange={(checked) => 
-                      setFileTypeFilters(prev => ({ ...prev, pdf: !!checked }))
-                    }
-                  />
-                  <label htmlFor="pdf" className="text-xs cursor-pointer">PDF</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="audio"
-                    checked={fileTypeFilters.audio}
-                    onCheckedChange={(checked) => 
-                      setFileTypeFilters(prev => ({ ...prev, audio: !!checked }))
-                    }
-                  />
-                  <label htmlFor="audio" className="text-xs cursor-pointer">Audio</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="video"
-                    checked={fileTypeFilters.video}
-                    onCheckedChange={(checked) => 
-                      setFileTypeFilters(prev => ({ ...prev, video: !!checked }))
-                    }
-                  />
-                  <label htmlFor="video" className="text-xs cursor-pointer">Video</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="image"
-                    checked={fileTypeFilters.image}
-                    onCheckedChange={(checked) => 
-                      setFileTypeFilters(prev => ({ ...prev, image: !!checked }))
-                    }
-                  />
-                  <label htmlFor="image" className="text-xs cursor-pointer">Image</label>
-                </div>
+                {resourceTypes.map((type) => (
+                  <div key={type.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`type-${type.id}`}
+                      checked={resourceTypeFilters[type.id] || false}
+                      onCheckedChange={(checked) => 
+                        setResourceTypeFilters(prev => ({ ...prev, [type.id]: !!checked }))
+                      }
+                    />
+                    <label htmlFor={`type-${type.id}`} className="text-xs cursor-pointer">
+                      {type.type}
+                    </label>
+                  </div>
+                ))}
               </div>
             </div>
 
