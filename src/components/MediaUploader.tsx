@@ -4,20 +4,25 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Camera, Upload, Mic, Youtube, FileText, Loader2 } from 'lucide-react';
+import { Camera, Upload, Mic, Youtube, FileText, Loader2, X, Image, FileAudio, Video } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { enhanceDocument, isMobileDevice } from '@/utils/documentScanner';
 import { MediaPreviewDialog } from './MediaPreviewDialog';
+import { Card } from '@/components/ui/card';
 
 interface MediaUploaderProps {
   onMediaUploaded: (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => void;
   acceptedTypes?: ('image' | 'video' | 'audio' | 'pdf')[];
+  uploadedMedia?: Array<{ url: string; type: string; name: string }>;
+  onRemoveMedia?: (index: number) => void;
 }
 
 export const MediaUploader: React.FC<MediaUploaderProps> = ({ 
   onMediaUploaded,
-  acceptedTypes = ['image', 'video', 'audio', 'pdf']
+  acceptedTypes = ['image', 'video', 'audio', 'pdf'],
+  uploadedMedia = [],
+  onRemoveMedia
 }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -61,18 +66,29 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
     
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setPreviewUrl(event.target?.result as string);
-      setPreviewFile(file);
-      setPreviewType('image');
-      setFromCamera(false);
-    };
-    reader.readAsDataURL(file);
+    // Process multiple files
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setPreviewUrl(event.target?.result as string);
+        setPreviewFile(file);
+        setPreviewType('image');
+        setFromCamera(false);
+      };
+      reader.readAsDataURL(file);
+      
+      // Only show preview for first file, upload others directly
+      if (i > 0) {
+        await uploadToArchive(file, 'image');
+      }
+    }
+    
+    // Reset input
+    e.target.value = '';
   };
 
   const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,17 +107,28 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   };
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
     
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setPreviewUrl(event.target?.result as string);
-      setPreviewFile(file);
-      setPreviewType('pdf');
-    };
-    reader.readAsDataURL(file);
+    // Process multiple files
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setPreviewUrl(event.target?.result as string);
+        setPreviewFile(file);
+        setPreviewType('pdf');
+      };
+      reader.readAsDataURL(file);
+      
+      // Only show preview for first file, upload others directly
+      if (i > 0) {
+        await uploadToArchive(file, 'pdf');
+      }
+    }
+    
+    // Reset input
+    e.target.value = '';
   };
 
   const handleKeepFile = async () => {
@@ -147,16 +174,18 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       return;
     }
     
-    // Validate YouTube URL
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/;
-    if (!youtubeRegex.test(youtubeUrl)) {
+    // Validate YouTube URL - support multiple formats
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]+)/;
+    const match = youtubeUrl.match(youtubeRegex);
+    
+    if (!match) {
       toast.error('Invalid YouTube URL');
       return;
     }
 
     onMediaUploaded(youtubeUrl, 'video');
     setYoutubeUrl('');
-    toast.success('YouTube URL added');
+    toast.success('YouTube video added');
   };
 
   const startRecording = async () => {
@@ -207,8 +236,71 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     setPreviewType('audio');
   };
 
+  const getMediaIcon = (url: string) => {
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      return <Video className="h-4 w-4 text-red-500" />;
+    }
+    if (url.includes('.pdf')) {
+      return <FileText className="h-4 w-4 text-blue-500" />;
+    }
+    if (url.includes('audio') || url.includes('.mp3') || url.includes('.wav') || url.includes('.webm')) {
+      return <FileAudio className="h-4 w-4 text-purple-500" />;
+    }
+    return <Image className="h-4 w-4 text-green-500" />;
+  };
+
+  const getMediaName = (url: string) => {
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      return 'YouTube Video';
+    }
+    if (url.includes('.pdf')) {
+      return 'PDF Document';
+    }
+    if (url.includes('recording-')) {
+      return 'Audio Recording';
+    }
+    if (url.includes('archive.org')) {
+      const urlParts = url.split('/');
+      return decodeURIComponent(urlParts[urlParts.length - 1]);
+    }
+    return 'Attachment';
+  };
+
   return (
     <div className="space-y-4">
+      {/* Uploaded Media List */}
+      {uploadedMedia.length > 0 && (
+        <Card className="p-3">
+          <div className="space-y-2">
+            <p className="text-sm font-semibold mb-2">Uploaded Files ({uploadedMedia.length})</p>
+            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+              {uploadedMedia.map((media, index) => (
+                <div 
+                  key={index} 
+                  className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded-md hover:bg-muted transition-colors"
+                >
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {getMediaIcon(media.url)}
+                    <span className="text-sm truncate">{getMediaName(media.url)}</span>
+                  </div>
+                  {onRemoveMedia && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRemoveMedia(index)}
+                      className="h-7 w-7 p-0 flex-shrink-0"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
+
       <Tabs defaultValue="image" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           {acceptedTypes.includes('image') && <TabsTrigger value="image">Image</TabsTrigger>}
@@ -264,6 +356,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleImageUpload}
                 className="hidden"
               />
@@ -373,6 +466,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
                 ref={pdfInputRef}
                 type="file"
                 accept="application/pdf"
+                multiple
                 onChange={handlePdfUpload}
                 className="hidden"
               />

@@ -265,26 +265,11 @@ export const AddResourceFormWithSelection: React.FC<AddResourceFormWithSelection
 
         <div>
           <FormLabel>Resource Files/URLs</FormLabel>
-          <MediaUploader onMediaUploaded={handleMediaUploaded} />
-          
-          {mediaUrls.length > 0 && (
-            <div className="mt-3 space-y-2">
-              <p className="text-sm font-medium">Added resources:</p>
-              {mediaUrls.map((url, index) => (
-                <div key={index} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
-                  <span className="truncate flex-1">Resource {index + 1}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeMedia(index)}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
+          <MediaUploader 
+            onMediaUploaded={handleMediaUploaded}
+            uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
+            onRemoveMedia={removeMedia}
+          />
         </div>
 
         <FormField

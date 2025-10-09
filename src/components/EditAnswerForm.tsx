@@ -115,45 +115,11 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
 
         <div>
           <FormLabel>Attachments (Optional)</FormLabel>
-          <MediaUploader onMediaUploaded={handleMediaUploaded} />
-          
-          {mediaUrls.length > 0 && (
-            <div className="mt-3 space-y-2">
-              <p className="text-sm font-medium">Added attachments:</p>
-              {mediaUrls.map((url, index) => {
-                let displayName = 'Attachment ' + (index + 1);
-                if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                  displayName = '📹 YouTube Video';
-                } else if (url.includes('.pdf')) {
-                  displayName = '📄 PDF Document';
-                } else if (url.includes('archive.org')) {
-                  const urlParts = url.split('/');
-                  const filename = urlParts[urlParts.length - 1];
-                  if (filename.includes('recording-')) {
-                    displayName = '🎤 Audio Recording';
-                  } else if (filename.match(/\.(jpg|jpeg|png|webp)$/i)) {
-                    displayName = '📷 Image';
-                  } else {
-                    displayName = '📎 ' + decodeURIComponent(filename);
-                  }
-                }
-                
-                return (
-                  <div key={index} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
-                    <span className="truncate flex-1">{displayName}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeMedia(index)}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <MediaUploader 
+            onMediaUploaded={handleMediaUploaded}
+            uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
+            onRemoveMedia={removeMedia}
+          />
         </div>
 
         <div className="flex gap-2 justify-end">
