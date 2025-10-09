@@ -5,16 +5,25 @@ import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { ArrowLeft, LogOut, Trash2 } from 'lucide-react';
+import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Session } from '@supabase/supabase-js';
+import { EditProfileDialog } from '@/components/EditProfileDialog';
+import { Card } from '@/components/ui/card';
 
 export default function Profile() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [session, setSession] = useState<Session | null>(null);
-  const [userProfile, setUserProfile] = useState<{ full_name: string } | null>(null);
+  const [userProfile, setUserProfile] = useState<{ full_name: string; avatar_color?: string } | null>(null);
   const [activeTab, setActiveTab] = useState('profile');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [stats, setStats] = useState({
+    questionsAsked: 0,
+    answersGiven: 0,
+    upvotes: 0,
+    downvotes: 0,
+  });
 
   const handleTabChange = (tab: string) => {
     if (tab === 'subjects') {
@@ -26,18 +35,56 @@ export default function Profile() {
     }
   };
 
+  const fetchUserStats = async (userId: string) => {
+    try {
+      // Count questions
+      const { count: questionsCount } = await supabase
+        .from('questions')
+        .select('*', { count: 'exact', head: true })
+        .contains('contributors', [userId]);
+
+      // Count answers
+      const { count: answersCount } = await supabase
+        .from('answers')
+        .select('*', { count: 'exact', head: true })
+        .contains('contributors', [userId]);
+
+      // Count upvotes and downvotes
+      const { data: votes } = await supabase
+        .from('votes')
+        .select('vote_type')
+        .eq('user_id', userId);
+
+      const upvotes = votes?.filter(v => v.vote_type === 'upvote').length || 0;
+      const downvotes = votes?.filter(v => v.vote_type === 'downvote').length || 0;
+
+      setStats({
+        questionsAsked: questionsCount || 0,
+        answersGiven: answersCount || 0,
+        upvotes,
+        downvotes,
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
+
+  const fetchUserProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('full_name, avatar_color')
+      .eq('user_id', userId)
+      .single();
+    
+    if (data) setUserProfile(data);
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
-        supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('user_id', session.user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) setUserProfile(data);
-          });
+        fetchUserProfile(session.user.id);
+        fetchUserStats(session.user.id);
       }
     });
 
@@ -45,6 +92,10 @@ export default function Profile() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session) {
+        fetchUserProfile(session.user.id);
+        fetchUserStats(session.user.id);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -76,6 +127,13 @@ export default function Profile() {
     }
   };
 
+  const getInitials = (name: string) => {
+    const parts = name.split(' ');
+    return parts.map(p => p[0]).join('').toUpperCase().substring(0, 2);
+  };
+
+  const avatarColorClass = userProfile?.avatar_color || 'gradient-primary';
+
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
       <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
@@ -85,22 +143,95 @@ export default function Profile() {
         <h1 className="text-lg font-semibold flex-1">{t('profile') || 'Profile'}</h1>
       </div>
 
-      <div className="flex flex-col items-center justify-start h-full p-8">
-        <div className="w-full max-w-md space-y-6">
-          <div className="bg-white rounded-lg border p-6 space-y-4">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-2xl">
-                👤
+      <div className="flex flex-col items-center justify-start p-4 md:p-8 space-y-6">
+        <div className="w-full max-w-2xl space-y-6">
+          {/* Profile Card */}
+          <Card className="gamified-card p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className={`w-20 h-20 bg-gradient-to-br ${avatarColorClass} rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-lg`}>
+                  {userProfile?.full_name ? getInitials(userProfile.full_name) : '👤'}
+                </div>
+                <div>
+                  <h3 className="font-bold text-xl">{userProfile?.full_name || 'User'}</h3>
+                  <p className="text-sm text-muted-foreground">{session?.user?.email}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-lg">{userProfile?.full_name || 'User'}</h3>
-                <p className="text-sm text-gray-600">{session?.user?.email}</p>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setEditDialogOpen(true)}
+                className="hover-scale"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </div>
+          </Card>
+
+          {/* Statistics Card */}
+          <Card className="gamified-card p-6">
+            <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              Your Statistics
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 rounded-lg bg-gradient-primary text-white hover-glow">
+                <div className="flex items-center gap-2 mb-2">
+                  <MessageSquare className="w-5 h-5" />
+                  <span className="text-sm font-medium">Questions</span>
+                </div>
+                <p className="text-3xl font-bold">{stats.questionsAsked}</p>
+              </div>
+              <div className="p-4 rounded-lg bg-gradient-secondary text-white hover-glow">
+                <div className="flex items-center gap-2 mb-2">
+                  <MessageSquare className="w-5 h-5" />
+                  <span className="text-sm font-medium">Answers</span>
+                </div>
+                <p className="text-3xl font-bold">{stats.answersGiven}</p>
+              </div>
+              <div className="p-4 rounded-lg bg-green-500 text-white hover-glow">
+                <div className="flex items-center gap-2 mb-2">
+                  <ThumbsUp className="w-5 h-5" />
+                  <span className="text-sm font-medium">Upvotes</span>
+                </div>
+                <p className="text-3xl font-bold">{stats.upvotes}</p>
+              </div>
+              <div className="p-4 rounded-lg bg-red-500 text-white hover-glow">
+                <div className="flex items-center gap-2 mb-2">
+                  <ThumbsDown className="w-5 h-5" />
+                  <span className="text-sm font-medium">Downvotes</span>
+                </div>
+                <p className="text-3xl font-bold">{stats.downvotes}</p>
               </div>
             </div>
+          </Card>
 
+          {/* Contact Card */}
+          <Card className="gamified-card p-6 space-y-3">
+            <h3 className="font-bold text-lg mb-4">Contact & Support</h3>
             <Button
               variant="outline"
-              className="w-full justify-start"
+              className="w-full justify-start hover-scale"
+              onClick={() => window.location.href = 'mailto:support@qarray.com?subject=Support Request'}
+            >
+              <Mail className="mr-2 h-4 w-4" />
+              Contact Support
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start hover-scale"
+              onClick={() => window.location.href = 'mailto:shiraz@code-craft-studios.com?subject=Developer Contact'}
+            >
+              <Mail className="mr-2 h-4 w-4" />
+              Contact Developer
+            </Button>
+          </Card>
+
+          {/* Actions Card */}
+          <Card className="gamified-card p-6 space-y-3">
+            <Button
+              variant="outline"
+              className="w-full justify-start hover-scale"
               onClick={handleSignOut}
             >
               <LogOut className="mr-2 h-4 w-4" />
@@ -116,9 +247,23 @@ export default function Profile() {
               <Trash2 className="mr-2 h-4 w-4" />
               {isDeleting ? (t('deleting') || 'Deleting...') : (t('deleteAccount') || 'Delete Account')}
             </Button>
-          </div>
+          </Card>
         </div>
       </div>
+
+      <EditProfileDialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        currentFirstName={userProfile?.full_name.split(' ')[0] || ''}
+        currentLastName={userProfile?.full_name.split(' ').slice(1).join(' ') || ''}
+        currentAvatarColor={userProfile?.avatar_color || 'gradient-primary'}
+        userId={session?.user?.id || ''}
+        onUpdate={() => {
+          if (session) {
+            fetchUserProfile(session.user.id);
+          }
+        }}
+      />
 
       <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
     </div>

@@ -9,7 +9,8 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
-import { LogOut, Trash2 } from 'lucide-react';
+import { LogOut, Trash2, Search } from 'lucide-react';
+import { GlobalSearch } from '@/components/GlobalSearch';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import qarayLogo from '@/assets/qarray-logo-new.png';
@@ -34,6 +35,7 @@ const Index: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [userProfile, setUserProfile] = useState<{ full_name: string; class_id: number } | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const handleTabChange = (tab: string) => {
     if (tab === 'bookmarks') {
@@ -162,15 +164,30 @@ const Index: React.FC = () => {
         <div className="flex-1 w-full overflow-auto">
           {activeTab === 'subjects' && (
             <>
-              <section className="items-stretch flex w-full flex-col bg-white">
+              <section className="items-stretch flex w-full flex-col bg-background">
                 <Header userName={userProfile?.full_name || 'User'} />
                 
-                <div className="flex justify-center mt-4">
-                  <img
-                    src={qarayLogo}
-                    className="h-16 w-16 object-contain"
-                    alt="Qarray Logo"
-                  />
+                <div className="flex flex-col items-center mt-6 mb-4 gap-4">
+                  <div className="flex items-center gap-3 hover-scale">
+                    <img
+                      src={qarayLogo}
+                      className="h-16 w-16 object-contain"
+                      alt="Qarray Logo"
+                    />
+                    <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                      Qarray
+                    </h1>
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => setSearchOpen(true)}
+                    className="w-[90%] max-w-md justify-start gap-2 hover-glow"
+                  >
+                    <Search className="w-4 h-4" />
+                    <span className="text-muted-foreground">Search anything...</span>
+                  </Button>
                 </div>
                 
                 <ActionButtons />
@@ -251,6 +268,8 @@ const Index: React.FC = () => {
         
         <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
       </div>
+      
+      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 };

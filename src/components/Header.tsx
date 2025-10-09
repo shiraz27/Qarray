@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { BellDot } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { NotificationPanel } from './NotificationPanel';
 
 interface HeaderProps {

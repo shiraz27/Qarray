@@ -112,10 +112,10 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
           return (
             <button
               key={subject.id}
-              className={`items-center flex flex-col flex-shrink-0 sm:flex-1 pb-2 min-w-0 ${
+              className={`items-center flex flex-col flex-shrink-0 sm:flex-1 pb-2 min-w-0 transition-all duration-300 ${
                 isActive 
-                  ? 'text-[#38a6ff] font-semibold border-b-2 border-[#38A6FF]' 
-                  : 'text-[#9E9E9E] border-b-2 border-transparent hover:text-[#38a6ff] transition-colors'
+                  ? 'text-primary font-semibold border-b-2 border-primary scale-110' 
+                  : 'text-muted-foreground border-b-2 border-transparent hover:text-primary hover:scale-105'
               }`}
               onClick={() => handleSubjectClick(subject.id)}
               aria-pressed={isActive}
@@ -123,7 +123,9 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
             >
               <Icon
                 size={24}
-                className={isActive ? 'text-[#38a6ff]' : 'text-[#9E9E9E]'}
+                className={`transition-all duration-300 ${
+                  isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'
+                }`}
               />
               <span className="mt-1 max-w-[100px] truncate">
                 {subject.name}
