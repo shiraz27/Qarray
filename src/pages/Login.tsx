@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import qarayLogo from '@/assets/qarray-logo-new.png';
 
 const Login: React.FC = () => {
@@ -202,9 +203,13 @@ const Login: React.FC = () => {
         <div className="absolute bottom-1/3 right-10 text-7xl opacity-15">🚀</div>
       </div>
 
-      {/* Language Switcher */}
-      <div className="absolute top-4 right-4 z-10">
+      {/* Language & Theme Switcher */}
+      <div className="absolute top-4 right-4 z-10 flex gap-2">
         <LanguageSwitcher />
+      </div>
+      
+      <div className="absolute top-4 left-4 z-10">
+        <ThemeSwitcher compact={true} showLabel={false} />
       </div>
 
       {/* Main Content */}
