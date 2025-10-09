@@ -361,7 +361,7 @@ export default function Bookmarks() {
             {groupedItems.resources.length > 0 && (
               <div>
                 <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  <FileText size={20} className="text-blue-600" />
+                  <FileText size={20} style={{ color: '#F6A18A' }} />
                   {t("resources") || "Resources"} ({groupedItems.resources.length})
                 </h2>
                 <div className="space-y-3">

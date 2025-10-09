@@ -204,10 +204,6 @@ const Login: React.FC = () => {
       <div className="absolute top-4 right-4 z-10 flex gap-2">
         <LanguageSwitcher />
       </div>
-      
-      <div className="absolute top-4 left-4 z-20">
-        <ThemeSwitcher compact={true} showLabel={false} />
-      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
