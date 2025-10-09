@@ -277,14 +277,26 @@ export default function Moderation() {
 
   const handleVerify = async (id: number, type: ContentType, approve: boolean) => {
     try {
-      const { error } = await supabase
-        .from(type)
-        .update({ verified: approve })
-        .eq('id', id);
+      if (approve) {
+        // Approve: set verified to true
+        const { error } = await supabase
+          .from(type)
+          .update({ verified: true })
+          .eq('id', id);
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success('Item approved');
+      } else {
+        // Reject: soft delete
+        const { error } = await supabase
+          .from(type)
+          .update({ deleted: true })
+          .eq('id', id);
 
-      toast.success(approve ? 'Item approved' : 'Item rejected');
+        if (error) throw error;
+        toast.success('Item deleted');
+      }
+
       fetchUnverifiedItems(activeTab);
     } catch (error) {
       console.error('Error updating verification:', error);
