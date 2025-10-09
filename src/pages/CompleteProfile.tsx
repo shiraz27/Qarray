@@ -60,6 +60,8 @@ const CompleteProfile: React.FC = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [stateId, setStateId] = useState('');
   const [classId, setClassId] = useState('');
@@ -243,6 +245,8 @@ const CompleteProfile: React.FC = () => {
         return;
       }
 
+      const fullName = `${firstName.trim()} ${lastName.trim()}`;
+      
       const { error } = await supabase
         .from('profiles')
         .upsert({
@@ -251,7 +255,7 @@ const CompleteProfile: React.FC = () => {
           state_id: parseInt(stateId),
           class_id: parseInt(classId),
           institute_id: instituteId,
-          full_name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'User',
+          full_name: fullName || session.user.email?.split('@')[0] || 'User',
         });
 
       if (error) throw error;
@@ -295,6 +299,33 @@ const CompleteProfile: React.FC = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="firstName">{t('firstName') || 'First Name'}</Label>
+              <Input
+                id="firstName"
+                type="text"
+                placeholder="John"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+                className="h-12 text-base"
+              />
+            </div>
+            <div>
+              <Label htmlFor="lastName">{t('lastName') || 'Last Name'}</Label>
+              <Input
+                id="lastName"
+                type="text"
+                placeholder="Doe"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+                className="h-12 text-base"
+              />
+            </div>
+          </div>
+
           <div>
             <Label htmlFor="phone">{t('phoneNumber')}</Label>
             <div className="flex gap-2">

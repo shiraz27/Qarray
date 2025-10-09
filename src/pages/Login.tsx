@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import qarayLogo from '@/assets/qarray-logo-new.png';
+import educationPattern from '@/assets/education-pattern.png';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -178,29 +179,25 @@ const Login: React.FC = () => {
     <div className="min-h-screen flex flex-col relative overflow-hidden">
       {/* Animated Background Pattern */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#F6A18A]/20 via-background to-[hsl(207,89%,54%)]/20" />
+        {/* Education pattern background */}
+        <div 
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage: `url(${educationPattern})`,
+            backgroundSize: '400px 400px',
+            backgroundRepeat: 'repeat',
+            backgroundPosition: 'center'
+          }}
+        />
+        
+        {/* Gradient overlay on top of pattern */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#F6A18A]/10 via-transparent to-[hsl(207,89%,54%)]/10" />
         
         {/* Geometric shapes for e-learning theme */}
-        <div className="absolute top-10 left-10 w-64 h-64 bg-[#F6A18A]/30 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-20 right-10 w-72 h-72 bg-[hsl(207,89%,54%)]/30 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute bottom-20 left-1/4 w-56 h-56 bg-[#F6A18A]/25 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
-        <div className="absolute bottom-40 right-1/3 w-60 h-60 bg-[hsl(207,89%,54%)]/25 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '3s' }} />
-        
-        {/* Decorative grid pattern */}
-        <div className="absolute inset-0 opacity-10" style={{
-          backgroundImage: 'radial-gradient(circle at 1px 1px, hsl(var(--primary)) 1px, transparent 0)',
-          backgroundSize: '40px 40px'
-        }} />
-        
-        {/* Book/Study icons pattern with better visibility */}
-        <div className="absolute top-10 right-10 text-8xl opacity-20">📚</div>
-        <div className="absolute top-1/3 left-20 text-7xl opacity-15">✏️</div>
-        <div className="absolute bottom-1/4 right-1/4 text-9xl opacity-20">🎓</div>
-        <div className="absolute top-2/3 left-1/3 text-7xl opacity-15">📖</div>
-        <div className="absolute bottom-20 left-10 text-8xl opacity-20">💡</div>
-        <div className="absolute top-1/2 right-1/3 text-7xl opacity-15">🏆</div>
-        <div className="absolute top-40 left-1/2 text-6xl opacity-10">🌟</div>
-        <div className="absolute bottom-1/3 right-10 text-7xl opacity-15">🚀</div>
+        <div className="absolute top-10 left-10 w-64 h-64 bg-[#F6A18A]/15 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-20 right-10 w-72 h-72 bg-[hsl(207,89%,54%)]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute bottom-20 left-1/4 w-56 h-56 bg-[#F6A18A]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute bottom-40 right-1/3 w-60 h-60 bg-[hsl(207,89%,54%)]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '3s' }} />
       </div>
 
       {/* Language & Theme Switcher */}
@@ -208,7 +205,7 @@ const Login: React.FC = () => {
         <LanguageSwitcher />
       </div>
       
-      <div className="absolute top-4 left-4 z-10">
+      <div className="absolute top-4 left-4 z-20">
         <ThemeSwitcher compact={true} showLabel={false} />
       </div>
 

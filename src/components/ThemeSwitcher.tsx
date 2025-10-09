@@ -143,11 +143,12 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
           <button
             key={theme.id}
             onClick={() => handleThemeChange(theme.id)}
-            className={`w-10 h-10 rounded-lg border-2 transition-all ${
+            className={`w-10 h-10 rounded-lg border-2 transition-all cursor-pointer hover:scale-110 ${
               currentTheme === theme.id ? 'border-foreground scale-110' : 'border-border'
             }`}
             style={theme.color ? { backgroundColor: theme.color } : undefined}
             title={theme.name}
+            type="button"
           >
             {theme.id === 'custom' && <Palette className="w-4 h-4 mx-auto" />}
             {currentTheme === theme.id && (

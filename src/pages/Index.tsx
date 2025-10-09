@@ -169,11 +169,9 @@ const Index: React.FC = () => {
             <>
               {/* Animated Background Pattern */}
               <div className="absolute inset-0 -z-10 overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-[#F6A18A]/15 via-background to-[hsl(207,89%,54%)]/15" />
-                
                 {/* Education pattern background */}
                 <div 
-                  className="absolute inset-0 opacity-10"
+                  className="absolute inset-0 opacity-20"
                   style={{
                     backgroundImage: `url(${educationPattern})`,
                     backgroundSize: '400px 400px',
@@ -182,11 +180,14 @@ const Index: React.FC = () => {
                   }}
                 />
                 
+                {/* Gradient overlay on top of pattern */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#F6A18A]/10 via-transparent to-[hsl(207,89%,54%)]/10" />
+                
                 {/* Geometric shapes for e-learning theme */}
-                <div className="absolute top-20 left-10 w-48 h-48 bg-[#F6A18A]/25 rounded-full blur-3xl animate-pulse" />
-                <div className="absolute top-40 right-20 w-56 h-56 bg-[hsl(207,89%,54%)]/25 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-                <div className="absolute top-96 left-1/4 w-52 h-52 bg-[#F6A18A]/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
-                <div className="absolute top-[600px] right-1/3 w-48 h-48 bg-[hsl(207,89%,54%)]/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '3s' }} />
+                <div className="absolute top-20 left-10 w-48 h-48 bg-[#F6A18A]/15 rounded-full blur-3xl animate-pulse" />
+                <div className="absolute top-40 right-20 w-56 h-56 bg-[hsl(207,89%,54%)]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+                <div className="absolute top-96 left-1/4 w-52 h-52 bg-[#F6A18A]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+                <div className="absolute top-[600px] right-1/3 w-48 h-48 bg-[hsl(207,89%,54%)]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '3s' }} />
               </div>
 
               <section className="items-stretch flex w-full flex-col bg-background/90 backdrop-blur-sm relative z-10">
