@@ -14,9 +14,9 @@ interface ThemeSwitcherProps {
 }
 
 const themes = [
-  { id: 'pink', name: 'Pink', color: 'hsl(330 81% 60%)' },
-  { id: 'green', name: 'Green', color: 'hsl(142 76% 36%)' },
   { id: 'blue', name: 'Blue', color: 'hsl(207 89% 54%)' },
+  { id: 'pink', name: 'Pink', color: '#F6A18A' },
+  { id: 'green', name: 'Green', color: 'hsl(142 76% 36%)' },
   { id: 'black', name: 'Black', color: 'hsl(0 0% 20%)' },
   { id: 'custom', name: 'Custom', color: null },
 ];
@@ -26,8 +26,8 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
   showLabel = true,
   compact = false 
 }) => {
-  const [currentTheme, setCurrentTheme] = useState('pink');
-  const [customColor, setCustomColor] = useState('#ec4899');
+  const [currentTheme, setCurrentTheme] = useState('blue');
+  const [customColor, setCustomColor] = useState('#3b82f6');
   const [isCustomMode, setIsCustomMode] = useState(false);
 
   useEffect(() => {
@@ -41,14 +41,14 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
           .single();
         
         if (data) {
-          setCurrentTheme(data.theme || 'pink');
+          setCurrentTheme(data.theme || 'blue');
           if (data.custom_theme_color) {
             setCustomColor(data.custom_theme_color);
           }
-          applyTheme(data.theme || 'pink', data.custom_theme_color);
+          applyTheme(data.theme || 'blue', data.custom_theme_color);
         }
       } else {
-        const savedTheme = localStorage.getItem('theme') || 'pink';
+        const savedTheme = localStorage.getItem('theme') || 'blue';
         const savedCustomColor = localStorage.getItem('customThemeColor');
         setCurrentTheme(savedTheme);
         if (savedCustomColor) {
@@ -78,7 +78,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
 
   const hexToHSL = (hex: string): string => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (!result) return '330 81% 60%';
+    if (!result) return '207 89% 54%';
 
     let r = parseInt(result[1], 16) / 255;
     let g = parseInt(result[2], 16) / 255;

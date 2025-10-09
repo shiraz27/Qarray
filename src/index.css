@@ -17,22 +17,22 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 0%;
 
-    --primary: 330 81% 60%;
+    --primary: 207 89% 54%;
     --primary-foreground: 0 0% 100%;
     
-    --primary-light: 330 81% 86%;
-    --primary-dark: 330 81% 30%;
+    --primary-light: 207 89% 86%;
+    --primary-dark: 207 89% 30%;
 
     --secondary: 0 0% 20%;
     --secondary-foreground: 0 0% 100%;
     
-    --tertiary: 330 81% 30%;
+    --tertiary: 207 89% 30%;
     --tertiary-foreground: 0 0% 100%;
 
     --muted: 0 0% 96%;
     --muted-foreground: 0 0% 45%;
 
-    --accent: 330 81% 60%;
+    --accent: 207 89% 54%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -40,14 +40,14 @@ All colors MUST be HSL.
 
     --border: 0 0% 90%;
     --input: 0 0% 95%;
-    --ring: 330 81% 60%;
+    --ring: 207 89% 54%;
 
     --radius: 1rem;
     
-    --gradient-primary: linear-gradient(135deg, hsl(330 81% 60%), hsl(330 81% 75%));
-    --gradient-secondary: linear-gradient(135deg, hsl(330 81% 75%), hsl(330 81% 85%));
-    --gradient-accent: linear-gradient(135deg, hsl(330 81% 85%), hsl(330 81% 60%));
-    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(330 81% 98%));
+    --gradient-primary: linear-gradient(135deg, hsl(207 89% 54%), hsl(207 89% 70%));
+    --gradient-secondary: linear-gradient(135deg, hsl(207 89% 70%), hsl(207 89% 85%));
+    --gradient-accent: linear-gradient(135deg, hsl(207 89% 85%), hsl(207 89% 54%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(207 89% 98%));
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 0 0% 20%;
@@ -56,7 +56,21 @@ All colors MUST be HSL.
     --sidebar-accent: 0 0% 96%;
     --sidebar-accent-foreground: 0 0% 0%;
     --sidebar-border: 0 0% 90%;
-    --sidebar-ring: 330 81% 60%;
+    --sidebar-ring: 207 89% 54%;
+  }
+
+  /* Pink Theme */
+  [data-theme="pink"] {
+    --primary: 14 92% 76%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 14 92% 90%;
+    --primary-dark: 14 92% 50%;
+    --accent: 14 92% 76%;
+    --ring: 14 92% 76%;
+    --gradient-primary: linear-gradient(135deg, hsl(14 92% 76%), hsl(14 92% 85%));
+    --gradient-secondary: linear-gradient(135deg, hsl(14 92% 85%), hsl(14 92% 90%));
+    --gradient-accent: linear-gradient(135deg, hsl(14 92% 90%), hsl(14 92% 76%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(14 92% 98%));
   }
 
   /* Green Theme */
