@@ -12,9 +12,6 @@ interface MediaListProps {
 
 export function MediaList({ data, showText = true }: MediaListProps) {
   const { text, media } = extractMediaFromText(data);
-  
-  // Filter out archive.org URLs - we'll just show file type indicators
-  const nonArchiveMedia = media.filter(file => !file.url.includes('archive.org'));
 
   return (
     <div className="space-y-4">
@@ -22,12 +19,12 @@ export function MediaList({ data, showText = true }: MediaListProps) {
         <p className="text-base leading-relaxed">{text}</p>
       )}
       
-      {nonArchiveMedia.length > 0 && (
+      {media.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-muted-foreground">
-            Attachments ({nonArchiveMedia.length})
+            Attachments ({media.length})
           </h3>
-          {nonArchiveMedia.map((file, index) => (
+          {media.map((file, index) => (
             <div key={index} className="space-y-2">
               {/* Only show file card with external link for PDFs */}
               {file.type === 'pdf' && (

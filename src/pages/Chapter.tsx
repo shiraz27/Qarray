@@ -727,74 +727,6 @@ export default function Chapter() {
             <TabsTrigger value="resources">{t('resources') || 'Resources'}</TabsTrigger>
           </TabsList>
 
-          {/* Filters */}
-          <div className="mb-4 space-y-3">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={selectedTypeFilters.length === 0 ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedTypeFilters([])}
-              >
-                {t('all') || 'All'}
-              </Button>
-              {resourceTypes.map((type) => (
-                <Button
-                  key={type.id}
-                  variant={selectedTypeFilters.includes(type.id) ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => {
-                    setSelectedTypeFilters(prev =>
-                      prev.includes(type.id)
-                        ? prev.filter(id => id !== type.id)
-                        : [...prev, type.id]
-                    );
-                  }}
-                >
-                  {type.type}
-                </Button>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={selectedDevoirFilters.length === 0 ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedDevoirFilters([])}
-              >
-                {t('allDevoirs') || 'All Types'}
-              </Button>
-              {devoirTypes.map((type) => (
-                <Button
-                  key={type.id}
-                  variant={selectedDevoirFilters.includes(type.id) ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => {
-                    setSelectedDevoirFilters(prev =>
-                      prev.includes(type.id)
-                        ? prev.filter(id => id !== type.id)
-                        : [...prev, type.id]
-                    );
-                  }}
-                >
-                  {type.devoir_type}
-                </Button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="withCorrection"
-                checked={showWithCorrectionOnly}
-                onChange={(e) => setShowWithCorrectionOnly(e.target.checked)}
-                className="rounded"
-              />
-              <label htmlFor="withCorrection" className="text-sm">
-                {t('withCorrection') || 'Avec correction'}
-              </label>
-            </div>
-          </div>
-
           <TabsContent value="questions" className="space-y-3">
             <Dialog open={isQuestionDialogOpen} onOpenChange={setIsQuestionDialogOpen}>
               <DialogTrigger asChild>
@@ -868,19 +800,15 @@ export default function Chapter() {
               </DialogContent>
             </Dialog>
 
-            {questions.filter(q => 
-              (selectedTypeFilters.length === 0 || (q.type_id && selectedTypeFilters.includes(q.type_id)))
-            ).length === 0 ? (
+            {questions.length === 0 ? (
               <EmptyState
                 type="questions"
                 message={t('noQuestions') || 'No questions available yet'}
               />
             ) : (
               questions
-                .filter(q => selectedTypeFilters.length === 0 || (q.type_id && selectedTypeFilters.includes(q.type_id)))
                 .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
                 .map((question) => {
-                  const questionType = resourceTypes.find(t => t.id === question.type_id);
                   const { text, media } = extractMediaFromText(question.data);
                   const hasAudio = media.some(m => m.type === 'audio');
                   const hasImages = media.some(m => m.type === 'image');
@@ -904,18 +832,11 @@ export default function Chapter() {
                   )}
                   <div className="flex items-start justify-between mb-2">
                     <p className="text-foreground flex-1">{text}</p>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {!question.verified && (
-                        <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full whitespace-nowrap">
-                          Unverified
-                        </span>
-                      )}
-                      {questionType && (
-                        <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full whitespace-nowrap">
-                          {questionType.type}
-                        </span>
-                      )}
-                    </div>
+                    {!question.verified && (
+                      <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full whitespace-nowrap">
+                        Unverified
+                      </span>
+                    )}
                   </div>
                   
                   {/* Media indicators */}
@@ -1000,6 +921,74 @@ export default function Chapter() {
           </TabsContent>
 
           <TabsContent value="resources" className="space-y-3">
+            {/* Filters for Resources */}
+            <div className="mb-4 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={selectedTypeFilters.length === 0 ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedTypeFilters([])}
+                >
+                  {t('all') || 'All'}
+                </Button>
+                {resourceTypes.map((type) => (
+                  <Button
+                    key={type.id}
+                    variant={selectedTypeFilters.includes(type.id) ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setSelectedTypeFilters(prev =>
+                        prev.includes(type.id)
+                          ? prev.filter(id => id !== type.id)
+                          : [...prev, type.id]
+                      );
+                    }}
+                  >
+                    {type.type}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={selectedDevoirFilters.length === 0 ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedDevoirFilters([])}
+                >
+                  {t('allDevoirs') || 'All Types'}
+                </Button>
+                {devoirTypes.map((type) => (
+                  <Button
+                    key={type.id}
+                    variant={selectedDevoirFilters.includes(type.id) ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setSelectedDevoirFilters(prev =>
+                        prev.includes(type.id)
+                          ? prev.filter(id => id !== type.id)
+                          : [...prev, type.id]
+                      );
+                    }}
+                  >
+                    {type.devoir_type}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="withCorrection"
+                  checked={showWithCorrectionOnly}
+                  onChange={(e) => setShowWithCorrectionOnly(e.target.checked)}
+                  className="rounded"
+                />
+                <label htmlFor="withCorrection" className="text-sm">
+                  {t('withCorrection') || 'Avec correction'}
+                </label>
+              </div>
+            </div>
+
             <Dialog open={isResourceDialogOpen} onOpenChange={setIsResourceDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="w-full mb-4">
