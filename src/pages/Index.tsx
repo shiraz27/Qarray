@@ -14,9 +14,6 @@ import { GlobalSearch } from '@/components/GlobalSearch';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import qarayLogo from '@/assets/qarray-logo-new.png';
-import Bookmarks from './Bookmarks';
-import Classmates from './Classmates';
-import Profile from './Profile';
 import {
   AlertDialog,
   AlertDialogAction,
