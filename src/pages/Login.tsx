@@ -27,12 +27,27 @@ const Login: React.FC = () => {
 
   // Check if user is coming from password reset email
   React.useEffect(() => {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const type = hashParams.get('type');
-    
-    if (type === 'recovery') {
-      setShowResetPassword(true);
-    }
+    // Check URL hash for recovery type
+    const checkRecovery = () => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const type = hashParams.get('type');
+      const accessToken = hashParams.get('access_token');
+      
+      if (type === 'recovery' && accessToken) {
+        setShowResetPassword(true);
+      }
+    };
+
+    checkRecovery();
+
+    // Also listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setShowResetPassword(true);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
