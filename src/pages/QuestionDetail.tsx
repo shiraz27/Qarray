@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { ContentSkeleton } from '@/components/LoadingSkeleton';
 import chapterPattern from '@/assets/chapter-pattern.png';
+import qarayLogo from '@/assets/qarray-logo-new.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MediaList } from '@/components/MediaList';
@@ -385,11 +386,14 @@ export default function QuestionDetail() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col pb-24">
-        <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft size={20} />
-          </Button>
-          <h1 className="text-lg font-semibold flex-1">{t('question') || 'Question'}</h1>
+        <div className="sticky top-0 z-50 bg-white border-b">
+          <div className="flex items-center justify-between px-4 py-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <ArrowLeft size={20} />
+            </Button>
+            <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+            <div className="w-10" />
+          </div>
         </div>
         <div className="flex-1 p-4">
           <ContentSkeleton />
@@ -403,11 +407,14 @@ export default function QuestionDetail() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
-      <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-          <ArrowLeft size={20} />
-        </Button>
-        <h1 className="text-lg font-semibold flex-1">{t('question') || 'Question'}</h1>
+      <div className="sticky top-0 z-50 bg-white border-b">
+        <div className="flex items-center justify-between px-4 py-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft size={20} />
+          </Button>
+          <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+          <div className="w-10" />
+        </div>
       </div>
 
       {/* Question Banner */}
