@@ -50,7 +50,7 @@ export const CreateMemorizationDialog = ({
         .from('subjects')
         .select('name, class_id, classes(name)')
         .eq('id', subjectId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching subject:', error);

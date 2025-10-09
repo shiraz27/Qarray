@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
 import { ChapterSkeleton } from '@/components/LoadingSkeleton';
 import { EmptyState } from '@/components/EmptyState';
+import { MemorizationsList } from '@/components/MemorizationsList';
 
 interface Chapter {
   id: number;
@@ -178,8 +179,10 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
   }
 
   return (
-    <main className="w-full px-4 pb-4 mb-24">
-      <div className="space-y-3 mt-4">
+    <main className="w-full pb-4 mb-24">
+      <MemorizationsList subjectId={subjectId} />
+      
+      <div className="space-y-3 mt-4 px-4">
         {chapters.map((chapter) => {
           const hasContent = chapter.questionCount > 0 || chapter.answerCount > 0 || chapter.resourceCount > 0;
           

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calculator, Atom, Code, BookOpen, Globe, Beaker, TestTube, FlaskConical } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { MemorizeButton } from '@/components/MemorizeButton';
 
 interface Subject {
   id: number;
@@ -103,9 +104,10 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
   }
 
   return (
-    <nav className="w-full text-xs text-[#BDBDBD] font-normal text-center tracking-[0.2px] leading-[1.6] px-2.5 py-4 overflow-x-auto" aria-label="Subject navigation">
-      <div className="flex w-full items-center gap-4 justify-start sm:justify-center rounded-xl min-w-max sm:min-w-0">
-        {subjects.map((subject) => {
+    <div className="w-full">
+      <nav className="w-full text-xs text-[#BDBDBD] font-normal text-center tracking-[0.2px] leading-[1.6] px-2.5 py-4 overflow-x-auto" aria-label="Subject navigation">
+        <div className="flex w-full items-center gap-4 justify-start sm:justify-center rounded-xl min-w-max sm:min-w-0">
+          {subjects.map((subject) => {
           const isActive = activeSubject === subject.id;
           const Icon = getIconForSubject(subject.logo, subject.name);
           
@@ -133,7 +135,14 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
             </button>
           );
         })}
-      </div>
-    </nav>
+        </div>
+      </nav>
+      
+      {activeSubject && (
+        <div className="px-4 pb-2">
+          <MemorizeButton subjectId={activeSubject} />
+        </div>
+      )}
+    </div>
   );
 };
