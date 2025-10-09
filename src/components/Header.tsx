@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Bell } from 'lucide-react';
+import { Bell, Shield, BarChart3 } from 'lucide-react';
 import { NotificationPanel } from './NotificationPanel';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useNavigate } from 'react-router-dom';
+import { Button } from './ui/button';
 
 interface HeaderProps {
   userName?: string;
@@ -10,6 +13,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ userName = "User" }) => {
   const [notificationCount, setNotificationCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+  const { isModerator, isAdmin } = useUserRole();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchNotificationCount();
@@ -72,17 +77,32 @@ export const Header: React.FC<HeaderProps> = ({ userName = "User" }) => {
             <span>Welcome, {userName} 👋</span>
           </h1>
         </div>
-        <nav className="self-stretch flex gap-4 my-auto px-2 py-1 rounded-3xl" aria-label="Header actions">
-          <button 
-            className="flex flex-col w-6"
-            aria-label="Search"
-            onClick={() => console.log('Search clicked')}
-          >
-            <div className="flex min-h-6 w-6" />
-          </button>
+        <nav className="self-stretch flex gap-2 my-auto px-2 py-1 rounded-3xl" aria-label="Header actions">
+          {(isModerator || isAdmin) && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2"
+                onClick={() => navigate('/moderation')}
+              >
+                <Shield size={18} />
+                <span className="hidden md:inline">Moderation</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2"
+                onClick={() => navigate('/statistics')}
+              >
+                <BarChart3 size={18} />
+                <span className="hidden md:inline">Stats</span>
+              </Button>
+            </>
+          )}
           <button 
             aria-label="Notifications" 
-            className="relative hover-scale"
+            className="relative hover-scale p-2"
             onClick={() => setShowNotifications(true)}
           >
             <Bell size={24} className="text-foreground" />

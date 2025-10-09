@@ -14,6 +14,8 @@ import Chapter from "./pages/Chapter";
 import QuestionDetail from "./pages/QuestionDetail";
 import ResourceDetail from "./pages/ResourceDetail";
 import Profile from "./pages/Profile";
+import Moderation from "./pages/Moderation";
+import Statistics from "./pages/Statistics";
 import NotFound from "./pages/NotFound";
 import DeleteBookmark from "./pages/DeleteBookmark";
 import { useDataPreload } from "./hooks/useDataPreload";
@@ -34,6 +36,8 @@ const AppContent = () => {
       <Route path="/question/:id" element={<QuestionDetail />} />
       <Route path="/resource/:id" element={<ResourceDetail />} />
       <Route path="/profile" element={<Profile />} />
+      <Route path="/moderation" element={<Moderation />} />
+      <Route path="/statistics" element={<Statistics />} />
       <Route path="/delete-bookmark" element={<DeleteBookmark />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
