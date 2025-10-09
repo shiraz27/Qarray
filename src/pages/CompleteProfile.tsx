@@ -37,6 +37,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import qarayLogo from '@/assets/qarray-logo-new.png';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 
 interface State {
   id: number;
@@ -415,6 +416,11 @@ const CompleteProfile: React.FC = () => {
               <Plus className="h-4 w-4" />
               {t('addMissingInstitute')}
             </button>
+          </div>
+
+          {/* Theme Selection */}
+          <div className="pt-4">
+            <ThemeSwitcher showLabel={true} compact={false} />
           </div>
 
           <Button 

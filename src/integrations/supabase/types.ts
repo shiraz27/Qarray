@@ -251,6 +251,7 @@ export type Database = {
           avatar_color: string | null
           class_id: number | null
           created_at: string | null
+          custom_theme_color: string | null
           deleted: boolean
           full_name: string
           id: string
@@ -258,6 +259,7 @@ export type Database = {
           is_moderator: boolean
           phone_number: string | null
           state_id: number | null
+          theme: string
           updated_at: string | null
           user_id: string | null
           verified: boolean
@@ -266,6 +268,7 @@ export type Database = {
           avatar_color?: string | null
           class_id?: number | null
           created_at?: string | null
+          custom_theme_color?: string | null
           deleted?: boolean
           full_name: string
           id?: string
@@ -273,6 +276,7 @@ export type Database = {
           is_moderator?: boolean
           phone_number?: string | null
           state_id?: number | null
+          theme?: string
           updated_at?: string | null
           user_id?: string | null
           verified?: boolean
@@ -281,6 +285,7 @@ export type Database = {
           avatar_color?: string | null
           class_id?: number | null
           created_at?: string | null
+          custom_theme_color?: string | null
           deleted?: boolean
           full_name?: string
           id?: string
@@ -288,6 +293,7 @@ export type Database = {
           is_moderator?: boolean
           phone_number?: string | null
           state_id?: number | null
+          theme?: string
           updated_at?: string | null
           user_id?: string | null
           verified?: boolean

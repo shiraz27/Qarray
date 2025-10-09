@@ -34,6 +34,7 @@ import {
 import { toast } from 'sonner';
 import { User, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 
 interface State {
   id: number;
@@ -67,15 +68,15 @@ interface EditProfileDialogProps {
 }
 
 const avatarColors = [
-  { name: 'Blue', value: 'from-blue-400 to-blue-600' },
-  { name: 'Grey', value: 'from-gray-400 to-gray-600' },
-  { name: 'Black', value: 'from-gray-700 to-gray-900' },
-  { name: 'Green', value: 'from-green-400 to-green-600' },
-  { name: 'Orange', value: 'from-orange-400 to-orange-600' },
-  { name: 'Red', value: 'from-red-400 to-red-600' },
-  { name: 'Primary', value: 'gradient-primary' },
-  { name: 'Secondary', value: 'gradient-secondary' },
-  { name: 'Accent', value: 'gradient-accent' },
+  { name: 'Pink', value: '#ec4899' },
+  { name: 'Purple', value: '#a855f7' },
+  { name: 'Blue', value: '#3b82f6' },
+  { name: 'Green', value: '#10b981' },
+  { name: 'Orange', value: '#f97316' },
+  { name: 'Red', value: '#ef4444' },
+  { name: 'Cyan', value: '#06b6d4' },
+  { name: 'Amber', value: '#f59e0b' },
+  { name: 'Indigo', value: '#6366f1' },
 ];
 
 export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
@@ -105,6 +106,7 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
   const [institutes, setInstitutes] = useState<Institute[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [openInstitute, setOpenInstitute] = useState(false);
+  const [customAvatarColor, setCustomAvatarColor] = useState(currentAvatarColor?.startsWith('#') ? currentAvatarColor : '#ec4899');
 
   useEffect(() => {
     if (open) {
@@ -227,7 +229,7 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
           <div>
             <Label htmlFor="firstName">First Name</Label>
             <Input
@@ -365,22 +367,66 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
 
           <div>
             <Label>Avatar Color</Label>
-            <div className="grid grid-cols-3 gap-3 mt-2">
-              {avatarColors.map((color) => (
-                <button
-                  key={color.value}
-                  type="button"
-                  onClick={() => setAvatarColor(color.value)}
-                  className={`relative h-16 rounded-lg bg-gradient-to-br ${color.value} hover-scale ${
-                    avatarColor === color.value ? 'ring-2 ring-primary ring-offset-2' : ''
-                  }`}
-                >
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <User className="w-6 h-6 text-white" />
-                  </div>
-                </button>
-              ))}
+            <div className="space-y-3 mt-2">
+              {/* Predefined Colors */}
+              <div className="grid grid-cols-3 gap-3">
+                {avatarColors.map((color) => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    onClick={() => {
+                      setAvatarColor(color.value);
+                      setCustomAvatarColor(color.value);
+                    }}
+                    className={`relative h-16 rounded-lg transition-all ${
+                      avatarColor === color.value ? 'ring-2 ring-primary ring-offset-2 scale-105' : 'hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: color.value }}
+                  >
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <User className="w-6 h-6 text-white drop-shadow-md" />
+                    </div>
+                    {avatarColor === color.value && (
+                      <Check className="absolute top-1 right-1 w-4 h-4 text-white drop-shadow-md" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              
+              {/* Custom Color Picker */}
+              <div className="space-y-2">
+                <Label htmlFor="customAvatarColor" className="text-sm">Custom Color</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="customAvatarColor"
+                    type="color"
+                    value={customAvatarColor}
+                    onChange={(e) => {
+                      setCustomAvatarColor(e.target.value);
+                      setAvatarColor(e.target.value);
+                    }}
+                    className="w-20 h-12 cursor-pointer"
+                  />
+                  <Input
+                    type="text"
+                    value={customAvatarColor}
+                    onChange={(e) => {
+                      if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+                        setCustomAvatarColor(e.target.value);
+                        setAvatarColor(e.target.value);
+                      }
+                    }}
+                    placeholder="#ec4899"
+                    className="flex-1"
+                  />
+                </div>
+              </div>
             </div>
+          </div>
+
+          {/* Theme Selection */}
+          <div className="pt-4 border-t">
+            <ThemeSwitcher userId={userId} showLabel={true} compact={false} />
           </div>
         </div>
 

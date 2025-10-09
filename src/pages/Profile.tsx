@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, ThumbsUp, ThumbsDown, FileText } from 'lucide-react';
+import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, ThumbsUp, ThumbsDown, FileText, Palette } from 'lucide-react';
 import { Session } from '@supabase/supabase-js';
 import { EditProfileDialog } from '@/components/EditProfileDialog';
 import { Card } from '@/components/ui/card';
@@ -21,6 +21,7 @@ export default function Profile() {
     state_id?: number;
     class_id?: number;
     institute_id?: string;
+    theme?: string;
   } | null>(null);
   const [activeTab, setActiveTab] = useState('profile');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -131,7 +132,7 @@ export default function Profile() {
   const fetchUserProfile = async (userId: string) => {
     const { data } = await supabase
       .from('profiles')
-      .select('full_name, avatar_color, phone_number, state_id, class_id, institute_id')
+      .select('full_name, avatar_color, phone_number, state_id, class_id, institute_id, theme')
       .eq('user_id', userId)
       .single();
     
@@ -191,7 +192,12 @@ export default function Profile() {
     return parts.map(p => p[0]).join('').toUpperCase().substring(0, 2);
   };
 
-  const avatarColorClass = userProfile?.avatar_color || 'gradient-primary';
+  const avatarColorClass = userProfile?.avatar_color?.startsWith('#') 
+    ? '' 
+    : userProfile?.avatar_color || 'gradient-primary';
+  const avatarColorStyle = userProfile?.avatar_color?.startsWith('#')
+    ? { backgroundColor: userProfile.avatar_color }
+    : undefined;
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
@@ -208,7 +214,10 @@ export default function Profile() {
           <Card className="gamified-card p-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-4">
-                <div className={`w-20 h-20 bg-gradient-to-br ${avatarColorClass} rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-lg`}>
+                <div 
+                  className={`w-20 h-20 ${avatarColorClass ? `bg-gradient-to-br ${avatarColorClass}` : ''} rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-lg`}
+                  style={avatarColorStyle}
+                >
                   {userProfile?.full_name ? getInitials(userProfile.full_name) : '👤'}
                 </div>
                 <div>
