@@ -21,6 +21,19 @@ const Login: React.FC = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+
+  // Check if user is coming from password reset email
+  React.useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get('type');
+    
+    if (type === 'recovery') {
+      setShowResetPassword(true);
+    }
+  }, []);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,7 +107,7 @@ const Login: React.FC = () => {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: `${window.location.origin}/login`,
       });
 
       if (error) throw error;
@@ -113,6 +126,35 @@ const Login: React.FC = () => {
       });
     } finally {
       setResetLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetPasswordLoading(true);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: t('success'),
+        description: 'Password updated successfully!',
+      });
+      setShowResetPassword(false);
+      setNewPassword('');
+      navigate('/');
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setResetPasswordLoading(false);
     }
   };
 
@@ -278,6 +320,40 @@ const Login: React.FC = () => {
               className="w-full h-12 bg-[#38A6FF] hover:bg-[#2B8FE8]"
             >
               {resetLoading ? 'Sending...' : 'Send Reset Link'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={showResetPassword} onOpenChange={setShowResetPassword}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Set New Password</DialogTitle>
+            <DialogDescription>
+              Enter your new password below.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div>
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="••••••••"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                minLength={6}
+                className="h-12"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={resetPasswordLoading}
+              className="w-full h-12 bg-[#38A6FF] hover:bg-[#2B8FE8]"
+            >
+              {resetPasswordLoading ? 'Updating...' : 'Update Password'}
             </Button>
           </form>
         </DialogContent>
