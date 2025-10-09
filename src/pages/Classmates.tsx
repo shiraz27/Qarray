@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Trophy, Users, School, ArrowLeft, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { ContentSkeleton } from '@/components/LoadingSkeleton';
 import { BottomNavigation } from '@/components/BottomNavigation';
@@ -174,13 +173,13 @@ export default function Classmates() {
   };
 
   const renderStudentCard = (student: StudentStat, rank: number) => (
-    <Card key={student.user_id} className="p-3 hover-scale transition-all bg-card/50 backdrop-blur-sm border-border/50">
+    <Card key={student.user_id} className="p-4 hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all bg-card">
       <div className="flex items-center gap-3">
         {/* Rank Badge */}
         <div className="flex-shrink-0">
           {rank <= 3 ? (
             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white shadow-lg ${
-              rank === 1 ? 'gradient-primary' : rank === 2 ? 'bg-gradient-to-br from-gray-300 to-gray-500' : 'bg-gradient-to-br from-orange-400 to-orange-600'
+              rank === 1 ? 'bg-gradient-to-br from-pink-400 to-pink-600' : rank === 2 ? 'bg-gradient-to-br from-gray-300 to-gray-500' : 'bg-gradient-to-br from-orange-400 to-orange-600'
             }`}>
               {rank === 1 && <Trophy className="w-4 h-4" />}
               {rank !== 1 && <span className="text-sm">{rank}</span>}
@@ -203,15 +202,15 @@ export default function Classmates() {
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-foreground truncate text-sm">{student.full_name}</h3>
           <div className="flex flex-wrap gap-1 mt-1">
-            <Badge variant="outline" className="text-xs px-1.5 py-0">
+            <span className="text-xs px-1.5 py-0 border border-border rounded-md bg-card">
               📝 {student.questions_count}
-            </Badge>
-            <Badge variant="outline" className="text-xs px-1.5 py-0">
+            </span>
+            <span className="text-xs px-1.5 py-0 border border-border rounded-md bg-card">
               💡 {student.answers_count}
-            </Badge>
-            <Badge variant="outline" className="text-xs px-1.5 py-0">
+            </span>
+            <span className="text-xs px-1.5 py-0 border border-border rounded-md bg-card">
               📚 {student.resources_count}
-            </Badge>
+            </span>
           </div>
           <div className="flex gap-2 mt-1">
             <span className="text-xs text-muted-foreground flex items-center gap-0.5">
@@ -225,7 +224,7 @@ export default function Classmates() {
 
         {/* Total Score */}
         <div className="flex-shrink-0 text-right">
-          <div className="text-xl font-bold gradient-text">{student.total_score}</div>
+          <div className="text-xl font-bold bg-gradient-to-r from-pink-500 to-primary bg-clip-text text-transparent">{student.total_score}</div>
           <div className="text-[10px] text-muted-foreground">points</div>
         </div>
       </div>
@@ -241,41 +240,32 @@ export default function Classmates() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24 flex flex-col">
-      {/* Header */}
-      <header className="bg-card border-b border-border p-4 flex items-center gap-3 sticky top-0 z-10 backdrop-blur-sm bg-card/95">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/')}
-          className="hover-scale"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <img
-          src={qarayLogo}
-          className="h-10 w-10 object-contain"
-          alt="Qarray Logo"
-        />
-        <div className="flex-1">
-          <h1 className="text-xl font-bold gradient-text flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            Classmates
-          </h1>
-          <p className="text-xs text-muted-foreground">Top contributors</p>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Top Navigation */}
+      <div className="sticky top-0 z-50 bg-background border-b">
+        <div className="flex items-center justify-between px-4 py-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="hover-scale">
+            <ArrowLeft size={20} />
+          </Button>
+          <div className="flex items-center gap-2">
+            <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
+            <span className="text-xl font-bold text-foreground">Qarray</span>
+          </div>
+          <div className="w-10" />
         </div>
-      </header>
+      </div>
 
-      <div className="flex-1 overflow-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+      <main className="flex-1 w-full px-4 pb-4 mb-24 mt-4">
+        <h1 className="text-2xl font-bold text-foreground mb-6">Classmates</h1>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Same School Section */}
           {schoolmates.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 sticky top-0 bg-background/95 backdrop-blur-sm py-2 z-5">
-                <School className="w-4 h-4 text-primary" />
-                <h2 className="text-base font-bold text-foreground">Same School</h2>
-                <Badge variant="secondary" className="text-xs">{schoolmates.length}</Badge>
-              </div>
+              <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <School size={20} className="text-pink-500" />
+                Same School ({schoolmates.length})
+              </h2>
               <div className="space-y-2">
                 {schoolmates.map((student, idx) => renderStudentCard(student, idx + 1))}
               </div>
@@ -285,11 +275,10 @@ export default function Classmates() {
           {/* All Classmates Section */}
           {classmates.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 sticky top-0 bg-background/95 backdrop-blur-sm py-2 z-5">
-                <Trophy className="w-4 h-4 text-primary" />
-                <h2 className="text-base font-bold text-foreground">All Classmates</h2>
-                <Badge variant="secondary" className="text-xs">{classmates.length}</Badge>
-              </div>
+              <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <Trophy size={20} className="text-primary" />
+                All Classmates ({classmates.length})
+              </h2>
               <div className="space-y-2">
                 {classmates.map((student, idx) => renderStudentCard(student, idx + 1))}
               </div>
@@ -303,7 +292,7 @@ export default function Classmates() {
             </div>
           )}
         </div>
-      </div>
+      </main>
 
       <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
     </div>
