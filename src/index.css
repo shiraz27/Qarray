@@ -44,9 +44,9 @@ All colors MUST be HSL.
 
     --radius: 1rem;
     
-    --gradient-primary: linear-gradient(135deg, hsl(207 89% 54%), hsl(280 70% 60%));
-    --gradient-secondary: linear-gradient(135deg, hsl(280 70% 60%), hsl(340 75% 55%));
-    --gradient-accent: linear-gradient(135deg, hsl(340 75% 55%), hsl(207 89% 54%));
+    --gradient-primary: linear-gradient(135deg, hsl(207 89% 54%), hsl(207 89% 70%));
+    --gradient-secondary: linear-gradient(135deg, hsl(207 89% 70%), hsl(207 89% 85%));
+    --gradient-accent: linear-gradient(135deg, hsl(207 89% 85%), hsl(207 89% 54%));
     --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(207 89% 98%));
 
     --sidebar-background: 0 0% 98%;

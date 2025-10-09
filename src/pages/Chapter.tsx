@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { AddResourceForm } from '@/components/AddResourceForm';
 import { UserAvatar } from '@/components/UserAvatar';
+import { extractMediaFromText } from '@/utils/mediaHelpers';
 
 interface ChapterData {
   id: number;
@@ -771,7 +772,7 @@ export default function Chapter() {
                     />
                   )}
                   <div className="flex items-start justify-between mb-2">
-                    <p className="text-foreground flex-1">{question.data}</p>
+                    <p className="text-foreground flex-1">{extractMediaFromText(question.data).text}</p>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {!question.verified && (
                         <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full whitespace-nowrap">
