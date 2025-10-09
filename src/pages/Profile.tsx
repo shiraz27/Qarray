@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, ThumbsUp, ThumbsDown, FileText } from 'lucide-react';
 import { Session } from '@supabase/supabase-js';
 import { EditProfileDialog } from '@/components/EditProfileDialog';
 import { Card } from '@/components/ui/card';
@@ -21,6 +21,7 @@ export default function Profile() {
   const [stats, setStats] = useState({
     questionsAsked: 0,
     answersGiven: 0,
+    resourcesAdded: 0,
     upvotes: 0,
     downvotes: 0,
   });
@@ -41,28 +42,79 @@ export default function Profile() {
       const { count: questionsCount } = await supabase
         .from('questions')
         .select('*', { count: 'exact', head: true })
-        .contains('contributors', [userId]);
+        .contains('contributors', [userId])
+        .eq('deleted', false);
 
       // Count answers
       const { count: answersCount } = await supabase
         .from('answers')
         .select('*', { count: 'exact', head: true })
-        .contains('contributors', [userId]);
+        .contains('contributors', [userId])
+        .eq('deleted', false);
 
-      // Count upvotes and downvotes
-      const { data: votes } = await supabase
+      // Count resources
+      const { count: resourcesCount } = await supabase
+        .from('resources')
+        .select('*', { count: 'exact', head: true })
+        .eq('published_by', userId)
+        .eq('deleted', false);
+
+      // Get all questions by this user to count upvotes/downvotes received
+      const { data: userQuestions } = await supabase
+        .from('questions')
+        .select('id')
+        .contains('contributors', [userId])
+        .eq('deleted', false);
+
+      const questionIds = userQuestions?.map(q => q.id) || [];
+
+      // Get all answers by this user to count upvotes/downvotes received
+      const { data: userAnswers } = await supabase
+        .from('answers')
+        .select('id')
+        .contains('contributors', [userId])
+        .eq('deleted', false);
+
+      const answerIds = userAnswers?.map(a => a.id) || [];
+
+      // Count upvotes received on questions
+      const { count: questionUpvotes } = await supabase
         .from('votes')
-        .select('vote_type')
-        .eq('user_id', userId);
+        .select('*', { count: 'exact', head: true })
+        .in('content_id', questionIds)
+        .eq('content_type', 'question')
+        .eq('vote_type', 'upvote');
 
-      const upvotes = votes?.filter(v => v.vote_type === 'upvote').length || 0;
-      const downvotes = votes?.filter(v => v.vote_type === 'downvote').length || 0;
+      // Count downvotes received on questions
+      const { count: questionDownvotes } = await supabase
+        .from('votes')
+        .select('*', { count: 'exact', head: true })
+        .in('content_id', questionIds)
+        .eq('content_type', 'question')
+        .eq('vote_type', 'downvote');
+
+      // Count upvotes received on answers
+      const { count: answerUpvotes } = await supabase
+        .from('votes')
+        .select('*', { count: 'exact', head: true })
+        .in('content_id', answerIds)
+        .eq('content_type', 'answer')
+        .eq('vote_type', 'upvote');
+
+      // Count downvotes received on answers
+      const { count: answerDownvotes } = await supabase
+        .from('votes')
+        .select('*', { count: 'exact', head: true })
+        .in('content_id', answerIds)
+        .eq('content_type', 'answer')
+        .eq('vote_type', 'downvote');
 
       setStats({
         questionsAsked: questionsCount || 0,
         answersGiven: answersCount || 0,
-        upvotes,
-        downvotes,
+        resourcesAdded: resourcesCount || 0,
+        upvotes: (questionUpvotes || 0) + (answerUpvotes || 0),
+        downvotes: (questionDownvotes || 0) + (answerDownvotes || 0),
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -174,32 +226,35 @@ export default function Profile() {
               <TrendingUp className="w-5 h-5 text-primary" />
               Your Statistics
             </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-lg bg-gradient-primary text-white hover-glow">
-                <div className="flex items-center gap-2 mb-2">
-                  <MessageSquare className="w-5 h-5" />
-                  <span className="text-sm font-medium">Questions</span>
-                </div>
-                <p className="text-3xl font-bold">{stats.questionsAsked}</p>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="p-3 rounded-lg bg-gradient-primary text-white hover-glow text-center">
+                <MessageSquare className="w-5 h-5 mx-auto mb-1" />
+                <p className="text-2xl font-bold">{stats.questionsAsked}</p>
+                <span className="text-xs">Questions</span>
               </div>
-              <div className="p-4 rounded-lg bg-gradient-secondary text-white hover-glow">
-                <div className="flex items-center gap-2 mb-2">
-                  <MessageSquare className="w-5 h-5" />
-                  <span className="text-sm font-medium">Answers</span>
-                </div>
-                <p className="text-3xl font-bold">{stats.answersGiven}</p>
+              <div className="p-3 rounded-lg bg-gradient-secondary text-white hover-glow text-center">
+                <MessageSquare className="w-5 h-5 mx-auto mb-1" />
+                <p className="text-2xl font-bold">{stats.answersGiven}</p>
+                <span className="text-xs">Answers</span>
               </div>
+              <div className="p-3 rounded-lg bg-purple-500 text-white hover-glow text-center">
+                <FileText className="w-5 h-5 mx-auto mb-1" />
+                <p className="text-2xl font-bold">{stats.resourcesAdded}</p>
+                <span className="text-xs">Resources</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="p-4 rounded-lg bg-green-500 text-white hover-glow">
                 <div className="flex items-center gap-2 mb-2">
                   <ThumbsUp className="w-5 h-5" />
-                  <span className="text-sm font-medium">Upvotes</span>
+                  <span className="text-sm font-medium">Upvotes Received</span>
                 </div>
                 <p className="text-3xl font-bold">{stats.upvotes}</p>
               </div>
               <div className="p-4 rounded-lg bg-red-500 text-white hover-glow">
                 <div className="flex items-center gap-2 mb-2">
                   <ThumbsDown className="w-5 h-5" />
-                  <span className="text-sm font-medium">Downvotes</span>
+                  <span className="text-sm font-medium">Downvotes Received</span>
                 </div>
                 <p className="text-3xl font-bold">{stats.downvotes}</p>
               </div>

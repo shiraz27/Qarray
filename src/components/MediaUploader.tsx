@@ -256,9 +256,13 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     if (url.includes('.pdf')) {
       return 'PDF Document';
     }
-    if (url.includes('recording-')) {
-      return 'Audio Recording';
+    
+    // Extract recording number for archive.org URLs
+    const recordingMatch = url.match(/recording-(\d+)/);
+    if (recordingMatch) {
+      return `Recording #${recordingMatch[1]}`;
     }
+    
     if (url.includes('archive.org')) {
       const urlParts = url.split('/');
       return decodeURIComponent(urlParts[urlParts.length - 1]);

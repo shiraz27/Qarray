@@ -40,7 +40,17 @@ export function extractMediaFromText(text: string): { text: string; media: Media
       };
     }
     
-    if (lowerUrl.match(/\.(mp3|wav|webm|ogg|m4a)$/i) || lowerUrl.includes('audio')) {
+    if (lowerUrl.match(/\.(mp3|wav|webm|ogg|m4a)$/i) || lowerUrl.includes('audio') || lowerUrl.includes('archive.org')) {
+      // Extract recording number for archive.org URLs
+      const recordingMatch = url.match(/recording-(\d+)/);
+      if (recordingMatch) {
+        return {
+          url,
+          type: 'audio' as const,
+          displayName: `🎵 Recording #${recordingMatch[1]}`
+        };
+      }
+      
       const filename = url.split('/').pop() || 'Audio';
       return {
         url,

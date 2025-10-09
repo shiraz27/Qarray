@@ -1,8 +1,14 @@
 import { Card } from '@/components/ui/card';
+import { AudioPlayer } from '@/components/AudioPlayer';
 
 interface MediaPreviewProps {
   url: string;
   className?: string;
+}
+
+function extractRecordingNumber(url: string): string | undefined {
+  const match = url.match(/recording-(\d+)/);
+  return match ? match[1] : undefined;
 }
 
 export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
@@ -76,15 +82,13 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   }
 
   if (isAudio) {
+    const recordingNumber = extractRecordingNumber(url);
     return (
-      <Card className={`p-4 ${className}`}>
-        <audio controls className="w-full">
-          <source src={url} type="audio/mpeg" />
-          <source src={url} type="audio/webm" />
-          <source src={url} type="audio/wav" />
-          Your browser does not support the audio element.
-        </audio>
-      </Card>
+      <AudioPlayer 
+        url={url} 
+        recordingNumber={recordingNumber}
+        className={className}
+      />
     );
   }
 
