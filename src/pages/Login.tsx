@@ -179,18 +179,7 @@ const Login: React.FC = () => {
     <div className="min-h-screen flex flex-col relative overflow-hidden">
       {/* Animated Background Pattern */}
       <div className="absolute inset-0 -z-10">
-        {/* Education pattern background */}
-        <div 
-          className="absolute inset-0 opacity-20"
-          style={{
-            backgroundImage: `url(${educationPattern})`,
-            backgroundSize: '400px 400px',
-            backgroundRepeat: 'repeat',
-            backgroundPosition: 'center'
-          }}
-        />
-        
-        {/* Gradient overlay on top of pattern */}
+        {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-[#F6A18A]/10 via-transparent to-[hsl(207,89%,54%)]/10" />
         
         {/* Geometric shapes for e-learning theme */}
