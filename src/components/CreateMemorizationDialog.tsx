@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +37,35 @@ export const CreateMemorizationDialog = ({
   ]);
   const [loading, setLoading] = useState(false);
   const [editingCardIndex, setEditingCardIndex] = useState<number | null>(null);
+  const [classId, setClassId] = useState<number | null>(null);
+  const [subjectName, setSubjectName] = useState<string>('');
+  const [className, setClassName] = useState<string>('');
+
+  // Fetch class_id from subject when subjectId is provided
+  useEffect(() => {
+    const fetchSubjectDetails = async () => {
+      if (!subjectId) return;
+
+      const { data: subject, error } = await supabase
+        .from('subjects')
+        .select('name, class_id, classes(name)')
+        .eq('id', subjectId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching subject:', error);
+        return;
+      }
+
+      if (subject) {
+        setClassId(subject.class_id);
+        setSubjectName(subject.name);
+        setClassName((subject.classes as any)?.name || '');
+      }
+    };
+
+    fetchSubjectDetails();
+  }, [subjectId]);
 
   const handleAddFlashcard = () => {
     setFlashcards([
@@ -100,6 +129,7 @@ export const CreateMemorizationDialog = ({
           creator_id: user.id,
           subject_id: subjectId || null,
           chapter_id: chapterId || null,
+          class_id: classId,
           is_public: isPublic,
         })
         .select()
@@ -149,6 +179,19 @@ export const CreateMemorizationDialog = ({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Basic Info */}
           <div className="space-y-4">
+            {subjectId && (
+              <div className="p-3 bg-muted rounded-lg space-y-1">
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Class: </span>
+                  <span className="font-medium">{className}</span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Subject: </span>
+                  <span className="font-medium">{subjectName}</span>
+                </div>
+              </div>
+            )}
+
             <div>
               <Label htmlFor="title">Title *</Label>
               <Input

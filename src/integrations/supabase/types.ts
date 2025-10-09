@@ -337,6 +337,7 @@ export type Database = {
       memorizations: {
         Row: {
           chapter_id: number | null
+          class_id: number | null
           created_at: string
           creator_id: string
           deleted: boolean
@@ -349,6 +350,7 @@ export type Database = {
         }
         Insert: {
           chapter_id?: number | null
+          class_id?: number | null
           created_at?: string
           creator_id: string
           deleted?: boolean
@@ -361,6 +363,7 @@ export type Database = {
         }
         Update: {
           chapter_id?: number | null
+          class_id?: number | null
           created_at?: string
           creator_id?: string
           deleted?: boolean
