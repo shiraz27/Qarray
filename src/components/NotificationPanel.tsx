@@ -269,7 +269,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
       )}
     >
       <div className="flex gap-3">
-        <div className={cn("flex-shrink-0 rounded-full p-3", colorClass)}>
+        <div className={cn("flex-shrink-0 rounded-full w-12 h-12 flex items-center justify-center", colorClass)}>
           {icon}
         </div>
         <div className="flex-1 min-w-0">

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Bell } from 'lucide-react';
+import { BellDot } from 'lucide-react';
 import { NotificationPanel } from './NotificationPanel';
 
 interface HeaderProps {
@@ -85,9 +85,9 @@ export const Header: React.FC<HeaderProps> = ({ userName = "Osman" }) => {
             className="relative"
             onClick={() => setShowNotifications(true)}
           >
-            <Bell className="h-8 w-8 text-black" />
+            <BellDot className="h-8 w-8 text-black" />
             {notificationCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[11px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
                 {notificationCount > 9 ? '9+' : notificationCount}
               </span>
             )}
