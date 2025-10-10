@@ -18,9 +18,16 @@ serve(async (req) => {
     const file = formData.get('file') as File;
     const fileName = formData.get('fileName') as string;
     const fileType = formData.get('fileType') as string;
+    const chapterId = formData.get('chapterId') as string;
+    const contentType = formData.get('contentType') as string; // 'question' or 'resource'
+    const contentId = formData.get('contentId') as string;
     
     if (!file || !fileName) {
       throw new Error('File and fileName are required');
+    }
+
+    if (!chapterId) {
+      throw new Error('chapterId is required for organization');
     }
 
     const accessKey = Deno.env.get('ARCHIVE_ORG_ACCESS_KEY');
@@ -32,9 +39,62 @@ serve(async (req) => {
 
     console.log(`Uploading file: ${fileName}, type: ${fileType}`);
 
-    // Generate a unique identifier for the item
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Fetch chapter, subject, and class information
+    const { data: chapter, error: chapterError } = await supabase
+      .from('chapters')
+      .select('id, name, subject_id, class_id')
+      .eq('id', parseInt(chapterId))
+      .single();
+
+    if (chapterError || !chapter) {
+      throw new Error('Chapter not found');
+    }
+
+    const { data: subject, error: subjectError } = await supabase
+      .from('subjects')
+      .select('id, name')
+      .eq('id', chapter.subject_id)
+      .single();
+
+    if (subjectError || !subject) {
+      throw new Error('Subject not found');
+    }
+
+    const { data: classData, error: classError } = await supabase
+      .from('classes')
+      .select('id, name')
+      .eq('id', chapter.class_id)
+      .single();
+
+    if (classError || !classData) {
+      throw new Error('Class not found');
+    }
+
+    // Sanitize names for URL use
+    const sanitize = (str: string) => str.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    const className = sanitize(classData.name);
+    const subjectName = sanitize(subject.name);
+    const chapterName = sanitize(chapter.name);
+    const sanitizedFileName = sanitize(fileName);
+
+    // Generate organized identifier
     const timestamp = Date.now();
-    const itemIdentifier = `qarray-${timestamp}-${fileName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}`;
+    let itemIdentifier: string;
+    
+    if (contentType && contentId) {
+      // Full organization with content type and ID
+      itemIdentifier = `qarray-${className}-${subjectName}-${chapterName}-${contentType}-${contentId}-${timestamp}`;
+      console.log(`Organized path: ${className}/${subjectName}/${chapterName}/${contentType}/${contentId}`);
+    } else {
+      // Organization without content (for new uploads)
+      itemIdentifier = `qarray-${className}-${subjectName}-${chapterName}-${timestamp}`;
+      console.log(`Organized path: ${className}/${subjectName}/${chapterName}`);
+    }
 
     // Read file as array buffer
     const fileBuffer = await file.arrayBuffer();
@@ -51,6 +111,11 @@ serve(async (req) => {
         'x-archive-meta-mediatype': fileType === 'audio' ? 'audio' : fileType === 'image' ? 'image' : 'texts',
         'x-archive-meta-collection': 'opensource',
         'x-archive-meta-title': fileName,
+        'x-archive-meta-class': classData.name,
+        'x-archive-meta-subject': subject.name,
+        'x-archive-meta-chapter': chapter.name,
+        ...(contentType && { 'x-archive-meta-content-type': contentType }),
+        ...(contentId && { 'x-archive-meta-content-id': contentId }),
         'Content-Type': file.type || 'application/octet-stream',
       },
       body: fileBytes,

@@ -164,6 +164,8 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
             onMediaUploaded={handleMediaUploaded}
             uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
             onRemoveMedia={removeMedia}
+            chapterId={chapterId}
+            contentType="resource"
           />
         </div>
 

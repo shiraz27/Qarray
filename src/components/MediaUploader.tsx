@@ -16,13 +16,19 @@ interface MediaUploaderProps {
   acceptedTypes?: ('image' | 'video' | 'audio' | 'pdf')[];
   uploadedMedia?: Array<{ url: string; type: string; name: string }>;
   onRemoveMedia?: (index: number) => void;
+  chapterId?: number;
+  contentType?: 'question' | 'resource';
+  contentId?: number;
 }
 
 export const MediaUploader: React.FC<MediaUploaderProps> = ({ 
   onMediaUploaded,
   acceptedTypes = ['image', 'video', 'audio', 'pdf'],
   uploadedMedia = [],
-  onRemoveMedia
+  onRemoveMedia,
+  chapterId,
+  contentType,
+  contentId
 }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -48,6 +54,11 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       formData.append('file', file);
       formData.append('fileName', file.name);
       formData.append('fileType', fileType);
+      
+      // Add organization metadata if available
+      if (chapterId) formData.append('chapterId', chapterId.toString());
+      if (contentType) formData.append('contentType', contentType);
+      if (contentId) formData.append('contentId', contentId.toString());
 
       const { data, error } = await supabase.functions.invoke('upload-to-archive', {
         body: formData,

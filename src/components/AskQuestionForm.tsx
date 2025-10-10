@@ -145,6 +145,8 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
             onMediaUploaded={handleMediaUploaded}
             uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
             onRemoveMedia={removeMedia}
+            chapterId={chapterId}
+            contentType="question"
           />
         </div>
 
