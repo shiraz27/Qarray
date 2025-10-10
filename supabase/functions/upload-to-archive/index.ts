@@ -26,10 +26,6 @@ serve(async (req) => {
       throw new Error('File and fileName are required');
     }
 
-    if (!chapterId) {
-      throw new Error('chapterId is required for organization');
-    }
-
     const accessKey = Deno.env.get('ARCHIVE_ORG_ACCESS_KEY');
     const secretKey = Deno.env.get('ARCHIVE_ORG_SECRET_KEY');
 
@@ -39,68 +35,91 @@ serve(async (req) => {
 
     console.log(`Uploading file: ${fileName}, type: ${fileType}`);
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Fetch chapter, subject, and class information
-    const { data: chapter, error: chapterError } = await supabase
-      .from('chapters')
-      .select('id, name, subject_id, class_id')
-      .eq('id', parseInt(chapterId))
-      .single();
-
-    if (chapterError || !chapter) {
-      throw new Error('Chapter not found');
-    }
-
-    const { data: subject, error: subjectError } = await supabase
-      .from('subjects')
-      .select('id, name')
-      .eq('id', chapter.subject_id)
-      .single();
-
-    if (subjectError || !subject) {
-      throw new Error('Subject not found');
-    }
-
-    const { data: classData, error: classError } = await supabase
-      .from('classes')
-      .select('id, name')
-      .eq('id', chapter.class_id)
-      .single();
-
-    if (classError || !classData) {
-      throw new Error('Class not found');
-    }
-
-    // Sanitize names for URL use
-    const sanitize = (str: string) => str.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    const className = sanitize(classData.name);
-    const subjectName = sanitize(subject.name);
-    const chapterName = sanitize(chapter.name);
-    
-    // Use a single collection identifier for all Qarray content
     const itemIdentifier = 'qarray-educational-content';
-    
-    // Create organized folder path within the collection
     let folderPath: string;
-    if (contentType && contentId) {
-      // Full organization: class/subject/chapter/content-type/content-id/filename
-      folderPath = `${className}/${subjectName}/${chapterName}/${contentType}/${contentId}/${fileName}`;
-      console.log(`Organized path: ${folderPath}`);
+    let metadataTitle: string;
+    let additionalMetadata: Record<string, string> = {};
+    
+    // ChapterId is optional - if not provided, upload to root
+    if (chapterId) {
+      // Initialize Supabase client
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      // Fetch chapter, subject, and class information
+      const { data: chapter, error: chapterError } = await supabase
+        .from('chapters')
+        .select('id, name, subject_id, class_id')
+        .eq('id', parseInt(chapterId))
+        .single();
+
+      if (chapterError || !chapter) {
+        throw new Error('Chapter not found');
+      }
+
+      const { data: subject, error: subjectError } = await supabase
+        .from('subjects')
+        .select('id, name')
+        .eq('id', chapter.subject_id)
+        .single();
+
+      if (subjectError || !subject) {
+        throw new Error('Subject not found');
+      }
+
+      const { data: classData, error: classError } = await supabase
+        .from('classes')
+        .select('id, name')
+        .eq('id', chapter.class_id)
+        .single();
+
+      if (classError || !classData) {
+        throw new Error('Class not found');
+      }
+
+      // Sanitize names for URL use
+      const sanitize = (str: string) => str.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      const className = sanitize(classData.name);
+      const subjectName = sanitize(subject.name);
+      const chapterName = sanitize(chapter.name);
+      
+      // Create organized folder path within the collection
+      if (contentType && contentId) {
+        // Full organization: class/subject/chapter/content-type/content-id/filename
+        folderPath = `${className}/${subjectName}/${chapterName}/${contentType}/${contentId}/${fileName}`;
+        console.log(`Organized path: ${folderPath}`);
+      } else {
+        // Basic organization: class/subject/chapter/filename
+        folderPath = `${className}/${subjectName}/${chapterName}/${fileName}`;
+        console.log(`Organized path: ${folderPath}`);
+      }
+
+      metadataTitle = `${classData.name} - ${subject.name} - ${chapter.name}`;
+      additionalMetadata = {
+        'x-archive-meta-class': classData.name,
+        'x-archive-meta-subject': subject.name,
+        'x-archive-meta-chapter': chapter.name,
+      };
+      
+      if (contentType) {
+        additionalMetadata['x-archive-meta-content-type'] = contentType;
+      }
+      if (contentId) {
+        additionalMetadata['x-archive-meta-content-id'] = contentId;
+      }
     } else {
-      // Basic organization: class/subject/chapter/filename
-      folderPath = `${className}/${subjectName}/${chapterName}/${fileName}`;
-      console.log(`Organized path: ${folderPath}`);
+      // Upload without organization (fallback for forms without chapterId)
+      folderPath = `uploads/${fileName}`;
+      metadataTitle = fileName;
+      console.log(`Uploading to root: ${folderPath}`);
     }
 
     // Read file as array buffer
     const fileBuffer = await file.arrayBuffer();
     const fileBytes = new Uint8Array(fileBuffer);
 
-    // Upload to Archive.org using S3-compatible API with organized folder path
+    // Upload to Archive.org using S3-compatible API
     const uploadUrl = `https://s3.us.archive.org/${itemIdentifier}/${folderPath}`;
     
     const uploadResponse = await fetch(uploadUrl, {
@@ -110,12 +129,8 @@ serve(async (req) => {
         'x-amz-auto-make-bucket': '1',
         'x-archive-meta-mediatype': fileType === 'audio' ? 'audio' : fileType === 'image' ? 'image' : 'texts',
         'x-archive-meta-collection': 'opensource',
-        'x-archive-meta-title': `${classData.name} - ${subject.name} - ${chapter.name}`,
-        'x-archive-meta-class': classData.name,
-        'x-archive-meta-subject': subject.name,
-        'x-archive-meta-chapter': chapter.name,
-        ...(contentType && { 'x-archive-meta-content-type': contentType }),
-        ...(contentId && { 'x-archive-meta-content-id': contentId }),
+        'x-archive-meta-title': metadataTitle,
+        ...additionalMetadata,
         'Content-Type': file.type || 'application/octet-stream',
       },
       body: fileBytes,

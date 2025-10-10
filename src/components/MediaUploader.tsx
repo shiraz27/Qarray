@@ -59,9 +59,11 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       formData.append('fileType', fileType);
       
       // Add organization metadata if available
-      if (chapterId) formData.append('chapterId', chapterId.toString());
-      if (contentType) formData.append('contentType', contentType);
-      if (contentId) formData.append('contentId', contentId.toString());
+      if (chapterId) {
+        formData.append('chapterId', chapterId.toString());
+        if (contentType) formData.append('contentType', contentType);
+        if (contentId) formData.append('contentId', contentId.toString());
+      }
 
       const { data, error } = await supabase.functions.invoke('upload-to-archive', {
         body: formData,
