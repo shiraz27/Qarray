@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User } from 'lucide-react';
+import { TeacherBadge } from './TeacherBadge';
 
 interface UserAvatarProps {
   userId: string;
@@ -14,6 +15,8 @@ interface UserAvatarProps {
 interface Profile {
   full_name: string | null;
   avatar_color: string | null;
+  user_type: string | null;
+  teacher_verified: boolean | null;
 }
 
 export function UserAvatar({ userId, size = 'md', showName = false, showDate = false, date }: UserAvatarProps) {
@@ -23,7 +26,7 @@ export function UserAvatar({ userId, size = 'md', showName = false, showDate = f
     const fetchProfile = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('full_name, avatar_color')
+        .select('full_name, avatar_color, user_type, teacher_verified')
         .eq('user_id', userId)
         .single();
 
@@ -68,8 +71,11 @@ export function UserAvatar({ userId, size = 'md', showName = false, showDate = f
     </Avatar>
         <div className="flex flex-col">
           {showName && (
-            <span className="text-sm font-medium">
+            <span className="text-sm font-medium inline-flex items-center">
               {profile?.full_name || 'Anonymous'}
+              {profile?.user_type === 'teacher' && (
+                <TeacherBadge verified={profile.teacher_verified || false} size="sm" />
+              )}
             </span>
           )}
           {showDate && date && (
