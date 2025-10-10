@@ -449,9 +449,13 @@ export type Database = {
           is_moderator: boolean
           phone_number: string | null
           state_id: number | null
+          teacher_documents: string[] | null
+          teacher_verification_status: string | null
+          teacher_verified: boolean | null
           theme: string
           updated_at: string | null
           user_id: string | null
+          user_type: Database["public"]["Enums"]["user_type"] | null
           verified: boolean
         }
         Insert: {
@@ -466,9 +470,13 @@ export type Database = {
           is_moderator?: boolean
           phone_number?: string | null
           state_id?: number | null
+          teacher_documents?: string[] | null
+          teacher_verification_status?: string | null
+          teacher_verified?: boolean | null
           theme?: string
           updated_at?: string | null
           user_id?: string | null
+          user_type?: Database["public"]["Enums"]["user_type"] | null
           verified?: boolean
         }
         Update: {
@@ -483,9 +491,13 @@ export type Database = {
           is_moderator?: boolean
           phone_number?: string | null
           state_id?: number | null
+          teacher_documents?: string[] | null
+          teacher_verification_status?: string | null
+          teacher_verified?: boolean | null
           theme?: string
           updated_at?: string | null
           user_id?: string | null
+          user_type?: Database["public"]["Enums"]["user_type"] | null
           verified?: boolean
         }
         Relationships: [
@@ -800,6 +812,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      user_type: "student" | "teacher"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -928,6 +941,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      user_type: ["student", "teacher"],
     },
   },
 } as const
