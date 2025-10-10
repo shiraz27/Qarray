@@ -21,9 +21,9 @@ export function MediaList({ data, showText = true }: MediaListProps) {
           <h3 className="text-sm font-semibold text-muted-foreground">
             Attachments ({media.length})
           </h3>
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {media.map((file, index) => (
-              <div key={index} className="w-64">
+              <div key={index} className="w-full">
                 <MediaPreview url={file.url} />
               </div>
             ))}

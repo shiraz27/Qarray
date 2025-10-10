@@ -3,6 +3,9 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { Volume2 } from 'lucide-react';
 import { useState } from 'react';
 import { AudioPlayerModal } from '@/components/AudioPlayerModal';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface MediaPreviewProps {
   url: string;
@@ -16,6 +19,7 @@ function extractRecordingNumber(url: string): string | undefined {
 
 export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   const [audioModalOpen, setAudioModalOpen] = useState(false);
+  const [imageZoomOpen, setImageZoomOpen] = useState(false);
   
   // Check if it's a YouTube URL
   const getYouTubeEmbedUrl = (url: string) => {
@@ -85,9 +89,38 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
 
   if (isImage) {
     return (
-      <Card className={`overflow-hidden ${className}`}>
-        <img src={url} alt="Media content" className="w-full h-auto object-cover max-h-40 rounded-lg" />
-      </Card>
+      <>
+        <Card 
+          className={`overflow-hidden ${className} cursor-pointer hover:shadow-lg transition-all`}
+          onClick={() => setImageZoomOpen(true)}
+        >
+          <img 
+            src={url} 
+            alt="Media content" 
+            className="w-full h-auto object-contain rounded-lg" 
+            style={{ maxHeight: '400px' }}
+          />
+        </Card>
+        <Dialog open={imageZoomOpen} onOpenChange={setImageZoomOpen}>
+          <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-none">
+            <div className="relative w-full h-full flex items-center justify-center p-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-4 right-4 z-50 text-white hover:bg-white/20"
+                onClick={() => setImageZoomOpen(false)}
+              >
+                <X className="h-6 w-6" />
+              </Button>
+              <img 
+                src={url} 
+                alt="Media content" 
+                className="max-w-full max-h-[90vh] object-contain"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      </>
     );
   }
 

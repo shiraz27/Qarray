@@ -316,50 +316,59 @@ export default function QuestionDetail() {
     const questionId = Number(id);
     if (isNaN(questionId)) return;
 
-    console.log('Attempting to delete question:', questionId);
-    console.log('User ID:', user?.id);
-    console.log('Is Moderator:', isModerator);
-    console.log('Question contributors:', question?.contributors);
+    try {
+      console.log('Attempting to delete question:', questionId);
+      console.log('User ID:', user?.id);
+      console.log('Is Moderator:', isModerator);
+      console.log('Question contributors:', question?.contributors);
 
-    // Delete associated files from Archive.org first
-    if (question?.data) {
-      const { media } = extractMediaFromText(question.data);
-      for (const mediaFile of media) {
-        if (mediaFile.url.includes('archive.org')) {
-          try {
-            await supabase.functions.invoke('delete-from-archive', {
-              body: { fileUrl: mediaFile.url }
-            });
-          } catch (err) {
-            console.error('Error deleting file from archive:', err);
+      // Delete associated files from Archive.org first
+      if (question?.data) {
+        const { media } = extractMediaFromText(question.data);
+        for (const mediaFile of media) {
+          if (mediaFile.url.includes('archive.org')) {
+            try {
+              await supabase.functions.invoke('delete-from-archive', {
+                body: { fileUrl: mediaFile.url }
+              });
+            } catch (err) {
+              console.error('Error deleting file from archive:', err);
+            }
           }
         }
       }
-    }
 
-    const { error } = await supabase
-      .from('questions')
-      .update({ deleted: true })
-      .eq('id', questionId);
+      const { error } = await supabase
+        .from('questions')
+        .update({ deleted: true })
+        .eq('id', questionId);
 
-    console.log('Delete result:', { error });
+      console.log('Delete result:', { error });
 
-    if (error) {
-      console.error('Delete error details:', error);
+      if (error) {
+        console.error('Delete error details:', error);
+        toast({
+          title: 'Error',
+          description: `Failed to delete question: ${error.message}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Question deleted successfully',
+      });
+
+      navigate(-1);
+    } catch (error) {
+      console.error('Unexpected error during deletion:', error);
       toast({
         title: 'Error',
-        description: `Failed to delete question: ${error.message}`,
+        description: 'An unexpected error occurred while deleting',
         variant: 'destructive',
       });
-      return;
     }
-
-    toast({
-      title: 'Success',
-      description: 'Question deleted successfully',
-    });
-
-    navigate(-1);
   };
 
   const handleTabChange = (tab: string) => {
