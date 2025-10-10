@@ -12,7 +12,7 @@ import chapterPattern from '@/assets/chapter-pattern.png';
 import qarayLogo from '@/assets/qarray-logo-new.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { MediaPreview } from '@/components/MediaPreview';
+import { MediaList } from '@/components/MediaList';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
@@ -317,14 +317,6 @@ export default function ResourceDetail() {
     }
   };
 
-  const getDisplayName = (url: string) => {
-    if (url.includes('youtube.com') || url.includes('youtu.be')) return '📹 YouTube Video';
-    if (url.includes('.pdf')) return '📄 PDF Document';
-    if (url.includes('.mp3') || url.includes('.wav')) return '🎤 Audio Recording';
-    if (url.includes('.jpg') || url.includes('.png') || url.includes('.jpeg')) return '📷 Image';
-    const filename = url.split('/').pop() || 'File';
-    return `📎 ${filename}`;
-  };
 
   const isOwner = user && resource?.published_by === user.id;
   const canEdit = isOwner || isModerator;
@@ -570,24 +562,7 @@ export default function ResourceDetail() {
 
       {/* Files Section */}
       <div className="flex-1 px-4 space-y-3">
-        <h2 className="text-lg font-semibold">Files</h2>
-        {resource.data.map((url, index) => (
-          <div key={index} className="space-y-2">
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">{getDisplayName(url)}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(url, '_blank')}
-                >
-                  Open
-                </Button>
-              </div>
-            </Card>
-            <MediaPreview url={url} />
-          </div>
-        ))}
+        <MediaList data={resource.data.join('\n')} showText={true} />
       </div>
 
       {/* Questions Section */}
