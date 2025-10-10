@@ -80,28 +80,28 @@ serve(async (req) => {
     const className = sanitize(classData.name);
     const subjectName = sanitize(subject.name);
     const chapterName = sanitize(chapter.name);
-    const sanitizedFileName = sanitize(fileName);
-
-    // Generate organized identifier
-    const timestamp = Date.now();
-    let itemIdentifier: string;
     
+    // Use a single collection identifier for all Qarray content
+    const itemIdentifier = 'qarray-educational-content';
+    
+    // Create organized folder path within the collection
+    let folderPath: string;
     if (contentType && contentId) {
-      // Full organization with content type and ID
-      itemIdentifier = `qarray-${className}-${subjectName}-${chapterName}-${contentType}-${contentId}-${timestamp}`;
-      console.log(`Organized path: ${className}/${subjectName}/${chapterName}/${contentType}/${contentId}`);
+      // Full organization: class/subject/chapter/content-type/content-id/filename
+      folderPath = `${className}/${subjectName}/${chapterName}/${contentType}/${contentId}/${fileName}`;
+      console.log(`Organized path: ${folderPath}`);
     } else {
-      // Organization without content (for new uploads)
-      itemIdentifier = `qarray-${className}-${subjectName}-${chapterName}-${timestamp}`;
-      console.log(`Organized path: ${className}/${subjectName}/${chapterName}`);
+      // Basic organization: class/subject/chapter/filename
+      folderPath = `${className}/${subjectName}/${chapterName}/${fileName}`;
+      console.log(`Organized path: ${folderPath}`);
     }
 
     // Read file as array buffer
     const fileBuffer = await file.arrayBuffer();
     const fileBytes = new Uint8Array(fileBuffer);
 
-    // Upload to Archive.org using S3-compatible API
-    const uploadUrl = `https://s3.us.archive.org/${itemIdentifier}/${fileName}`;
+    // Upload to Archive.org using S3-compatible API with organized folder path
+    const uploadUrl = `https://s3.us.archive.org/${itemIdentifier}/${folderPath}`;
     
     const uploadResponse = await fetch(uploadUrl, {
       method: 'PUT',
@@ -110,7 +110,7 @@ serve(async (req) => {
         'x-amz-auto-make-bucket': '1',
         'x-archive-meta-mediatype': fileType === 'audio' ? 'audio' : fileType === 'image' ? 'image' : 'texts',
         'x-archive-meta-collection': 'opensource',
-        'x-archive-meta-title': fileName,
+        'x-archive-meta-title': `${classData.name} - ${subject.name} - ${chapter.name}`,
         'x-archive-meta-class': classData.name,
         'x-archive-meta-subject': subject.name,
         'x-archive-meta-chapter': chapter.name,
@@ -127,7 +127,7 @@ serve(async (req) => {
       throw new Error(`Upload failed: ${uploadResponse.status} - ${errorText}`);
     }
 
-    const archiveUrl = `https://archive.org/download/${itemIdentifier}/${fileName}`;
+    const archiveUrl = `https://archive.org/download/${itemIdentifier}/${folderPath}`;
     console.log('Upload successful:', archiveUrl);
 
     return new Response(

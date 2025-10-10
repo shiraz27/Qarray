@@ -281,7 +281,6 @@ export default function Moderation() {
             .eq('user_type', 'teacher')
             .eq('teacher_verified', false)
             .neq('teacher_verification_status', 'rejected')
-            .not('teacher_documents', 'eq', '{}')
             .order('created_at', { ascending: false });
 
           items = (teachers || []).map(t => ({
