@@ -493,12 +493,22 @@ export default function QuestionDetail() {
             <img src={qarayLogo} alt="Qarray Logo" className="h-12 w-12 object-contain" />
             <span className="text-xl font-bold text-foreground">Qarray</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={toggleBookmark}>
-            <Bookmark
-              size={20}
-              className={question?.isBookmarked ? 'fill-current text-primary' : ''}
-            />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleShare}
+              className="hover:bg-primary/10"
+            >
+              <Share2 size={20} className="text-primary" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={toggleBookmark}>
+              <Bookmark
+                size={20}
+                className={question?.isBookmarked ? 'fill-current text-primary' : 'text-primary'}
+              />
+            </Button>
+          </div>
         </div>
       </div>
 
