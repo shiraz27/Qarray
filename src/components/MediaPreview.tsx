@@ -41,13 +41,19 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   const youtubeEmbedUrl = getYouTubeEmbedUrl(url);
 
   // Check if it's a PDF
-  const isPdf = url.toLowerCase().includes('.pdf') || url.includes('pdf');
+  const isPdf = url.toLowerCase().includes('.pdf') || url.toLowerCase().includes('pdf');
 
-  // Check if it's an image
-  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url) || url.includes('image');
+  // Check if it's an image (more robust detection)
+  const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg|ico)/i.test(url) || 
+                  url.toLowerCase().includes('image') ||
+                  url.toLowerCase().includes('.jpg') ||
+                  url.toLowerCase().includes('.jpeg') ||
+                  url.toLowerCase().includes('.png') ||
+                  url.toLowerCase().includes('.gif') ||
+                  url.toLowerCase().includes('.webp');
 
   // Check if it's an audio file
-  const isAudio = /\.(mp3|wav|webm|ogg|m4a)$/i.test(url) || url.includes('audio');
+  const isAudio = /\.(mp3|wav|webm|ogg|m4a)/i.test(url) || url.toLowerCase().includes('audio');
 
   if (youtubeEmbedUrl) {
     return (
@@ -91,14 +97,18 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
     return (
       <>
         <Card 
-          className={`overflow-hidden ${className} cursor-pointer hover:shadow-lg transition-all`}
+          className={`overflow-hidden ${className} cursor-pointer hover:shadow-lg transition-all border-border`}
           onClick={() => setImageZoomOpen(true)}
         >
           <img 
             src={url} 
             alt="Media content" 
-            className="w-full h-auto object-contain rounded-lg" 
-            style={{ maxHeight: '400px' }}
+            className="w-full h-full object-cover rounded-lg" 
+            style={{ minHeight: '200px', maxHeight: '500px' }}
+            onError={(e) => {
+              console.error('Image failed to load:', url);
+              e.currentTarget.style.display = 'none';
+            }}
           />
         </Card>
         <Dialog open={imageZoomOpen} onOpenChange={setImageZoomOpen}>

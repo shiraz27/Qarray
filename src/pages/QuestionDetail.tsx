@@ -441,32 +441,64 @@ export default function QuestionDetail() {
   };
 
   const handleDeleteAnswer = async (answerId: number) => {
-    const { error } = await supabase
-      .from('answers')
-      .update({ deleted: true })
-      .eq('id', answerId);
+    try {
+      // First get the answer data to delete associated files
+      const { data: answerData } = await supabase
+        .from('answers')
+        .select('data')
+        .eq('id', answerId)
+        .single();
 
-    if (error) {
+      // Delete associated files from Archive.org first
+      if (answerData?.data) {
+        const { media } = extractMediaFromText(answerData.data);
+        for (const mediaFile of media) {
+          if (mediaFile.url.includes('archive.org')) {
+            try {
+              await supabase.functions.invoke('delete-from-archive', {
+                body: { fileUrl: mediaFile.url }
+              });
+            } catch (err) {
+              console.error('Error deleting file from archive:', err);
+            }
+          }
+        }
+      }
+
+      const { error } = await supabase
+        .from('answers')
+        .update({ deleted: true })
+        .eq('id', answerId);
+
+      if (error) {
+        toast({
+          title: 'Error',
+          description: `Failed to delete answer: ${error.message}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Answer deleted successfully',
+      });
+
+      // Remove answer from state
+      setAnswers(prev => prev.filter(a => a.id !== answerId));
+      setQuestion(prev => prev ? {
+        ...prev,
+        answerCount: (prev.answerCount || 1) - 1
+      } : null);
+      setDeletingAnswerId(null);
+    } catch (error) {
+      console.error('Unexpected error during answer deletion:', error);
       toast({
         title: 'Error',
-        description: `Failed to delete answer: ${error.message}`,
+        description: 'An unexpected error occurred while deleting',
         variant: 'destructive',
       });
-      return;
     }
-
-    toast({
-      title: 'Success',
-      description: 'Answer deleted successfully',
-    });
-
-    // Remove answer from state
-    setAnswers(prev => prev.filter(a => a.id !== answerId));
-    setQuestion(prev => prev ? {
-      ...prev,
-      answerCount: (prev.answerCount || 1) - 1
-    } : null);
-    setDeletingAnswerId(null);
   };
 
   const canEditAnswer = (answer: Answer) => {
