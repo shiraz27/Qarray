@@ -227,6 +227,21 @@ export default function ResourceDetail() {
     const resourceId = Number(id);
     if (isNaN(resourceId)) return;
 
+    // Delete associated files from Archive.org first
+    if (resource?.data && Array.isArray(resource.data)) {
+      for (const fileUrl of resource.data) {
+        if (fileUrl.includes('archive.org')) {
+          try {
+            await supabase.functions.invoke('delete-from-archive', {
+              body: { fileUrl }
+            });
+          } catch (err) {
+            console.error('Error deleting file from archive:', err);
+          }
+        }
+      }
+    }
+
     const { error } = await supabase
       .from('resources')
       .update({ deleted: true })

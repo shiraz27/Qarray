@@ -17,6 +17,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { AnswerQuestionForm } from '@/components/AnswerQuestionForm';
 import { EditQuestionForm } from '@/components/EditQuestionForm';
 import { EditAnswerForm } from '@/components/EditAnswerForm';
+import { extractMediaFromText } from '@/utils/mediaHelpers';
 
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -319,6 +320,22 @@ export default function QuestionDetail() {
     console.log('User ID:', user?.id);
     console.log('Is Moderator:', isModerator);
     console.log('Question contributors:', question?.contributors);
+
+    // Delete associated files from Archive.org first
+    if (question?.data) {
+      const { media } = extractMediaFromText(question.data);
+      for (const mediaFile of media) {
+        if (mediaFile.url.includes('archive.org')) {
+          try {
+            await supabase.functions.invoke('delete-from-archive', {
+              body: { fileUrl: mediaFile.url }
+            });
+          } catch (err) {
+            console.error('Error deleting file from archive:', err);
+          }
+        }
+      }
+    }
 
     const { error } = await supabase
       .from('questions')
