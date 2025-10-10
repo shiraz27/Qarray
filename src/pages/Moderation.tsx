@@ -8,14 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { CheckCircle2, XCircle, BookOpen, MessageCircle, Brain, FileText, ExternalLink } from 'lucide-react';
+import { CheckCircle2, XCircle, BookOpen, MessageCircle, Brain, FileText, ExternalLink, GraduationCap } from 'lucide-react';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Navigate, Link } from 'react-router-dom';
 
-type ContentType = 'questions' | 'answers' | 'resources' | 'memorizations';
+type ContentType = 'questions' | 'answers' | 'resources' | 'memorizations' | 'teachers';
 
 interface UnverifiedItem {
-  id: number;
+  id: number | string;
   type: ContentType;
   title?: string;
   data?: string;
@@ -25,6 +25,9 @@ interface UnverifiedItem {
   subject_name?: string;
   chapter_name?: string;
   question_id?: number; // For answers
+  full_name?: string; // For teachers
+  teacher_documents?: string[]; // For teachers
+  user_id?: string; // For teachers
 }
 
 export default function Moderation() {
@@ -264,6 +267,32 @@ export default function Moderation() {
             chapter_name: (m.chapters as any)?.name,
           }));
           break;
+
+        case 'teachers':
+          const { data: teachers } = await supabase
+            .from('profiles')
+            .select(`
+              user_id,
+              full_name,
+              teacher_documents,
+              created_at,
+              teacher_verification_status
+            `)
+            .eq('user_type', 'teacher')
+            .eq('teacher_verified', false)
+            .neq('teacher_verification_status', 'rejected')
+            .not('teacher_documents', 'eq', '{}')
+            .order('created_at', { ascending: false });
+
+          items = (teachers || []).map(t => ({
+            id: t.user_id as any, // Will be used as user_id for approval
+            type: 'teachers' as ContentType,
+            full_name: t.full_name,
+            teacher_documents: t.teacher_documents,
+            created_at: t.created_at,
+            user_id: t.user_id,
+          }));
+          break;
       }
 
       setItems(items);
@@ -275,26 +304,40 @@ export default function Moderation() {
     }
   };
 
-  const handleVerify = async (id: number, type: ContentType, approve: boolean) => {
+  const handleVerify = async (id: number | string, type: ContentType, approve: boolean) => {
     try {
-      if (approve) {
-        // Approve: set verified to true
+      if (type === 'teachers') {
+        // Handle teacher verification differently - id is user_id (string)
         const { error } = await supabase
-          .from(type)
-          .update({ verified: true })
-          .eq('id', id);
+          .from('profiles')
+          .update({ 
+            teacher_verified: approve,
+            teacher_verification_status: approve ? 'approved' : 'rejected'
+          })
+          .eq('user_id', id as string);
 
         if (error) throw error;
-        toast.success('Item approved');
+        toast.success(approve ? 'Teacher verified' : 'Teacher verification rejected');
       } else {
-        // Reject: soft delete
-        const { error } = await supabase
-          .from(type)
-          .update({ deleted: true })
-          .eq('id', id);
+        if (approve) {
+          // Approve: set verified to true
+          const { error } = await supabase
+            .from(type as 'questions' | 'answers' | 'resources' | 'memorizations')
+            .update({ verified: true })
+            .eq('id', id as number);
 
-        if (error) throw error;
-        toast.success('Item deleted');
+          if (error) throw error;
+          toast.success('Item approved');
+        } else {
+          // Reject: soft delete
+          const { error } = await supabase
+            .from(type as 'questions' | 'answers' | 'resources' | 'memorizations')
+            .update({ deleted: true })
+            .eq('id', id as number);
+
+          if (error) throw error;
+          toast.success('Item deleted');
+        }
       }
 
       fetchUnverifiedItems(activeTab);
@@ -394,7 +437,7 @@ export default function Moderation() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ContentType)}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="questions" className="gap-2">
               <MessageCircle className="w-4 h-4" />
               Questions
@@ -411,6 +454,10 @@ export default function Moderation() {
               <Brain className="w-4 h-4" />
               Memorizations
             </TabsTrigger>
+            <TabsTrigger value="teachers" className="gap-2">
+              <GraduationCap className="w-4 h-4" />
+              Teachers
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="mt-6">
@@ -426,14 +473,46 @@ export default function Moderation() {
                   <Card key={item.id} className="p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 space-y-2">
-                        {item.title && (
-                          <h3 className="font-semibold text-lg">{item.title}</h3>
-                        )}
-                        {item.data && (
-                          <p className="text-sm line-clamp-3">{item.data}</p>
-                        )}
-                        {item.description && (
-                          <p className="text-sm text-muted-foreground">{item.description}</p>
+                        {item.type === 'teachers' ? (
+                          <>
+                            <h3 className="font-semibold text-lg flex items-center gap-2">
+                              <GraduationCap className="w-5 h-5 text-primary" />
+                              {item.full_name}
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              Teacher Verification Request
+                            </p>
+                            {item.teacher_documents && item.teacher_documents.length > 0 && (
+                              <div className="space-y-1 mt-2">
+                                <p className="text-sm font-medium">Uploaded Documents:</p>
+                                {item.teacher_documents.map((doc, idx) => (
+                                  <a
+                                    key={idx}
+                                    href={doc}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 text-sm text-primary hover:underline"
+                                  >
+                                    <FileText className="w-4 h-4" />
+                                    Document {idx + 1}
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {item.title && (
+                              <h3 className="font-semibold text-lg">{item.title}</h3>
+                            )}
+                            {item.data && (
+                              <p className="text-sm line-clamp-3">{item.data}</p>
+                            )}
+                            {item.description && (
+                              <p className="text-sm text-muted-foreground">{item.description}</p>
+                            )}
+                          </>
                         )}
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
                           {item.subject_name && (
@@ -449,17 +528,19 @@ export default function Moderation() {
                       </div>
 
                       <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-2"
-                          asChild
-                        >
-                          <Link to={getViewLink(item)} target="_blank">
-                            <ExternalLink className="w-4 h-4" />
-                            View
-                          </Link>
-                        </Button>
+                        {item.type !== 'teachers' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-2"
+                            asChild
+                          >
+                            <Link to={getViewLink(item)} target="_blank">
+                              <ExternalLink className="w-4 h-4" />
+                              View
+                            </Link>
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="default"

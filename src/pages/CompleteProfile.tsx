@@ -31,13 +31,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Check, ChevronsUpDown, Plus } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus, Upload, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import qarayLogo from '@/assets/qarray-logo-new.png';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
+import { Card } from '@/components/ui/card';
 
 interface State {
   id: number;
@@ -76,6 +77,10 @@ const CompleteProfile: React.FC = () => {
   const [openAddInstitute, setOpenAddInstitute] = useState(false);
   const [newInstituteName, setNewInstituteName] = useState('');
   const [addingInstitute, setAddingInstitute] = useState(false);
+  const [userType, setUserType] = useState<'student' | 'teacher'>('student');
+  const [teacherDocuments, setTeacherDocuments] = useState<string[]>([]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [skipVerification, setSkipVerification] = useState(false);
 
   // Fetch states on component mount
   useEffect(() => {
@@ -227,6 +232,58 @@ const CompleteProfile: React.FC = () => {
     }
   };
 
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Only allow PDF files
+    if (file.type !== 'application/pdf') {
+      toast({
+        title: 'Error',
+        description: 'Only PDF files are allowed',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setUploadingDoc(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fileName', file.name);
+      formData.append('fileType', 'pdf');
+      // Use a placeholder chapter ID for teacher documents
+      formData.append('chapterId', '1');
+      formData.append('contentType', 'teacher-verification');
+
+      const { data, error } = await supabase.functions.invoke('upload-to-archive', {
+        body: formData,
+      });
+
+      if (error) throw error;
+
+      setTeacherDocuments([...teacherDocuments, data.url]);
+      toast({
+        title: 'Success',
+        description: 'Document uploaded successfully',
+      });
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to upload document',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingDoc(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeDocument = (index: number) => {
+    setTeacherDocuments(teacherDocuments.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -247,16 +304,26 @@ const CompleteProfile: React.FC = () => {
 
       const fullName = `${firstName.trim()} ${lastName.trim()}`;
       
+      const profileData: any = {
+        user_id: session.user.id,
+        phone_number: `+216${phoneNumber}`,
+        state_id: parseInt(stateId),
+        class_id: parseInt(classId),
+        institute_id: instituteId,
+        full_name: fullName || session.user.email?.split('@')[0] || 'User',
+        user_type: userType,
+      };
+
+      // Add teacher-specific fields
+      if (userType === 'teacher') {
+        profileData.teacher_documents = teacherDocuments;
+        profileData.teacher_verification_status = skipVerification || teacherDocuments.length === 0 ? 'pending' : 'pending';
+        profileData.teacher_verified = false;
+      }
+      
       const { error } = await supabase
         .from('profiles')
-        .upsert({
-          user_id: session.user.id,
-          phone_number: `+216${phoneNumber}`,
-          state_id: parseInt(stateId),
-          class_id: parseInt(classId),
-          institute_id: instituteId,
-          full_name: fullName || session.user.email?.split('@')[0] || 'User',
-        });
+        .upsert(profileData);
 
       if (error) throw error;
 
@@ -348,6 +415,88 @@ const CompleteProfile: React.FC = () => {
               />
             </div>
           </div>
+
+          <div>
+            <Label htmlFor="userType">I am a</Label>
+            <Select value={userType} onValueChange={(val) => setUserType(val as 'student' | 'teacher')} required>
+              <SelectTrigger className="h-12">
+                <SelectValue placeholder="Select user type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="student">Student</SelectItem>
+                <SelectItem value="teacher">Teacher</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {userType === 'teacher' && (
+            <Card className="p-4 space-y-3 border-primary/20">
+              <div>
+                <Label htmlFor="teacherDocs">Teacher Verification Documents (Optional)</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Upload certification, degree, or ID to get verified as a teacher
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById('teacherDocInput')?.click()}
+                    disabled={uploadingDoc}
+                    className="flex-1"
+                  >
+                    {uploadingDoc ? (
+                      <>
+                        <span className="animate-spin mr-2">⏳</span>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload Document
+                      </>
+                    )}
+                  </Button>
+                  <input
+                    id="teacherDocInput"
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleDocumentUpload}
+                    className="hidden"
+                  />
+                </div>
+                {teacherDocuments.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm font-medium">Uploaded Documents:</p>
+                    {teacherDocuments.map((doc, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
+                        <span className="truncate flex-1">Document {index + 1}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeDocument(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center gap-2 mt-3">
+                  <input
+                    type="checkbox"
+                    id="skipVerification"
+                    checked={skipVerification}
+                    onChange={(e) => setSkipVerification(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="skipVerification" className="text-sm cursor-pointer">
+                    I'll upload documents later
+                  </Label>
+                </div>
+              </div>
+            </Card>
+          )}
 
           <div>
             <Label htmlFor="state">{t('gouvernorat')}</Label>
