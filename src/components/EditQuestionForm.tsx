@@ -18,6 +18,7 @@ type QuestionFormData = z.infer<typeof questionSchema>;
 
 interface EditQuestionFormProps {
   questionId: number;
+  chapterId: number;
   initialData: string;
   onSuccess: () => void;
   onCancel: () => void;
@@ -25,6 +26,7 @@ interface EditQuestionFormProps {
 
 export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({ 
   questionId,
+  chapterId,
   initialData,
   onSuccess, 
   onCancel 
@@ -133,6 +135,9 @@ export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
             onMediaUploaded={handleMediaUploaded}
             uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
             onRemoveMedia={removeMedia}
+            chapterId={chapterId}
+            contentType="question"
+            contentId={questionId}
           />
         </div>
 

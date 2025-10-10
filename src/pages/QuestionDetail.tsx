@@ -602,6 +602,7 @@ export default function QuestionDetail() {
                   </DialogHeader>
                   <EditQuestionForm
                     questionId={question.id}
+                    chapterId={question.chapter_id}
                     initialData={question.data}
                     onSuccess={async () => {
                       setIsEditDialogOpen(false);
