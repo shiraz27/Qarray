@@ -51,6 +51,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
   onCancel 
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -306,6 +307,9 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
             onMediaUploaded={handleMediaUploaded}
             uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
             onRemoveMedia={removeMedia}
+            chapterId={parseInt(form.watch('chapter_id')) || undefined}
+            contentType="resource"
+            onUploadStateChange={setIsUploading}
           />
         </div>
 
@@ -383,9 +387,9 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Add Resource
+          <Button type="submit" disabled={isSubmitting || isUploading}>
+            {(isSubmitting || isUploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isUploading ? 'Uploading...' : 'Add Resource'}
           </Button>
         </div>
       </form>

@@ -42,6 +42,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
   onCancel 
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const { isModerator, isAdmin } = useUserRole();
   
@@ -166,6 +167,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
             onRemoveMedia={removeMedia}
             chapterId={chapterId}
             contentType="resource"
+            onUploadStateChange={setIsUploading}
           />
         </div>
 
@@ -243,9 +245,9 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Add Resource
+          <Button type="submit" disabled={isSubmitting || isUploading}>
+            {(isSubmitting || isUploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isUploading ? 'Uploading...' : 'Add Resource'}
           </Button>
         </div>
       </form>

@@ -19,6 +19,7 @@ interface MediaUploaderProps {
   chapterId?: number;
   contentType?: 'question' | 'resource';
   contentId?: number;
+  onUploadStateChange?: (isUploading: boolean) => void;
 }
 
 export const MediaUploader: React.FC<MediaUploaderProps> = ({ 
@@ -28,7 +29,8 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   onRemoveMedia,
   chapterId,
   contentType,
-  contentId
+  contentId,
+  onUploadStateChange
 }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -49,6 +51,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
 
   const uploadToArchive = async (file: File, fileType: 'image' | 'audio' | 'pdf') => {
     setIsUploading(true);
+    onUploadStateChange?.(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -73,6 +76,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       toast.error('Failed to upload file');
     } finally {
       setIsUploading(false);
+      onUploadStateChange?.(false);
     }
   };
 
@@ -94,6 +98,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     } else {
       // Multiple files - upload all directly
       setIsUploading(true);
+      onUploadStateChange?.(true);
       try {
         for (let i = 0; i < files.length; i++) {
           await uploadToArchive(files[i], 'image');
@@ -103,6 +108,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
         toast.error('Failed to upload some images');
       } finally {
         setIsUploading(false);
+        onUploadStateChange?.(false);
       }
     }
     
@@ -130,6 +136,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     if (!files || files.length === 0) return;
     
     setIsUploading(true);
+    onUploadStateChange?.(true);
     
     try {
       // Process all PDF files directly without preview (since iframe doesn't support data URLs)
@@ -142,6 +149,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       toast.error('Failed to upload some PDF files');
     } finally {
       setIsUploading(false);
+      onUploadStateChange?.(false);
       // Reset input
       e.target.value = '';
     }

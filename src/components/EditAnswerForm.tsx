@@ -30,6 +30,7 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
   onCancel 
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   
   // Parse initial data to separate text from URLs
   const parseAnswerData = (data: string) => {
@@ -119,6 +120,7 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
             onMediaUploaded={handleMediaUploaded}
             uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
             onRemoveMedia={removeMedia}
+            onUploadStateChange={setIsUploading}
           />
         </div>
 
@@ -126,9 +128,9 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Update Answer
+          <Button type="submit" disabled={isSubmitting || isUploading}>
+            {(isSubmitting || isUploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isUploading ? 'Uploading...' : 'Update Answer'}
           </Button>
         </div>
       </form>

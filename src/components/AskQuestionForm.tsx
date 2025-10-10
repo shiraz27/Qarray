@@ -34,6 +34,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
   resourceId
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const { isModerator, isAdmin } = useUserRole();
   
@@ -147,6 +148,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
             onRemoveMedia={removeMedia}
             chapterId={chapterId}
             contentType="question"
+            onUploadStateChange={setIsUploading}
           />
         </div>
 
@@ -154,9 +156,9 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Submit Question
+          <Button type="submit" disabled={isSubmitting || isUploading}>
+            {(isSubmitting || isUploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isUploading ? 'Uploading...' : 'Submit Question'}
           </Button>
         </div>
       </form>

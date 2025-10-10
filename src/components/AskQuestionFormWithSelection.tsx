@@ -40,6 +40,7 @@ export const AskQuestionFormWithSelection: React.FC<AskQuestionFormWithSelection
   onCancel 
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -237,6 +238,9 @@ export const AskQuestionFormWithSelection: React.FC<AskQuestionFormWithSelection
             onMediaUploaded={handleMediaUploaded}
             uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
             onRemoveMedia={removeMedia}
+            chapterId={parseInt(form.watch('chapter_id')) || undefined}
+            contentType="question"
+            onUploadStateChange={setIsUploading}
           />
         </div>
 
@@ -244,9 +248,9 @@ export const AskQuestionFormWithSelection: React.FC<AskQuestionFormWithSelection
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Submit Question
+          <Button type="submit" disabled={isSubmitting || isUploading}>
+            {(isSubmitting || isUploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isUploading ? 'Uploading...' : 'Submit Question'}
           </Button>
         </div>
       </form>

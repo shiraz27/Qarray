@@ -48,6 +48,7 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
   onCancel 
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>(initialData.data);
   
   const form = useForm<ResourceFormData>({
@@ -163,6 +164,7 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
             onMediaUploaded={handleMediaUploaded}
             uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
             onRemoveMedia={removeMedia}
+            onUploadStateChange={setIsUploading}
           />
         </div>
 
@@ -240,9 +242,9 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Update Resource
+          <Button type="submit" disabled={isSubmitting || isUploading}>
+            {(isSubmitting || isUploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isUploading ? 'Uploading...' : 'Update Resource'}
           </Button>
         </div>
       </form>
