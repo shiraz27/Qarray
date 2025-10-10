@@ -429,7 +429,8 @@ export default function ResourceDetail() {
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1">
               <h2 className="text-xl font-bold text-foreground mb-2">{resource.title}</h2>
-              <p className="text-sm text-muted-foreground">{resource.description}</p>
+              <p className="text-sm text-muted-foreground mb-3">{resource.description}</p>
+              <MediaList data={resource.data.join('\n')} showText={true} />
             </div>
             {!resource.verified && (
               <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs flex-shrink-0">
@@ -559,11 +560,6 @@ export default function ResourceDetail() {
           )}
         </div>
       </Card>
-
-      {/* Files Section */}
-      <div className="flex-1 px-4 space-y-3">
-        <MediaList data={resource.data.join('\n')} showText={true} />
-      </div>
 
       {/* Questions Section */}
       <div className="px-4 py-6 border-t">
