@@ -1,1 +1,10 @@
 project_id = "xwqmdhnuthprzfbyoxlb"
+
+[functions.delete-user]
+verify_jwt = false
+
+[functions.upload-to-archive]
+verify_jwt = false
+
+[functions.check-flashcard-reviews]
+verify_jwt = false
