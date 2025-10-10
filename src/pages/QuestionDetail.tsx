@@ -349,6 +349,7 @@ export default function QuestionDetail() {
     setActiveTab(tab);
     if (tab === 'subjects') navigate('/');
     else if (tab === 'bookmarks') navigate('/bookmarks');
+    else if (tab === 'classmates') navigate('/classmates');
     else if (tab === 'profile') navigate('/profile');
   };
 
