@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, ThumbsUp, ThumbsDown, FileText, Palette } from 'lucide-react';
+import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, ThumbsUp, ThumbsDown, FileText, Palette, Upload, X, GraduationCap, Bell } from 'lucide-react';
 import { Session } from '@supabase/supabase-js';
 import { EditProfileDialog } from '@/components/EditProfileDialog';
 import { Card } from '@/components/ui/card';
@@ -22,7 +22,12 @@ export default function Profile() {
     class_id?: number;
     institute_id?: string;
     theme?: string;
+    user_type?: string;
+    teacher_verified?: boolean;
+    teacher_documents?: string[];
+    teacher_verification_status?: string;
   } | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [isDeleting, setIsDeleting] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -132,11 +137,101 @@ export default function Profile() {
   const fetchUserProfile = async (userId: string) => {
     const { data } = await supabase
       .from('profiles')
-      .select('full_name, avatar_color, phone_number, state_id, class_id, institute_id, theme')
+      .select('full_name, avatar_color, phone_number, state_id, class_id, institute_id, theme, user_type, teacher_verified, teacher_documents, teacher_verification_status')
       .eq('user_id', userId)
       .single();
     
     if (data) setUserProfile(data);
+  };
+
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      toast.error('Only PDF files are allowed');
+      return;
+    }
+
+    setUploadingDoc(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fileName', file.name);
+      formData.append('fileType', 'pdf');
+      formData.append('chapterId', '1');
+      formData.append('contentType', 'teacher-verification');
+
+      const { data, error } = await supabase.functions.invoke('upload-to-archive', {
+        body: formData,
+      });
+
+      if (error) throw error;
+
+      const updatedDocs = [...(userProfile?.teacher_documents || []), data.url];
+      
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          teacher_documents: updatedDocs,
+          teacher_verification_status: 'pending'
+        })
+        .eq('user_id', session?.user?.id);
+
+      if (updateError) throw updateError;
+
+      toast.success('Document uploaded successfully');
+      if (session) fetchUserProfile(session.user.id);
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload document');
+    } finally {
+      setUploadingDoc(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeDocument = async (index: number) => {
+    if (!session?.user?.id) return;
+    
+    const updatedDocs = userProfile?.teacher_documents?.filter((_, i) => i !== index) || [];
+    
+    const { error } = await supabase
+      .from('profiles')
+      .update({ teacher_documents: updatedDocs })
+      .eq('user_id', session.user.id);
+
+    if (error) {
+      toast.error('Failed to remove document');
+      return;
+    }
+
+    toast.success('Document removed');
+    fetchUserProfile(session.user.id);
+  };
+
+  const createTestNotification = async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: session.user.id,
+          type: 'flashcard_review',
+          title: 'Flashcards Due for Review (TEST)',
+          message: 'You have 5 flashcards due for review across 2 memorizations',
+          reference_type: 'flashcard',
+          reference_id: null
+        });
+
+      if (error) throw error;
+      
+      toast.success('Test notification created!');
+    } catch (error: any) {
+      console.error('Error creating test notification:', error);
+      toast.error('Failed to create test notification');
+    }
   };
 
   useEffect(() => {
@@ -275,6 +370,95 @@ export default function Profile() {
                 <p className="text-3xl font-bold">{stats.downvotes}</p>
               </div>
             </div>
+          </Card>
+
+          {/* Teacher Documents Card - Only show for teachers */}
+          {userProfile?.user_type === 'teacher' && (
+            <Card className="gamified-card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <GraduationCap className="w-5 h-5 text-primary" />
+                  Teacher Verification
+                </h3>
+                {userProfile.teacher_verified ? (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                    Verified
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
+                    {userProfile.teacher_verification_status || 'Pending'}
+                  </span>
+                )}
+              </div>
+              
+              <p className="text-sm text-muted-foreground mb-4">
+                Upload your teaching certification, degree, or professional ID to get verified
+              </p>
+
+              <Button
+                variant="outline"
+                onClick={() => document.getElementById('teacherDocInput')?.click()}
+                disabled={uploadingDoc}
+                className="w-full mb-4"
+              >
+                {uploadingDoc ? (
+                  <>
+                    <span className="animate-spin mr-2">⏳</span>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Document
+                  </>
+                )}
+              </Button>
+              <input
+                id="teacherDocInput"
+                type="file"
+                accept="application/pdf"
+                onChange={handleDocumentUpload}
+                className="hidden"
+              />
+
+              {userProfile.teacher_documents && userProfile.teacher_documents.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Uploaded Documents:</p>
+                  {userProfile.teacher_documents.map((doc, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <a 
+                        href={doc} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline flex-1 truncate"
+                      >
+                        Document {index + 1}
+                      </a>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeDocument(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Test Notifications Card - For development */}
+          <Card className="gamified-card p-6 space-y-3">
+            <h3 className="font-bold text-lg mb-4">Testing</h3>
+            <Button
+              variant="outline"
+              className="w-full justify-start hover-scale"
+              onClick={createTestNotification}
+            >
+              <Bell className="mr-2 h-4 w-4" />
+              Create Test Flashcard Notification
+            </Button>
           </Card>
 
           {/* Contact Card */}
