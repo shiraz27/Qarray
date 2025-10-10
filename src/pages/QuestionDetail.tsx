@@ -664,6 +664,7 @@ export default function QuestionDetail() {
               </DialogHeader>
               <AnswerQuestionForm
                 questionId={Number(id)}
+                chapterId={question.chapter_id}
                 onSuccess={async () => {
                   setIsAnswerDialogOpen(false);
                   // Refetch answers
@@ -790,6 +791,8 @@ export default function QuestionDetail() {
                         </DialogHeader>
                         <EditAnswerForm
                           answerId={answer.id}
+                          questionId={Number(id)}
+                          chapterId={question.chapter_id}
                           initialData={answer.data}
                           onSuccess={async () => {
                             setEditingAnswerId(null);

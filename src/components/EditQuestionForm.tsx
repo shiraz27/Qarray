@@ -138,7 +138,7 @@ export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
             onRemoveMedia={removeMedia}
             chapterId={chapterId}
             contentType="question"
-            contentId={questionId}
+            contentId={questionId.toString()}
             onUploadStateChange={setIsUploading}
           />
         </div>

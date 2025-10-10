@@ -489,6 +489,7 @@ export default function ResourceDetail() {
                   </DialogHeader>
                   <EditResourceForm
                     resourceId={resource.id}
+                    chapterId={resource.chapter_id!}
                     initialData={{
                       title: resource.title,
                       description: resource.description,

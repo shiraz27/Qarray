@@ -17,8 +17,8 @@ interface MediaUploaderProps {
   uploadedMedia?: Array<{ url: string; type: string; name: string }>;
   onRemoveMedia?: (index: number) => void;
   chapterId?: number;
-  contentType?: 'question' | 'resource';
-  contentId?: number;
+  contentType?: 'question' | 'resource' | 'answer';
+  contentId?: string;
   onUploadStateChange?: (isUploading: boolean) => void;
 }
 

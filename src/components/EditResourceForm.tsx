@@ -25,6 +25,7 @@ type ResourceFormData = z.infer<typeof resourceSchema>;
 
 interface EditResourceFormProps {
   resourceId: number;
+  chapterId: number;
   initialData: {
     title: string;
     description: string;
@@ -41,6 +42,7 @@ interface EditResourceFormProps {
 
 export const EditResourceForm: React.FC<EditResourceFormProps> = ({ 
   resourceId,
+  chapterId,
   initialData,
   resourceTypes,
   devoirTypes,
@@ -164,6 +166,9 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
             onMediaUploaded={handleMediaUploaded}
             uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
             onRemoveMedia={removeMedia}
+            chapterId={chapterId}
+            contentType="resource"
+            contentId={resourceId.toString()}
             onUploadStateChange={setIsUploading}
           />
         </div>
