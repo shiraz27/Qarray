@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bell, CheckCheck, MessageSquare, BookmarkPlus, FileText, X } from 'lucide-react';
+import { Bell, CheckCheck, MessageSquare, BookmarkPlus, FileText, X, Brain } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -117,7 +117,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
       case 'new_resource':
         return <FileText className="h-6 w-6" />;
       case 'flashcard_review':
-        return <Bell className="h-6 w-6" />;
+        return <Brain className="h-6 w-6" />;
       default:
         return <Bell className="h-6 w-6" />;
     }
@@ -139,10 +139,10 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
   };
 
   const groupedNotifications = {
-    flashcard_review: notifications.filter(n => n.type === 'flashcard_review'),
     answer_added: notifications.filter(n => n.type === 'answer_added'),
     bookmark_content: notifications.filter(n => n.type === 'bookmark_content'),
     new_resource: notifications.filter(n => n.type === 'new_resource'),
+    flashcard_review: notifications.filter(n => n.type === 'flashcard_review'),
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -185,23 +185,6 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
             </div>
           ) : (
             <div className="space-y-6">
-              {groupedNotifications.flashcard_review.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-muted-foreground px-2">
-                    Flashcard Reviews
-                  </h3>
-                  {groupedNotifications.flashcard_review.map((notification) => (
-                    <NotificationItem
-                      key={notification.id}
-                      notification={notification}
-                      onClick={() => handleNotificationClick(notification)}
-                      icon={getNotificationIcon(notification.type)}
-                      colorClass={getNotificationColor(notification.type)}
-                    />
-                  ))}
-                </div>
-              )}
-
               {groupedNotifications.answer_added.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-muted-foreground px-2">
@@ -242,6 +225,23 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
                     New Resources
                   </h3>
                   {groupedNotifications.new_resource.map((notification) => (
+                    <NotificationItem
+                      key={notification.id}
+                      notification={notification}
+                      onClick={() => handleNotificationClick(notification)}
+                      icon={getNotificationIcon(notification.type)}
+                      colorClass={getNotificationColor(notification.type)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {groupedNotifications.flashcard_review.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground px-2">
+                    Flashcard Reviews
+                  </h3>
+                  {groupedNotifications.flashcard_review.map((notification) => (
                     <NotificationItem
                       key={notification.id}
                       notification={notification}

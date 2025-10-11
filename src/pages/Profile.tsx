@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, ThumbsUp, ThumbsDown, FileText, Palette, Upload, X, GraduationCap, Bell, BookOpen } from 'lucide-react';
+import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, ThumbsUp, ThumbsDown, FileText, Palette, Upload, X, GraduationCap, Bell, BookOpen, Brain } from 'lucide-react';
 import { Session } from '@supabase/supabase-js';
 import { EditProfileDialog } from '@/components/EditProfileDialog';
 import { TutorialDialog } from '@/components/TutorialDialog';
@@ -238,6 +238,21 @@ export default function Profile() {
     }
   };
 
+  const triggerFlashcardCheck = async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      const { error } = await supabase.functions.invoke('check-flashcard-reviews');
+      
+      if (error) throw error;
+      
+      toast.success('Flashcard review check triggered!');
+    } catch (error: any) {
+      console.error('Error triggering flashcard check:', error);
+      toast.error('Failed to trigger flashcard check');
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -463,6 +478,14 @@ export default function Profile() {
               >
                 <Bell className="mr-2 h-4 w-4" />
                 Create Test Flashcard Notification
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start hover-scale"
+                onClick={triggerFlashcardCheck}
+              >
+                <Brain className="mr-2 h-4 w-4" />
+                Trigger Flashcard Review Check
               </Button>
             </Card>
           )}
