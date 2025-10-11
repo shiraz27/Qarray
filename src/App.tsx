@@ -18,6 +18,7 @@ import Moderation from "./pages/Moderation";
 import Statistics from "./pages/Statistics";
 import NotFound from "./pages/NotFound";
 import DeleteBookmark from "./pages/DeleteBookmark";
+import MemorizationDetail from "./pages/MemorizationDetail";
 import { useDataPreload } from "./hooks/useDataPreload";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const AppContent = () => {
       <Route path="/moderation" element={<Moderation />} />
       <Route path="/statistics" element={<Statistics />} />
       <Route path="/delete-bookmark" element={<DeleteBookmark />} />
+      <Route path="/memorization/:id" element={<MemorizationDetail />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>

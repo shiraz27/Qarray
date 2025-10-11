@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { MessageSquare, FileText, Bookmark, ArrowLeft } from "lucide-react";
+import { MessageSquare, FileText, Bookmark, ArrowLeft, Brain } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -14,7 +14,7 @@ import { extractMediaFromText } from "@/utils/mediaHelpers";
 
 interface BookmarkedItem {
   id: string;
-  type: 'chapter' | 'question' | 'answer' | 'resource';
+  type: 'chapter' | 'question' | 'answer' | 'resource' | 'memorization';
   title: string;
   description?: string;
   chapterName?: string;
@@ -212,6 +212,35 @@ export default function Bookmarks() {
                 actualId: resource.id
               });
             }
+          } else if (bookmark.content_type === 'memorization') {
+            const { data: memorization } = await supabase
+              .from("memorizations")
+              .select("id, title, description, subject_id")
+              .eq("id", bookmark.content_id)
+              .eq("deleted", false)
+              .maybeSingle();
+
+            if (memorization) {
+              let subjectName = "";
+              if (memorization.subject_id) {
+                const { data: subject } = await supabase
+                  .from("subjects")
+                  .select("name")
+                  .eq("id", memorization.subject_id)
+                  .maybeSingle();
+                subjectName = subject?.name || "";
+              }
+
+              items.push({
+                id: `memorization-${bookmark.id}`,
+                type: 'memorization',
+                title: memorization.title,
+                description: memorization.description || undefined,
+                subjectName,
+                created_at: bookmark.created_at,
+                actualId: memorization.id
+              });
+            }
           }
         }
 
@@ -251,11 +280,14 @@ export default function Bookmarks() {
       navigate(`/question/${item.actualId}`);
     } else if (item.type === 'resource') {
       navigate(`/resource/${item.actualId}`);
+    } else if (item.type === 'memorization') {
+      navigate(`/memorization/${item.actualId}`);
     }
   };
 
   const groupedItems = {
     chapters: bookmarkedItems.filter(item => item.type === 'chapter'),
+    memorizations: bookmarkedItems.filter(item => item.type === 'memorization'),
     questions: bookmarkedItems.filter(item => item.type === 'question'),
     answers: bookmarkedItems.filter(item => item.type === 'answer'),
     resources: bookmarkedItems.filter(item => item.type === 'resource'),
@@ -327,6 +359,19 @@ export default function Bookmarks() {
                 </h2>
                 <div className="space-y-3">
                   {groupedItems.chapters.map(renderBookmarkCard)}
+                </div>
+              </div>
+            )}
+
+            {/* Memorizations Section */}
+            {groupedItems.memorizations.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <Brain size={20} style={{ color: '#703627' }} />
+                  {t("memorizations") || "Memorizations"} ({groupedItems.memorizations.length})
+                </h2>
+                <div className="space-y-3">
+                  {groupedItems.memorizations.map(renderBookmarkCard)}
                 </div>
               </div>
             )}
