@@ -12,7 +12,7 @@ import { CheckCircle2, XCircle, BookOpen, MessageCircle, Brain, FileText, Extern
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Navigate, Link } from 'react-router-dom';
 
-type ContentType = 'questions' | 'answers' | 'resources' | 'memorizations' | 'teachers';
+type ContentType = 'questions' | 'answers' | 'resources' | 'memorizations' | 'teachers' | 'users';
 
 interface UnverifiedItem {
   id: number | string;
@@ -25,9 +25,12 @@ interface UnverifiedItem {
   subject_name?: string;
   chapter_name?: string;
   question_id?: number; // For answers
-  full_name?: string; // For teachers
+  full_name?: string; // For teachers and users
   teacher_documents?: string[]; // For teachers
-  user_id?: string; // For teachers
+  user_id?: string; // For teachers and users
+  tutorial_completed?: boolean; // For users
+  tutorial_step?: number; // For users
+  user_type?: string; // For users
 }
 
 export default function Moderation() {
@@ -292,6 +295,32 @@ export default function Moderation() {
             user_id: t.user_id,
           }));
           break;
+
+        case 'users':
+          const { data: users } = await supabase
+            .from('profiles')
+            .select(`
+              user_id,
+              full_name,
+              created_at,
+              tutorial_completed,
+              tutorial_step,
+              user_type
+            `)
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+          items = (users || []).map(u => ({
+            id: u.user_id as any,
+            type: 'users' as ContentType,
+            full_name: u.full_name,
+            created_at: u.created_at,
+            user_id: u.user_id,
+            tutorial_completed: u.tutorial_completed,
+            tutorial_step: u.tutorial_step,
+            user_type: u.user_type,
+          }));
+          break;
       }
 
       setItems(items);
@@ -436,7 +465,7 @@ export default function Moderation() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ContentType)}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="questions" className="gap-2">
               <MessageCircle className="w-4 h-4" />
               Questions
@@ -456,6 +485,10 @@ export default function Moderation() {
             <TabsTrigger value="teachers" className="gap-2">
               <GraduationCap className="w-4 h-4" />
               Teachers
+            </TabsTrigger>
+            <TabsTrigger value="users" className="gap-2">
+              <BookOpen className="w-4 h-4" />
+              Users
             </TabsTrigger>
           </TabsList>
 
@@ -500,6 +533,29 @@ export default function Moderation() {
                               </div>
                             )}
                           </>
+                        ) : item.type === 'users' ? (
+                          <>
+                            <h3 className="font-semibold text-lg flex items-center gap-2">
+                              {item.full_name}
+                            </h3>
+                            <div className="space-y-1">
+                              <p className="text-sm text-muted-foreground">
+                                User Type: <span className="font-medium">{item.user_type || 'student'}</span>
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Tutorial Status: {item.tutorial_completed ? (
+                                  <Badge className="ml-2 bg-green-500">Completed</Badge>
+                                ) : (
+                                  <Badge variant="outline" className="ml-2">
+                                    Step {item.tutorial_step || 0} of 4
+                                  </Badge>
+                                )}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Joined: {new Date(item.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </>
                         ) : (
                           <>
                             {item.title && (
@@ -527,7 +583,7 @@ export default function Moderation() {
                       </div>
 
                       <div className="flex gap-2">
-                        {item.type !== 'teachers' && (
+                        {item.type !== 'teachers' && item.type !== 'users' && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -540,24 +596,28 @@ export default function Moderation() {
                             </Link>
                           </Button>
                         )}
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="gap-2"
-                          onClick={() => handleVerify(item.id, item.type, true)}
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="gap-2"
-                          onClick={() => handleVerify(item.id, item.type, false)}
-                        >
-                          <XCircle className="w-4 h-4" />
-                          Reject
-                        </Button>
+                        {item.type !== 'users' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="gap-2"
+                              onClick={() => handleVerify(item.id, item.type, true)}
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="gap-2"
+                              onClick={() => handleVerify(item.id, item.type, false)}
+                            >
+                              <XCircle className="w-4 h-4" />
+                              Reject
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </Card>

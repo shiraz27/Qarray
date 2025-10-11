@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 
 interface Notification {
   id: string;
-  type: 'answer_added' | 'bookmark_content' | 'new_resource';
+  type: 'answer_added' | 'bookmark_content' | 'new_resource' | 'flashcard_review';
   title: string;
   message: string;
   reference_id: number | null;
@@ -102,6 +102,9 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
     } else if (notification.reference_type === 'resource' && notification.reference_id) {
       navigate(`/resource/${notification.reference_id}`);
       onClose();
+    } else if (notification.type === 'flashcard_review') {
+      navigate('/');
+      onClose();
     }
   };
 
@@ -113,6 +116,8 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
         return <BookmarkPlus className="h-6 w-6" />;
       case 'new_resource':
         return <FileText className="h-6 w-6" />;
+      case 'flashcard_review':
+        return <Bell className="h-6 w-6" />;
       default:
         return <Bell className="h-6 w-6" />;
     }
@@ -126,12 +131,15 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
         return 'bg-primary/10 text-primary dark:text-primary';
       case 'new_resource':
         return 'bg-green-500/10 text-green-600 dark:text-green-400';
+      case 'flashcard_review':
+        return 'bg-purple-500/10 text-purple-600 dark:text-purple-400';
       default:
         return 'bg-gray-500/10 text-gray-600 dark:text-gray-400';
     }
   };
 
   const groupedNotifications = {
+    flashcard_review: notifications.filter(n => n.type === 'flashcard_review'),
     answer_added: notifications.filter(n => n.type === 'answer_added'),
     bookmark_content: notifications.filter(n => n.type === 'bookmark_content'),
     new_resource: notifications.filter(n => n.type === 'new_resource'),
@@ -177,6 +185,23 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
             </div>
           ) : (
             <div className="space-y-6">
+              {groupedNotifications.flashcard_review.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground px-2">
+                    Flashcard Reviews
+                  </h3>
+                  {groupedNotifications.flashcard_review.map((notification) => (
+                    <NotificationItem
+                      key={notification.id}
+                      notification={notification}
+                      onClick={() => handleNotificationClick(notification)}
+                      icon={getNotificationIcon(notification.type)}
+                      colorClass={getNotificationColor(notification.type)}
+                    />
+                  ))}
+                </div>
+              )}
+
               {groupedNotifications.answer_added.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-muted-foreground px-2">
