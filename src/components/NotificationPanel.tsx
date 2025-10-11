@@ -254,7 +254,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
     <button
       onClick={onClick}
       className={cn(
-        "w-full text-left p-3 rounded-lg transition-colors hover:bg-accent",
+        "w-full text-left p-3 rounded-lg transition-all hover:shadow-md",
         !notification.read && "bg-accent/50"
       )}
     >

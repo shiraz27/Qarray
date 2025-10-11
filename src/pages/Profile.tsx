@@ -9,10 +9,12 @@ import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, Thumb
 import { Session } from '@supabase/supabase-js';
 import { EditProfileDialog } from '@/components/EditProfileDialog';
 import { Card } from '@/components/ui/card';
+import { useUserRole } from '@/hooks/useUserRole';
 
 export default function Profile() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { isModerator, isAdmin } = useUserRole();
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<{ 
     full_name: string; 
@@ -448,18 +450,20 @@ export default function Profile() {
             </Card>
           )}
 
-          {/* Test Notifications Card - For development */}
-          <Card className="gamified-card p-6 space-y-3">
-            <h3 className="font-bold text-lg mb-4">Testing</h3>
-            <Button
-              variant="outline"
-              className="w-full justify-start hover-scale"
-              onClick={createTestNotification}
-            >
-              <Bell className="mr-2 h-4 w-4" />
-              Create Test Flashcard Notification
-            </Button>
-          </Card>
+          {/* Test Notifications Card - For moderators only */}
+          {(isModerator || isAdmin) && (
+            <Card className="gamified-card p-6 space-y-3">
+              <h3 className="font-bold text-lg mb-4">Testing</h3>
+              <Button
+                variant="outline"
+                className="w-full justify-start hover-scale"
+                onClick={createTestNotification}
+              >
+                <Bell className="mr-2 h-4 w-4" />
+                Create Test Flashcard Notification
+              </Button>
+            </Card>
+          )}
 
           {/* Contact Card */}
           <Card className="gamified-card p-6 space-y-3">
