@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, ThumbsUp, ThumbsDown, FileText, Edit, Trash2, AlertCircle, Share2, Bookmark } from 'lucide-react';
+import { ArrowLeft, ThumbsUp, ThumbsDown, FileText, Edit, Trash2, AlertCircle, Share2, Bookmark, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { ContentSkeleton } from '@/components/LoadingSkeleton';
@@ -16,6 +16,7 @@ import { MediaList } from '@/components/MediaList';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
+import { EmptyState } from '@/components/EmptyState';
 
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -37,6 +38,20 @@ interface Resource {
   isBookmarked?: boolean;
 }
 
+interface Question {
+  id: number;
+  data: string;
+  type_id: number | null;
+  chapter_id: number;
+  created_at: string;
+  verified: boolean;
+  contributors: string[];
+  upvotes: number;
+  downvotes: number;
+  userVote: string | null;
+  answerCount: number;
+}
+
 export default function ResourceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -51,6 +66,7 @@ export default function ResourceDetail() {
   const [isAskQuestionDialogOpen, setIsAskQuestionDialogOpen] = useState(false);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
   const [devoirTypes, setDevoirTypes] = useState<Array<{ id: number; devoir_type: string }>>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const { isModerator } = useUserRole();
 
   useEffect(() => {
@@ -134,6 +150,60 @@ export default function ResourceDetail() {
         isBookmarked,
       });
 
+      // Fetch questions related to this resource
+      const { data: questionsData } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('resource_id', resourceId)
+        .eq('deleted', false)
+        .order('created_at', { ascending: false });
+
+      const questionsWithDetails = await Promise.all(
+        (questionsData || []).map(async (question) => {
+          const { count: upvotes } = await supabase
+            .from('votes')
+            .select('*', { count: 'exact', head: true })
+            .eq('content_id', question.id)
+            .eq('content_type', 'question')
+            .eq('vote_type', 'upvote');
+
+          const { count: downvotes } = await supabase
+            .from('votes')
+            .select('*', { count: 'exact', head: true })
+            .eq('content_id', question.id)
+            .eq('content_type', 'question')
+            .eq('vote_type', 'downvote');
+
+          const { count: answerCount } = await supabase
+            .from('answers')
+            .select('*', { count: 'exact', head: true })
+            .eq('question_id', question.id)
+            .eq('deleted', false);
+
+          let userVote = null;
+          if (user) {
+            const { data: voteData } = await supabase
+              .from('votes')
+              .select('vote_type')
+              .eq('content_id', question.id)
+              .eq('content_type', 'question')
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+            userVote = voteData?.vote_type || null;
+          }
+
+          return {
+            ...question,
+            upvotes: upvotes || 0,
+            downvotes: downvotes || 0,
+            userVote,
+            answerCount: answerCount || 0,
+          };
+        })
+      );
+
+      setQuestions(questionsWithDetails);
       setLoading(false);
     };
 
@@ -570,7 +640,7 @@ export default function ResourceDetail() {
       </Card>
 
       {/* Questions Section */}
-      <div className="px-4 py-6 border-t">
+      <div className="flex-1 px-4 py-6 border-t space-y-3">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Questions about this resource</h2>
           <Dialog open={isAskQuestionDialogOpen} onOpenChange={setIsAskQuestionDialogOpen}>
@@ -586,12 +656,66 @@ export default function ResourceDetail() {
                   chapterId={resource.chapter_id}
                   resourceId={resource.id}
                   resourceTypes={resourceTypes}
-                  onSuccess={() => {
+                  onSuccess={async () => {
                     setIsAskQuestionDialogOpen(false);
                     toast({
                       title: 'Success',
                       description: 'Question added successfully',
                     });
+                    // Refetch questions
+                    const { data: questionsData } = await supabase
+                      .from('questions')
+                      .select('*')
+                      .eq('resource_id', resource.id)
+                      .eq('deleted', false)
+                      .order('created_at', { ascending: false });
+
+                    const questionsWithDetails = await Promise.all(
+                      (questionsData || []).map(async (question) => {
+                        const { count: upvotes } = await supabase
+                          .from('votes')
+                          .select('*', { count: 'exact', head: true })
+                          .eq('content_id', question.id)
+                          .eq('content_type', 'question')
+                          .eq('vote_type', 'upvote');
+
+                        const { count: downvotes } = await supabase
+                          .from('votes')
+                          .select('*', { count: 'exact', head: true })
+                          .eq('content_id', question.id)
+                          .eq('content_type', 'question')
+                          .eq('vote_type', 'downvote');
+
+                        const { count: answerCount } = await supabase
+                          .from('answers')
+                          .select('*', { count: 'exact', head: true })
+                          .eq('question_id', question.id)
+                          .eq('deleted', false);
+
+                        let userVote = null;
+                        if (user) {
+                          const { data: voteData } = await supabase
+                            .from('votes')
+                            .select('vote_type')
+                            .eq('content_id', question.id)
+                            .eq('content_type', 'question')
+                            .eq('user_id', user.id)
+                            .maybeSingle();
+
+                          userVote = voteData?.vote_type || null;
+                        }
+
+                        return {
+                          ...question,
+                          upvotes: upvotes || 0,
+                          downvotes: downvotes || 0,
+                          userVote,
+                          answerCount: answerCount || 0,
+                        };
+                      })
+                    );
+
+                    setQuestions(questionsWithDetails);
                   }}
                   onCancel={() => setIsAskQuestionDialogOpen(false)}
                 />
@@ -599,6 +723,59 @@ export default function ResourceDetail() {
             </DialogContent>
           </Dialog>
         </div>
+        
+        {questions.length === 0 ? (
+          <EmptyState 
+            type="questions" 
+            message="No questions yet. Be the first to ask something about this resource!" 
+          />
+        ) : (
+          questions.map((question) => (
+            <Card 
+              key={question.id} 
+              className="p-4 space-y-3 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => navigate(`/question/${question.id}`)}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 space-y-2">
+                  <MediaList data={question.data} showText={true} />
+                </div>
+                {!question.verified && (
+                  <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs flex-shrink-0">
+                    <AlertCircle size={12} />
+                    <span>Unverified</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare size={16} className="text-muted-foreground" />
+                    <span className="text-sm font-medium">{question.answerCount} {t('answers') || 'Answers'}</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5">
+                    <ThumbsUp
+                      size={16}
+                      className={question.userVote === 'upvote' ? 'fill-green-600 text-green-600' : 'text-muted-foreground'}
+                    />
+                    <span className="text-sm font-medium">{question.upvotes}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <ThumbsDown
+                      size={16}
+                      className={question.userVote === 'downvote' ? 'fill-red-600 text-red-600' : 'text-muted-foreground'}
+                    />
+                    <span className="text-sm font-medium">{question.downvotes}</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
       </div>
 
       <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />

@@ -18,6 +18,7 @@ import { AnswerQuestionForm } from '@/components/AnswerQuestionForm';
 import { EditQuestionForm } from '@/components/EditQuestionForm';
 import { EditAnswerForm } from '@/components/EditAnswerForm';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
+import { EmptyState } from '@/components/EmptyState';
 
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -786,9 +787,10 @@ export default function QuestionDetail() {
           </Dialog>
         </div>
         {answers.length === 0 ? (
-          <Card className="p-8 text-center">
-            <p className="text-muted-foreground">No answers yet</p>
-          </Card>
+          <EmptyState 
+            type="questions" 
+            message="No answers yet. Be the first to share your knowledge!" 
+          />
         ) : (
           answers.map((answer) => (
             <Card key={answer.id} className="p-4 space-y-3">
