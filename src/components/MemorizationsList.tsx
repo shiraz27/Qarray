@@ -61,16 +61,7 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
       try {
         const { data: memData, error } = await supabase
           .from('memorizations')
-          .select(`
-            id,
-            title,
-            description,
-            is_public,
-            creator_id,
-            upvotes,
-            downvotes,
-            profiles!memorizations_creator_id_fkey(full_name)
-          `)
+          .select('id, title, description, is_public, creator_id, upvotes, downvotes')
           .eq('subject_id', subjectId)
           .eq('deleted', false)
           .order('upvotes', { ascending: false });
@@ -99,7 +90,7 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
           });
         }
 
-        // Get flashcard counts
+        // Get flashcard counts and creator profiles
         const memorizationsWithCounts = await Promise.all(
           (memData || []).map(async (mem) => {
             const { count } = await supabase
@@ -108,13 +99,19 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
               .eq('memorization_id', mem.id)
               .eq('deleted', false);
 
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('user_id', mem.creator_id)
+              .maybeSingle();
+
             return {
               id: mem.id,
               title: mem.title,
               description: mem.description,
               is_public: mem.is_public,
               flashcard_count: count || 0,
-              creator_name: (mem.profiles as any)?.full_name || 'Unknown',
+              creator_name: profile?.full_name || 'Unknown',
               creator_id: mem.creator_id,
               upvotes: mem.upvotes || 0,
               downvotes: mem.downvotes || 0,

@@ -152,48 +152,58 @@ export const MemorizationsModal = ({ open, onClose, subjectId, chapterId }: Memo
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl h-[90vh] p-0 gap-0">
           {/* Header */}
-          <div className="sticky top-0 z-10 bg-background border-b p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" onClick={onClose}>
-                  <ArrowLeft className="w-5 h-5" />
+          <div className="sticky top-0 z-10 bg-background border-b p-3 sm:p-4">
+            <div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                 </Button>
-                <div className="flex items-center gap-2">
-                  <Brain className="w-6 h-6 text-primary" />
-                  <h2 className="text-2xl font-bold">Memorizations</h2>
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                  <Brain className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0" />
+                  <h2 className="text-lg sm:text-2xl font-bold truncate">Memorizations</h2>
                 </div>
               </div>
-              <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
-                <Plus className="w-4 h-4" />
-                Create New
+              <Button 
+                onClick={() => setCreateDialogOpen(true)} 
+                className="gap-1.5 sm:gap-2 text-xs sm:text-sm shrink-0"
+                size="sm"
+              >
+                <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden xs:inline">Create New</span>
+                <span className="xs:hidden">New</span>
               </Button>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 mb-4">
+            <div className="flex gap-1.5 sm:gap-2 mb-3 sm:mb-4">
               <Button
                 variant={activeTab === 'mine' ? 'default' : 'outline'}
                 onClick={() => setActiveTab('mine')}
-                className="flex-1"
+                className="flex-1 text-xs sm:text-sm px-2 sm:px-4"
+                size="sm"
               >
-                <BookOpen className="w-4 h-4 mr-2" />
-                My Sets
+                <BookOpen className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">My Sets</span>
+                <span className="sm:hidden ml-1">Mine</span>
               </Button>
               <Button
                 variant={activeTab === 'subscribed' ? 'default' : 'outline'}
                 onClick={() => setActiveTab('subscribed')}
-                className="flex-1"
+                className="flex-1 text-xs sm:text-sm px-2 sm:px-4"
+                size="sm"
               >
-                <Users className="w-4 h-4 mr-2" />
-                Subscribed
+                <Users className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Subscribed</span>
+                <span className="sm:hidden ml-1">Subs</span>
               </Button>
               <Button
                 variant={activeTab === 'public' ? 'default' : 'outline'}
                 onClick={() => setActiveTab('public')}
-                className="flex-1"
+                className="flex-1 text-xs sm:text-sm px-2 sm:px-4"
+                size="sm"
               >
-                <Brain className="w-4 h-4 mr-2" />
-                Public
+                <Brain className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="ml-1">Public</span>
               </Button>
             </div>
 
@@ -269,33 +279,35 @@ const MemorizationCard = ({ memorization, onStudy, onSubscribe, onRefresh }: Mem
   const isOwner = user?.id === memorization.creator_id;
 
   return (
-    <Card className="p-4 hover:shadow-lg transition-all">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
-          <h3 className="font-bold text-lg mb-1">{memorization.title}</h3>
+    <Card className="p-3 sm:p-4 hover:shadow-lg transition-all">
+      <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold text-base sm:text-lg mb-1 break-words">{memorization.title}</h3>
           {memorization.description && (
-            <p className="text-sm text-muted-foreground mb-2">{memorization.description}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">{memorization.description}</p>
           )}
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
             <span>{memorization.flashcards_count || 0} cards</span>
             {dueReviews > 0 && (
-              <span className="text-primary font-medium">{dueReviews} due for review</span>
+              <span className="text-primary font-medium">{dueReviews} due</span>
             )}
             {!isOwner && memorization.profiles && (
-              <span>by {memorization.profiles.full_name}</span>
+              <span className="truncate">by {memorization.profiles.full_name}</span>
             )}
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <Button onClick={onStudy} className="gap-2">
-            <Play className="w-4 h-4" />
-            Study
+        <div className="flex gap-2 shrink-0 sm:flex-col sm:w-auto w-full">
+          <Button onClick={onStudy} className="gap-1.5 sm:gap-2 flex-1 sm:flex-initial text-xs sm:text-sm" size="sm">
+            <Play className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span>Study</span>
           </Button>
           {!isOwner && (
             <Button
               variant={memorization.is_subscribed ? 'secondary' : 'outline'}
               onClick={() => onSubscribe(memorization.id, memorization.is_subscribed || false)}
+              className="flex-1 sm:flex-initial text-xs sm:text-sm whitespace-nowrap"
+              size="sm"
             >
               {memorization.is_subscribed ? 'Subscribed' : 'Subscribe'}
             </Button>
