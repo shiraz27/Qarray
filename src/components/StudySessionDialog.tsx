@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import { calculateNextReview } from '@/hooks/useSpacedRepetition';
 import { MediaPreview } from './MediaPreview';
@@ -28,6 +29,7 @@ interface FlashcardReview {
 }
 
 export const StudySessionDialog = ({ memorizationId, onClose }: StudySessionDialogProps) => {
+  const { t } = useTranslation();
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showBack, setShowBack] = useState(false);
@@ -125,7 +127,7 @@ export const StudySessionDialog = ({ memorizationId, onClose }: StudySessionDial
         setShowBack(false);
       } else {
         // Session complete
-        toast.success(`Session complete! ${sessionStats.correct + (quality >= 3 ? 1 : 0)} correct, ${sessionStats.incorrect + (quality < 3 ? 1 : 0)} to review`);
+        toast.success(`${t('sessionComplete')} ${sessionStats.correct + (quality >= 3 ? 1 : 0)} ${t('correct')}, ${sessionStats.incorrect + (quality < 3 ? 1 : 0)} ${t('toReview')}`);
         onClose();
       }
     } catch (error: any) {
@@ -140,7 +142,7 @@ export const StudySessionDialog = ({ memorizationId, onClose }: StudySessionDial
     return (
       <Dialog open onOpenChange={onClose}>
         <DialogContent className="max-w-2xl">
-          <div className="text-center py-12">Loading flashcards...</div>
+          <div className="text-center py-12 text-sm">{t('loadingFlashcards')}</div>
         </DialogContent>
       </Dialog>
     );
@@ -151,8 +153,8 @@ export const StudySessionDialog = ({ memorizationId, onClose }: StudySessionDial
       <Dialog open onOpenChange={onClose}>
         <DialogContent className="max-w-2xl">
           <div className="text-center py-12">
-            <p className="text-muted-foreground mb-4">No flashcards available</p>
-            <Button onClick={onClose}>Close</Button>
+            <p className="text-sm text-muted-foreground mb-4">{t('noFlashcardsAvailable')}</p>
+            <Button onClick={onClose}>{t('close')}</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -166,31 +168,31 @@ export const StudySessionDialog = ({ memorizationId, onClose }: StudySessionDial
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-2xl h-[90vh] flex flex-col p-0">
         {/* Header */}
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between mb-3">
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <ArrowLeft className="w-5 h-5" />
+        <div className="p-3 sm:p-4 border-b">
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 sm:h-10 sm:w-10">
+              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-xs sm:text-sm text-muted-foreground">
               Card {currentIndex + 1} of {flashcards.length}
             </div>
           </div>
-          <div className="w-full bg-muted rounded-full h-2">
+          <div className="w-full bg-muted rounded-full h-1.5 sm:h-2">
             <div
-              className="bg-gradient-to-r from-pink-500 to-primary h-2 rounded-full transition-all"
+              className="bg-gradient-to-r from-pink-500 to-primary h-1.5 sm:h-2 rounded-full transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
 
         {/* Card Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <Card className="p-6 min-h-[300px] flex flex-col justify-center items-center text-center">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6">
+          <Card className="p-4 sm:p-6 min-h-[250px] sm:min-h-[300px] flex flex-col justify-center items-center text-center">
             {!showBack ? (
-              <div className="space-y-4 w-full">
-                <h3 className="text-xl font-bold text-muted-foreground mb-4">Front</h3>
+              <div className="space-y-3 sm:space-y-4 w-full">
+                <h3 className="text-lg sm:text-xl font-bold text-muted-foreground mb-3 sm:mb-4">{t('front')}</h3>
                 {currentCard.front_data.text && (
-                  <p className="text-lg whitespace-pre-wrap">{currentCard.front_data.text}</p>
+                  <p className="text-sm sm:text-lg whitespace-pre-wrap">{currentCard.front_data.text}</p>
                 )}
                 {currentCard.front_data.media && currentCard.front_data.media.length > 0 && (
                   <div className="flex flex-wrap gap-2 justify-center">
@@ -201,10 +203,10 @@ export const StudySessionDialog = ({ memorizationId, onClose }: StudySessionDial
                 )}
               </div>
             ) : (
-              <div className="space-y-4 w-full">
-                <h3 className="text-xl font-bold text-primary mb-4">Back</h3>
+              <div className="space-y-3 sm:space-y-4 w-full">
+                <h3 className="text-lg sm:text-xl font-bold text-primary mb-3 sm:mb-4">{t('back')}</h3>
                 {currentCard.back_data.text && (
-                  <p className="text-lg whitespace-pre-wrap">{currentCard.back_data.text}</p>
+                  <p className="text-sm sm:text-lg whitespace-pre-wrap">{currentCard.back_data.text}</p>
                 )}
                 {currentCard.back_data.media && currentCard.back_data.media.length > 0 && (
                   <div className="flex flex-wrap gap-2 justify-center">
@@ -219,52 +221,52 @@ export const StudySessionDialog = ({ memorizationId, onClose }: StudySessionDial
         </div>
 
         {/* Actions */}
-        <div className="border-t p-4">
+        <div className="border-t p-3 sm:p-4">
           {!showBack ? (
             <Button
               onClick={() => setShowBack(true)}
-              className="w-full gap-2"
+              className="w-full gap-1.5 sm:gap-2 text-sm sm:text-base"
               size="lg"
             >
-              <Eye className="w-5 h-5" />
-              Show Answer
+              <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
+              {t('showAnswer')}
             </Button>
           ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-center text-muted-foreground mb-2">How well did you know this?</p>
-              <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2 sm:space-y-3">
+              <p className="text-xs sm:text-sm text-center text-muted-foreground mb-2">{t('howWellKnow')}</p>
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 <Button
                   onClick={() => handleRating(1)}
                   disabled={studying}
                   variant="destructive"
-                  className="gap-2"
+                  className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10"
                 >
-                  <XCircle className="w-5 h-5" />
-                  Again
+                  <XCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                  {t('again')}
                 </Button>
                 <Button
                   onClick={() => handleRating(3)}
                   disabled={studying}
                   variant="outline"
-                  className="gap-2"
+                  className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10"
                 >
-                  Hard
+                  {t('hard')}
                 </Button>
                 <Button
                   onClick={() => handleRating(4)}
                   disabled={studying}
                   variant="outline"
-                  className="gap-2"
+                  className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10"
                 >
-                  Good
+                  {t('good')}
                 </Button>
                 <Button
                   onClick={() => handleRating(5)}
                   disabled={studying}
-                  className="gap-2 bg-gradient-to-r from-green-500 to-emerald-500"
+                  className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10 bg-gradient-to-r from-green-500 to-emerald-500"
                 >
-                  <CheckCircle className="w-5 h-5" />
-                  Easy
+                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                  {t('easy')}
                 </Button>
               </div>
             </div>

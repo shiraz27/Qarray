@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, X, FileText, HelpCircle, MessageSquare, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,6 +37,7 @@ interface SearchResult {
 }
 
 export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -308,25 +310,25 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Search className="w-5 h-5" />
-            Global Search
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Search className="w-4 h-4 sm:w-5 sm:h-5" />
+            {t('globalSearch')}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Search across chapters, resources, questions, and answers
+            {t('searchPlaceholder')}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search chapters, resources, questions, answers..."
-              className="pl-10"
+              placeholder={t('searchPlaceholder')}
+              className="pl-10 text-sm"
               autoFocus
             />
           </div>
@@ -336,50 +338,55 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
               size="sm"
               variant={filter === 'all' ? 'default' : 'outline'}
               onClick={() => setFilter('all')}
+              className="text-xs sm:text-sm"
             >
-              All
+              {t('all')}
             </Button>
             <Button
               size="sm"
               variant={filter === 'chapters' ? 'default' : 'outline'}
               onClick={() => setFilter('chapters')}
+              className="text-xs sm:text-sm"
             >
-              Chapters
+              {t('chapter')}s
             </Button>
             <Button
               size="sm"
               variant={filter === 'resources' ? 'default' : 'outline'}
               onClick={() => setFilter('resources')}
+              className="text-xs sm:text-sm"
             >
-              Resources
+              {t('resources')}
             </Button>
             <Button
               size="sm"
               variant={filter === 'questions' ? 'default' : 'outline'}
               onClick={() => setFilter('questions')}
+              className="text-xs sm:text-sm"
             >
-              Questions
+              {t('questions')}
             </Button>
             <Button
               size="sm"
               variant={filter === 'answers' ? 'default' : 'outline'}
               onClick={() => setFilter('answers')}
+              className="text-xs sm:text-sm"
             >
-              Answers
+              {t('answers')}
             </Button>
           </div>
 
           {/* Additional Filters */}
-          <div className="space-y-3 p-3 border rounded-lg bg-muted/20">
-            <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2 sm:space-y-3 p-2 sm:p-3 border rounded-lg bg-muted/20">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
               <div>
-                <Label className="text-xs">Subject</Label>
+                <Label className="text-xs">{t('selectSubject')}</Label>
                 <Select value={subjectFilter} onValueChange={setSubjectFilter}>
                   <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="All subjects" />
+                    <SelectValue placeholder={t('allSubjects')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All subjects</SelectItem>
+                    <SelectItem value="all">{t('allSubjects')}</SelectItem>
                     {subjects.map((subject) => (
                       <SelectItem key={subject.id} value={subject.id.toString()}>
                         {subject.name}
@@ -390,17 +397,17 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
               </div>
 
               <div>
-                <Label className="text-xs">Chapter</Label>
+                <Label className="text-xs">{t('chapter')}</Label>
                 <Select 
                   value={chapterFilter} 
                   onValueChange={setChapterFilter}
                   disabled={subjectFilter === 'all'}
                 >
                   <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder={subjectFilter === 'all' ? 'Select subject first' : 'All chapters'} />
+                    <SelectValue placeholder={subjectFilter === 'all' ? t('selectSubjectFirst') : t('allChapters')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All chapters</SelectItem>
+                    <SelectItem value="all">{t('allChapters')}</SelectItem>
                     {chapters.map((chapter) => (
                       <SelectItem key={chapter.id} value={chapter.id.toString()}>
                         {chapter.name}
@@ -412,10 +419,10 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs">Resource Types</Label>
-              <div className="flex flex-wrap gap-3">
+              <Label className="text-xs">{t('resourceTypes')}</Label>
+              <div className="flex flex-wrap gap-2 sm:gap-3">
                 {resourceTypes.map((type) => (
-                  <div key={type.id} className="flex items-center space-x-2">
+                  <div key={type.id} className="flex items-center space-x-1.5">
                     <Checkbox
                       id={`type-${type.id}`}
                       checked={resourceTypeFilters[type.id] || false}
@@ -438,50 +445,54 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
                 onCheckedChange={(checked) => setWithCorrectionOnly(!!checked)}
               />
               <label htmlFor="withCorrection" className="text-xs cursor-pointer">
-                With correction only
+                {t('withCorrectionOnly')}
               </label>
             </div>
           </div>
 
-          <ScrollArea className="h-[400px]">
+          <ScrollArea className="h-[300px] sm:h-[400px]">
             {loading ? (
-              <div className="text-center py-8 text-muted-foreground">Searching...</div>
+              <div className="text-center py-8 text-sm text-muted-foreground">{t('searching')}</div>
             ) : results.length === 0 && query.length >= 2 ? (
-              <div className="text-center py-8 text-muted-foreground">No results found</div>
+              <div className="text-center py-8 text-sm text-muted-foreground">{t('noResults')}</div>
             ) : (
               <div className="space-y-2">
                 {results.map((result) => (
                   <button
                     key={`${result.type}-${result.id}`}
                     onClick={() => handleResultClick(result)}
-                    className="w-full p-4 text-left rounded-lg border-2 hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all"
+                    className="w-full p-3 sm:p-4 text-left rounded-lg border-2 hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all"
                   >
-                    <div className="flex items-start gap-3 overflow-hidden">
-                      <div className="mt-1 flex-shrink-0">{getIcon(result.type)}</div>
+                    <div className="flex items-start gap-2 sm:gap-3 overflow-hidden">
+                      <div className="mt-1 flex-shrink-0">
+                        <div className="w-4 h-4 sm:w-5 sm:h-5">
+                          {getIcon(result.type)}
+                        </div>
+                      </div>
                       <div className="flex-1 min-w-0 overflow-hidden">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <Badge variant="secondary" className="text-xs">
+                        <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
+                          <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 py-0.5">
                             {result.type}
                           </Badge>
                           {result.subjectName && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0.5">
                               {result.subjectName}
                             </Badge>
                           )}
                           {result.resourceType && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0.5">
                               {result.resourceType}
                             </Badge>
                           )}
                           {result.hasCorrection && (
-                            <Badge className="text-xs bg-green-100 text-green-700">
-                              With correction
+                            <Badge className="text-[10px] sm:text-xs px-1.5 py-0.5 bg-green-100 text-green-700">
+                              {t('withCorrection')}
                             </Badge>
                           )}
                         </div>
-                        <p className="font-medium truncate">{result.title}</p>
+                        <p className="font-medium text-sm sm:text-base truncate">{result.title}</p>
                         {result.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1 break-words">
+                          <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mt-1 break-words">
                             {result.description}
                           </p>
                         )}

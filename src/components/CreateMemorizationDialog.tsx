@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2 } from 'lucide-react';
 import { FlashcardEditor } from './FlashcardEditor';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -31,6 +32,7 @@ export const CreateMemorizationDialog = ({
   subjectId,
   chapterId,
 }: CreateMemorizationDialogProps) => {
+  const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [flashcards, setFlashcards] = useState<Flashcard[]>([
@@ -153,28 +155,28 @@ export const CreateMemorizationDialog = ({
 
   const handleSubmit = async () => {
     if (!title.trim()) {
-      toast.error('Please enter a title');
+      toast.error(t('enterTitle'));
       return;
     }
 
     if (!subjectId && !selectedSubjectId) {
-      toast.error('Please select a subject');
+      toast.error(t('selectASubject'));
       return;
     }
 
     if (flashcards.length === 0) {
-      toast.error('Please add at least one flashcard');
+      toast.error(t('atLeastOneFlashcard'));
       return;
     }
 
     // Validate flashcards
     for (const card of flashcards) {
       if (!card.front_data?.text && (!card.front_data?.media || card.front_data.media.length === 0)) {
-        toast.error('Each flashcard must have content on the front side');
+        toast.error(t('flashcardFrontRequired'));
         return;
       }
       if (!card.back_data?.text && (!card.back_data?.media || card.back_data.media.length === 0)) {
-        toast.error('Each flashcard must have content on the back side');
+        toast.error(t('flashcardBackRequired'));
         return;
       }
     }
@@ -221,7 +223,7 @@ export const CreateMemorizationDialog = ({
         .from('memorization_subscriptions')
         .insert({ user_id: user.id, memorization_id: memorization.id });
 
-      toast.success('Memorization created successfully!');
+      toast.success(t('memorizationCreated'));
       onClose();
       setTitle('');
       setDescription('');
@@ -239,11 +241,11 @@ export const CreateMemorizationDialog = ({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
-        <DialogHeader className="p-6 pb-4 border-b">
-          <DialogTitle>Create Memorization</DialogTitle>
+        <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b">
+          <DialogTitle className="text-base sm:text-lg">{t('createMemorization')}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Basic Info */}
           <div className="space-y-4">
             {/* Always show class */}
@@ -259,7 +261,7 @@ export const CreateMemorizationDialog = ({
             {/* Show subject selector if no subjectId provided */}
             {!subjectId && subjects.length > 0 && (
               <div>
-                <Label htmlFor="subject">Subject *</Label>
+                <Label htmlFor="subject" className="text-sm">{t('selectSubject')} *</Label>
                 <Select
                   value={selectedSubjectId?.toString()}
                   onValueChange={(value) => {
@@ -267,8 +269,8 @@ export const CreateMemorizationDialog = ({
                     setSelectedChapterId(null);
                   }}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a subject" />
+                  <SelectTrigger className="text-sm">
+                    <SelectValue placeholder={t('selectSubject')} />
                   </SelectTrigger>
                   <SelectContent>
                     {subjects.map((subject) => (
@@ -294,13 +296,13 @@ export const CreateMemorizationDialog = ({
             {/* Show chapter selector if chapters available */}
             {chapters.length > 0 && !chapterId && (
               <div>
-                <Label htmlFor="chapter">Chapter (Optional)</Label>
+                <Label htmlFor="chapter" className="text-sm">{t('chapter')} ({t('optional')})</Label>
                 <Select
                   value={selectedChapterId?.toString()}
                   onValueChange={(value) => setSelectedChapterId(value ? parseInt(value) : null)}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a chapter" />
+                  <SelectTrigger className="text-sm">
+                    <SelectValue placeholder={t('selectAChapter')} />
                   </SelectTrigger>
                   <SelectContent>
                     {chapters.map((chapter) => (
@@ -314,23 +316,25 @@ export const CreateMemorizationDialog = ({
             )}
 
             <div>
-              <Label htmlFor="title">Title *</Label>
+              <Label htmlFor="title" className="text-sm">{t('title')} *</Label>
               <Input
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., Biology Chapter 5 Terms"
+                className="text-sm"
               />
             </div>
 
             <div>
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description" className="text-sm">{t('description')}</Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Brief description of this memorization set..."
+                placeholder={t('briefDescription')}
                 rows={2}
+                className="text-sm"
               />
             </div>
 
@@ -338,45 +342,45 @@ export const CreateMemorizationDialog = ({
           </div>
 
           {/* Flashcards */}
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <div className="flex items-center justify-between">
-              <Label className="text-lg font-semibold">Flashcards ({flashcards.length})</Label>
-              <Button onClick={handleAddFlashcard} size="sm" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Add Card
+              <Label className="text-base sm:text-lg font-semibold">{t('flashcards')} ({flashcards.length})</Label>
+              <Button onClick={handleAddFlashcard} size="sm" className="gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                {t('addCard')}
               </Button>
             </div>
 
             {flashcards.map((card, index) => (
-              <div key={index} className="border rounded-lg p-4 space-y-3">
+              <div key={index} className="border rounded-lg p-3 sm:p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">Card {index + 1}</span>
+                  <span className="font-medium text-sm sm:text-base">Card {index + 1}</span>
                   {flashcards.length > 1 && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRemoveFlashcard(index)}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                     </Button>
                   )}
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                   <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">Front</Label>
+                    <Label className="text-xs sm:text-sm text-muted-foreground mb-2 block">{t('front')}</Label>
                     <FlashcardEditor
                       data={card.front_data}
                       onChange={(data) => handleUpdateFlashcard(index, 'front', data)}
-                      placeholder="Enter front content..."
+                      placeholder={t('enterFrontContent')}
                     />
                   </div>
                   <div>
-                    <Label className="text-sm text-muted-foreground mb-2 block">Back</Label>
+                    <Label className="text-xs sm:text-sm text-muted-foreground mb-2 block">{t('back')}</Label>
                     <FlashcardEditor
                       data={card.back_data}
                       onChange={(data) => handleUpdateFlashcard(index, 'back', data)}
-                      placeholder="Enter back content..."
+                      placeholder={t('enterBackContent')}
                     />
                   </div>
                 </div>
@@ -385,12 +389,12 @@ export const CreateMemorizationDialog = ({
           </div>
         </div>
 
-        <div className="border-t p-6 flex justify-end gap-3">
-          <Button variant="outline" onClick={onClose} disabled={loading}>
-            Cancel
+        <div className="border-t p-4 sm:p-6 flex justify-end gap-2 sm:gap-3">
+          <Button variant="outline" onClick={onClose} disabled={loading} className="text-xs sm:text-sm">
+            {t('cancel')}
           </Button>
-          <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Creating...' : 'Create Memorization'}
+          <Button onClick={handleSubmit} disabled={loading} className="text-xs sm:text-sm">
+            {loading ? t('creating') : t('createMemorization')}
           </Button>
         </div>
       </DialogContent>
