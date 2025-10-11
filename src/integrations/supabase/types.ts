@@ -453,6 +453,8 @@ export type Database = {
           teacher_verification_status: string | null
           teacher_verified: boolean | null
           theme: string
+          tutorial_completed: boolean | null
+          tutorial_step: number | null
           updated_at: string | null
           user_id: string | null
           user_type: Database["public"]["Enums"]["user_type"] | null
@@ -474,6 +476,8 @@ export type Database = {
           teacher_verification_status?: string | null
           teacher_verified?: boolean | null
           theme?: string
+          tutorial_completed?: boolean | null
+          tutorial_step?: number | null
           updated_at?: string | null
           user_id?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
@@ -495,6 +499,8 @@ export type Database = {
           teacher_verification_status?: string | null
           teacher_verified?: boolean | null
           theme?: string
+          tutorial_completed?: boolean | null
+          tutorial_step?: number | null
           updated_at?: string | null
           user_id?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null

@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, ThumbsUp, ThumbsDown, FileText, Palette, Upload, X, GraduationCap, Bell } from 'lucide-react';
+import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, ThumbsUp, ThumbsDown, FileText, Palette, Upload, X, GraduationCap, Bell, BookOpen } from 'lucide-react';
 import { Session } from '@supabase/supabase-js';
 import { EditProfileDialog } from '@/components/EditProfileDialog';
+import { TutorialDialog } from '@/components/TutorialDialog';
 import { Card } from '@/components/ui/card';
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -16,7 +17,8 @@ export default function Profile() {
   const { t } = useTranslation();
   const { isModerator, isAdmin } = useUserRole();
   const [session, setSession] = useState<Session | null>(null);
-  const [userProfile, setUserProfile] = useState<{ 
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<{
     full_name: string; 
     avatar_color?: string;
     phone_number?: string;
@@ -467,7 +469,15 @@ export default function Profile() {
 
           {/* Contact Card */}
           <Card className="gamified-card p-6 space-y-3">
-            <h3 className="font-bold text-lg mb-4">Contact & Support</h3>
+            <h3 className="font-bold text-lg mb-4">Tutorial & Support</h3>
+            <Button
+              variant="outline"
+              className="w-full justify-start hover-scale"
+              onClick={() => setTutorialOpen(true)}
+            >
+              <BookOpen className="mr-2 h-4 w-4" />
+              {t('viewTutorial') || 'View Tutorial'}
+            </Button>
             <Button
               variant="outline"
               className="w-full justify-start hover-scale"
@@ -529,6 +539,7 @@ export default function Profile() {
         }}
       />
 
+      <TutorialDialog open={tutorialOpen} onClose={() => setTutorialOpen(false)} />
       <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
     </div>
   );

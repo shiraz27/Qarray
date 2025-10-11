@@ -292,11 +292,10 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
     return user && (mem.creator_id === user.id || isModerator || isAdmin);
   };
 
-  if (!subjectId || loading) return null;
-
-  if (memorizations.length === 0) return null;
+  if (!subjectId) return null;
 
   const displayedMems = isExpanded ? memorizations : memorizations.slice(0, 3);
+  const hasMemorizations = memorizations.length > 0;
 
   return (
     <>
@@ -306,7 +305,7 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
             <Brain className="w-5 h-5" style={{ color: '#703627' }} />
             Memorization Sets
           </h3>
-          {memorizations.length > 3 && (
+          {hasMemorizations && (
             <Button
               variant="ghost"
               size="sm"
@@ -327,7 +326,16 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
             </Button>
           )}
         </div>
-        <div className="space-y-3">
+        
+        {loading ? (
+          <div className="text-center py-4 text-muted-foreground">Loading...</div>
+        ) : !hasMemorizations ? (
+          <Card className="p-8 text-center">
+            <Brain className="w-12 h-12 mx-auto mb-3 text-muted-foreground" style={{ color: '#703627', opacity: 0.5 }} />
+            <p className="text-muted-foreground">No memorization sets yet for this subject</p>
+          </Card>
+        ) : (
+          <div className="space-y-3">
           {displayedMems.map((mem) => (
             <Card
               key={mem.id}
@@ -429,8 +437,9 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
                 </div>
               </div>
             </Card>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {editingId && (

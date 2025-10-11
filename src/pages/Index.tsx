@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import qarayLogo from '@/assets/qarray-logo-new.png';
 import educationPattern from '@/assets/education-pattern.png';
+import { TutorialDialog } from '@/components/TutorialDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,7 @@ const Index: React.FC = () => {
   const [userProfile, setUserProfile] = useState<{ full_name: string; class_id: number } | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
 
    const handleTabChange = (tab: string) => {
     if (tab === 'bookmarks') {
@@ -117,7 +119,7 @@ const Index: React.FC = () => {
           setTimeout(async () => {
             const { data: profile } = await supabase
               .from('profiles')
-              .select('phone_number, state_id, class_id, full_name')
+              .select('phone_number, state_id, class_id, full_name, user_type, tutorial_completed, tutorial_step')
               .eq('user_id', session.user.id)
               .single();
             
@@ -125,6 +127,11 @@ const Index: React.FC = () => {
               navigate('/complete-profile');
             } else {
               setUserProfile({ full_name: profile.full_name, class_id: profile.class_id });
+              
+              // Show tutorial for students who haven't completed it
+              if (profile.user_type === 'student' && !profile.tutorial_completed) {
+                setTutorialOpen(true);
+              }
             }
           }, 0);
         }
@@ -141,7 +148,7 @@ const Index: React.FC = () => {
         setTimeout(async () => {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('phone_number, state_id, class_id, full_name')
+            .select('phone_number, state_id, class_id, full_name, user_type, tutorial_completed, tutorial_step')
             .eq('user_id', session.user.id)
             .single();
           
@@ -149,6 +156,11 @@ const Index: React.FC = () => {
             navigate('/complete-profile');
           } else {
             setUserProfile({ full_name: profile.full_name, class_id: profile.class_id });
+            
+            // Show tutorial for students who haven't completed it
+            if (profile.user_type === 'student' && !profile.tutorial_completed) {
+              setTutorialOpen(true);
+            }
           }
         }, 0);
       }
@@ -296,6 +308,7 @@ const Index: React.FC = () => {
       </div>
       
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <TutorialDialog open={tutorialOpen} onClose={() => setTutorialOpen(false)} />
     </div>
   );
 };
