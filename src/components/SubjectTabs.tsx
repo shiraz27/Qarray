@@ -155,7 +155,7 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
   return (
     <div className="w-full">
       <nav className="w-full text-xs text-[#BDBDBD] font-normal text-center tracking-[0.2px] leading-[1.6] px-2.5 py-4 overflow-x-auto" aria-label="Subject navigation">
-        <div className="flex w-full items-center gap-4 justify-start sm:justify-center rounded-xl min-w-max sm:min-w-0">
+        <div className="flex w-full items-center gap-4 justify-center rounded-xl min-w-max sm:min-w-0">
           {(isModerator || isAdmin) && (
             <Button
               size="sm"
