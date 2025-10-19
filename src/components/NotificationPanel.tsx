@@ -145,6 +145,13 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
     flashcard_review: notifications.filter(n => n.type === 'flashcard_review'),
   };
 
+  const unreadCountsByType = {
+    answer_added: groupedNotifications.answer_added.filter(n => !n.read).length,
+    bookmark_content: groupedNotifications.bookmark_content.filter(n => !n.read).length,
+    new_resource: groupedNotifications.new_resource.filter(n => !n.read).length,
+    flashcard_review: groupedNotifications.flashcard_review.filter(n => !n.read).length,
+  };
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
@@ -187,8 +194,13 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
             <div className="space-y-6">
               {groupedNotifications.answer_added.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-muted-foreground px-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground px-2 flex items-center gap-2">
                     Answers to Your Questions
+                    {unreadCountsByType.answer_added > 0 && (
+                      <span className="bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
+                        {unreadCountsByType.answer_added}
+                      </span>
+                    )}
                   </h3>
                   {groupedNotifications.answer_added.map((notification) => (
                     <NotificationItem
@@ -204,8 +216,13 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
 
               {groupedNotifications.bookmark_content.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-muted-foreground px-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground px-2 flex items-center gap-2">
                     Bookmarked Chapters
+                    {unreadCountsByType.bookmark_content > 0 && (
+                      <span className="bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
+                        {unreadCountsByType.bookmark_content}
+                      </span>
+                    )}
                   </h3>
                   {groupedNotifications.bookmark_content.map((notification) => (
                     <NotificationItem
@@ -221,8 +238,13 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
 
               {groupedNotifications.new_resource.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-muted-foreground px-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground px-2 flex items-center gap-2">
                     New Resources
+                    {unreadCountsByType.new_resource > 0 && (
+                      <span className="bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
+                        {unreadCountsByType.new_resource}
+                      </span>
+                    )}
                   </h3>
                   {groupedNotifications.new_resource.map((notification) => (
                     <NotificationItem
@@ -238,8 +260,13 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ open, onCl
 
               {groupedNotifications.flashcard_review.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-muted-foreground px-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground px-2 flex items-center gap-2">
                     Flashcard Reviews
+                    {unreadCountsByType.flashcard_review > 0 && (
+                      <span className="bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
+                        {unreadCountsByType.flashcard_review}
+                      </span>
+                    )}
                   </h3>
                   {groupedNotifications.flashcard_review.map((notification) => (
                     <NotificationItem
