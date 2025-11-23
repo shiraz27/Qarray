@@ -29,6 +29,8 @@ interface SearchResult {
   type: 'chapter' | 'resource' | 'question' | 'answer';
   title: string;
   description?: string;
+  matchSnippet?: string;
+  matchType?: 'title' | 'description' | 'content';
   chapterId?: number;
   questionId?: number;
   subjectName?: string;
@@ -173,6 +175,7 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
 
         // Search resources
         if (filter === 'all' || filter === 'resources') {
+          // Search by title and description
           let resourcesQuery = supabase
             .from('resources')
             .select('id, title, description, chapter_id, type_id, with_correction, data, resource_types(type), chapters(subject_id, subjects(name, class_id))')
@@ -205,20 +208,72 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
             resourcesQuery = resourcesQuery.eq('with_correction', true);
           }
 
-          const { data: resources } = await resourcesQuery.limit(5);
+          const { data: resources } = await resourcesQuery.limit(10);
 
-          if (resources) {
-            searchResults.push(...resources.map((r: any) => ({
-              id: r.id,
-              type: 'resource' as const,
-              title: r.title,
-              description: r.description,
-              chapterId: r.chapter_id,
-              resourceType: r.resource_types?.type,
-              hasCorrection: r.with_correction,
-              subjectName: r.chapters?.subjects?.name,
-            })));
+          // Also search OCR content
+          let ocrResults: any[] = [];
+          if (userClassId) {
+            const { data: ocrData } = await supabase.rpc('search_pdf_content', {
+              search_query: query,
+              user_class_id: userClassId
+            });
+            ocrResults = ocrData || [];
           }
+
+          // Merge results
+          const resourcesMap = new Map<number, any>();
+          
+          // Add title/description matches
+          if (resources) {
+            resources.forEach((r: any) => {
+              const titleMatch = r.title.toLowerCase().includes(query.toLowerCase());
+              const descMatch = r.description?.toLowerCase().includes(query.toLowerCase());
+              
+              resourcesMap.set(r.id, {
+                id: r.id,
+                type: 'resource' as const,
+                title: r.title,
+                description: r.description,
+                matchType: titleMatch ? 'title' : 'description',
+                chapterId: r.chapter_id,
+                resourceType: r.resource_types?.type,
+                hasCorrection: r.with_correction,
+                subjectName: r.chapters?.subjects?.name,
+              });
+            });
+          }
+
+          // Add or merge OCR matches
+          ocrResults.forEach((ocr: any) => {
+            // Apply additional filters to OCR results
+            const passesFilters = 
+              (subjectFilter === 'all' || ocr.subject_id === parseInt(subjectFilter)) &&
+              (chapterFilter === 'all' || ocr.chapter_id === parseInt(chapterFilter)) &&
+              (selectedResourceTypes.length === 0 || selectedResourceTypes.includes(ocr.type_id)) &&
+              (!withCorrectionOnly || ocr.with_correction);
+
+            if (!passesFilters) return;
+
+            if (resourcesMap.has(ocr.id)) {
+              // Already found via title/description, add OCR snippet
+              const existing = resourcesMap.get(ocr.id);
+              existing.matchSnippet = ocr.match_snippet;
+            } else {
+              // New match from OCR content only
+              resourcesMap.set(ocr.id, {
+                id: ocr.id,
+                type: 'resource' as const,
+                title: ocr.title,
+                description: ocr.description,
+                matchType: 'content',
+                matchSnippet: ocr.match_snippet,
+                chapterId: ocr.chapter_id,
+                subjectName: ocr.subjects?.name,
+              });
+            }
+          });
+
+          searchResults.push(...Array.from(resourcesMap.values()).slice(0, 10));
         }
 
         // Search questions
@@ -296,6 +351,24 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
       navigate(`/question/${result.questionId}`);
     }
     onClose();
+  };
+
+  const highlightKeyword = (text: string, keyword: string): React.ReactNode => {
+    if (!keyword || keyword.length < 2) return text;
+    
+    try {
+      const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(${escapedKeyword})`, 'gi');
+      const parts = text.split(regex);
+      
+      return parts.map((part, i) => 
+        regex.test(part) ? 
+          <mark key={i} className="bg-yellow-300 dark:bg-yellow-600/70 px-0.5 rounded">{part}</mark> 
+          : part
+      );
+    } catch (error) {
+      return text;
+    }
   };
 
   const getIcon = (type: string) => {
@@ -474,6 +547,13 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
                           <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 py-0.5">
                             {result.type}
                           </Badge>
+                          {result.matchType && (
+                            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0.5">
+                              {result.matchType === 'title' ? 'In Title' : 
+                               result.matchType === 'description' ? 'In Description' : 
+                               'In Content'}
+                            </Badge>
+                          )}
                           {result.subjectName && (
                             <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0.5">
                               {result.subjectName}
@@ -490,10 +570,17 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
                             </Badge>
                           )}
                         </div>
-                        <p className="font-medium text-sm sm:text-base truncate">{result.title}</p>
+                        <p className="font-medium text-sm sm:text-base truncate">
+                          {highlightKeyword(result.title, query)}
+                        </p>
                         {result.description && (
                           <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mt-1 break-words">
-                            {result.description}
+                            {highlightKeyword(result.description, query)}
+                          </p>
+                        )}
+                        {result.matchSnippet && (
+                          <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words italic border-l-2 border-yellow-300 dark:border-yellow-600 pl-2">
+                            {highlightKeyword(result.matchSnippet, query)}
                           </p>
                         )}
                       </div>
