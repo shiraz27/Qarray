@@ -5,6 +5,7 @@ import { NotificationPanel } from './NotificationPanel';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
+import { PdfSearchDialog } from './PdfSearchDialog';
 
 interface HeaderProps {
   userName?: string;
@@ -78,6 +79,7 @@ export const Header: React.FC<HeaderProps> = ({ userName = "User" }) => {
           </h1>
         </div>
         <nav className="self-stretch flex gap-2 my-auto px-2 py-1 rounded-3xl" aria-label="Header actions">
+          <PdfSearchDialog />
           {(isModerator || isAdmin) && (
             <>
               <Button
@@ -100,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({ userName = "User" }) => {
               </Button>
             </>
           )}
-          <button 
+          <button
             aria-label="Notifications" 
             className="relative hover-scale p-2"
             onClick={() => setShowNotifications(true)}
