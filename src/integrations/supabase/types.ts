@@ -616,6 +616,9 @@ export type Database = {
           description: string
           devoir_type_id: number | null
           id: number
+          ocr_processed_at: string | null
+          ocr_status: string | null
+          ocr_text: string | null
           published_by: string | null
           subject_id: number | null
           title: string
@@ -633,6 +636,9 @@ export type Database = {
           description: string
           devoir_type_id?: number | null
           id?: number
+          ocr_processed_at?: string | null
+          ocr_status?: string | null
+          ocr_text?: string | null
           published_by?: string | null
           subject_id?: number | null
           title: string
@@ -650,6 +656,9 @@ export type Database = {
           description?: string
           devoir_type_id?: number | null
           id?: number
+          ocr_processed_at?: string | null
+          ocr_status?: string | null
+          ocr_text?: string | null
           published_by?: string | null
           subject_id?: number | null
           title?: string
@@ -812,6 +821,19 @@ export type Database = {
         Returns: boolean
       }
       is_moderator_or_admin: { Args: { _user_id: string }; Returns: boolean }
+      search_pdf_content: {
+        Args: { search_query: string; user_class_id: number }
+        Returns: {
+          chapter_id: number
+          data: string[]
+          description: string
+          id: number
+          match_snippet: string
+          rank: number
+          subject_id: number
+          title: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
