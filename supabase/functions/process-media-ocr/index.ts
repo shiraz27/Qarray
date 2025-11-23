@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface OcrRequest {
   resourceId: number;
-  pdfUrl: string;
+  mediaUrl: string;
 }
 
 Deno.serve(async (req) => {
@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { resourceId, pdfUrl }: OcrRequest = await req.json();
+    const { resourceId, mediaUrl }: OcrRequest = await req.json();
 
     console.log(`Starting OCR processing for resource ${resourceId}`);
 
@@ -33,29 +33,26 @@ Deno.serve(async (req) => {
       .update({ ocr_status: 'processing' })
       .eq('id', resourceId);
 
-    // Download PDF
-    const pdfResponse = await fetch(pdfUrl);
-    if (!pdfResponse.ok) {
-      throw new Error(`Failed to download PDF: ${pdfResponse.statusText}`);
-    }
+    // Determine media type
+    const lowerUrl = mediaUrl.toLowerCase();
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(lowerUrl);
+    const isPdf = lowerUrl.endsWith('.pdf');
 
-    const pdfBuffer = await pdfResponse.arrayBuffer();
-    const pdfBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
-
-    // Convert PDF to images and run OCR
-    // For now, we'll use a simplified approach - convert first few pages
-    const worker = await createWorker('eng');
     let extractedText = '';
+    const worker = await createWorker('eng');
 
     try {
-      // This is a simplified version - in production you'd want to:
-      // 1. Convert PDF pages to images using a PDF library
-      // 2. Process each page with Tesseract
-      // 3. Combine the results
-      
-      // For this implementation, we'll mark as completed with a note
-      // that full OCR requires additional PDF processing capabilities
-      extractedText = `PDF content extraction in progress for resource ${resourceId}`;
+      if (isImage) {
+        // Process image directly with Tesseract
+        console.log(`Processing image: ${mediaUrl}`);
+        const result = await worker.recognize(mediaUrl);
+        extractedText = result.data.text;
+      } else if (isPdf) {
+        // PDF processing - simplified placeholder
+        // In production, you'd convert PDF pages to images first
+        console.log(`PDF processing not yet fully implemented for: ${mediaUrl}`);
+        extractedText = `PDF content extraction in progress for resource ${resourceId}`;
+      }
 
       await worker.terminate();
 
@@ -93,7 +90,7 @@ Deno.serve(async (req) => {
       throw ocrError;
     }
   } catch (error) {
-    console.error('Error in process-pdf-ocr:', error);
+    console.error('Error in process-media-ocr:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { 

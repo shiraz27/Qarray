@@ -17,9 +17,9 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('Checking for PDFs pending OCR processing...');
+    console.log('Checking for media pending OCR processing...');
 
-    // Find all resources with PDFs that need OCR processing
+    // Find all resources with media that need OCR processing
     const { data: resources, error } = await supabaseClient
       .from('resources')
       .select('id, data')
@@ -45,13 +45,15 @@ Deno.serve(async (req) => {
 
     // Process each resource
     for (const resource of resources) {
-      // Check if resource has PDF files
-      const pdfUrls = resource.data?.filter((url: string) => 
-        url.toLowerCase().endsWith('.pdf')
-      );
+      // Check if resource has PDFs or images
+      const mediaUrls = resource.data?.filter((url: string) => {
+        const lowerUrl = url.toLowerCase();
+        return lowerUrl.endsWith('.pdf') || 
+               /\.(jpg|jpeg|png|gif|webp)$/i.test(lowerUrl);
+      });
 
-      if (!pdfUrls || pdfUrls.length === 0) {
-        // Mark as not_applicable if no PDFs
+      if (!mediaUrls || mediaUrls.length === 0) {
+        // Mark as not_applicable if no processable media
         await supabaseClient
           .from('resources')
           .update({ ocr_status: 'not_applicable' })
@@ -59,16 +61,16 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Trigger OCR processing for the first PDF
-      const pdfUrl = pdfUrls[0];
+      // Trigger OCR processing for the first media file
+      const mediaUrl = mediaUrls[0];
       
       console.log(`Triggering OCR for resource ${resource.id}`);
 
       // Call the OCR processing function
       const { error: invokeError } = await supabaseClient.functions.invoke(
-        'process-pdf-ocr',
+        'process-media-ocr',
         {
-          body: { resourceId: resource.id, pdfUrl },
+          body: { resourceId: resource.id, mediaUrl },
         }
       );
 
@@ -92,7 +94,7 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error in check-pdf-ocr-status:', error);
+    console.error('Error in check-media-ocr-status:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { 
