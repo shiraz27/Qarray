@@ -9,8 +9,8 @@ verify_jwt = false
 [functions.check-flashcard-reviews]
 verify_jwt = false
 
-[functions.process-pdf-ocr]
+[functions.process-media-ocr]
 verify_jwt = false
 
-[functions.check-pdf-ocr-status]
+[functions.check-media-ocr-status]
 verify_jwt = false
