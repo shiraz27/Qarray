@@ -5,7 +5,6 @@ import { NotificationPanel } from './NotificationPanel';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
-import { MediaSearchDialog } from './MediaSearchDialog';
 
 interface HeaderProps {
   userName?: string;
@@ -79,7 +78,6 @@ export const Header: React.FC<HeaderProps> = ({ userName = "User" }) => {
           </h1>
         </div>
         <nav className="self-stretch flex gap-2 my-auto px-2 py-1 rounded-3xl" aria-label="Header actions">
-          <MediaSearchDialog />
           {(isModerator || isAdmin) && (
             <>
               <Button
