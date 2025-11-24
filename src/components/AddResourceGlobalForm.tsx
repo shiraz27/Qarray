@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
-import { processResourceOCR } from '@/utils/ocrProcessor';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
@@ -205,13 +204,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
       if (error) throw error;
 
       toast.success('Resource added successfully');
-
-      // Process OCR in background if needed
-      if (isPdfOrImage && insertedResource) {
-        processResourceOCR(insertedResource.id, mediaUrls).catch(err => 
-          console.error('OCR processing failed:', err)
-        );
-      }
+      
       form.reset();
       setMediaUrls([]);
       setSelectedSubject('');
