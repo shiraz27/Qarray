@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
+import { processResourceOCR } from '@/utils/ocrProcessor';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
@@ -131,6 +132,13 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
       if (error) throw error;
 
       toast.success('Resource updated successfully');
+
+      // Process OCR in background if new PDF/image was added
+      if (hasNewPdfOrImage) {
+        processResourceOCR(resourceId, mediaUrls).catch(err => 
+          console.error('OCR processing failed:', err)
+        );
+      }
       onSuccess();
     } catch (error) {
       console.error('Error updating resource:', error);
