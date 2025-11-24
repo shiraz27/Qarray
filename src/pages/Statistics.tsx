@@ -13,6 +13,7 @@ import { Navigate } from 'react-router-dom';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Input } from '@/components/ui/input';
+import { processResourceOCR } from '@/utils/ocrProcessor';
 
 interface Stats {
   total_questions: number;
@@ -334,37 +335,57 @@ export default function Statistics() {
   const handleProcessAllPending = async () => {
     setIsProcessingBatch(true);
     try {
-      const { data, error } = await supabase.functions.invoke('check-media-ocr-status');
+      // Get all pending resources
+      const pendingResources = resources.filter(r => r.ocr_status === 'pending');
       
-      if (error) throw error;
+      if (pendingResources.length === 0) {
+        toast.info('No pending resources to process');
+        return;
+      }
+
+      toast.info(`Processing ${pendingResources.length} resources...`);
       
-      toast.success(`Started processing ${data?.processed || 0} items`);
-      setTimeout(() => {
-        fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
-        fetchResources(selectedClass, selectedSubject, selectedChapter);
-      }, 2000);
+      // Process each one
+      for (const resource of pendingResources) {
+        const pdfOrImageUrls = resource.data.filter((url: string) => {
+          const lower = url.toLowerCase();
+          return lower.match(/\.(pdf|jpg|jpeg|png|gif|webp)$/);
+        });
+        
+        if (pdfOrImageUrls.length > 0) {
+          await processResourceOCR(resource.id, pdfOrImageUrls);
+        }
+      }
+      
+      toast.success('All resources processed!');
+      fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
     } catch (error) {
       console.error('Error processing batch:', error);
-      toast.error('Failed to process pending OCR tasks');
+      toast.error('Failed to process some resources');
     } finally {
       setIsProcessingBatch(false);
     }
   };
 
-  const handleProcessSingle = async (resourceId: number, mediaUrl: string) => {
+  const handleProcessSingle = async (resourceId: number, mediaUrls: string[]) => {
     setProcessingId(resourceId);
     try {
-      const { error } = await supabase.functions.invoke('process-media-ocr', {
-        body: { resourceId, mediaUrl }
+      const pdfOrImageUrls = mediaUrls.filter(url => {
+        const lower = url.toLowerCase();
+        return lower.match(/\.(pdf|jpg|jpeg|png|gif|webp)$/);
       });
       
-      if (error) throw error;
+      if (pdfOrImageUrls.length === 0) {
+        toast.error('No PDFs or images to process');
+        return;
+      }
+
+      await processResourceOCR(resourceId, pdfOrImageUrls);
       
-      toast.success('Processing started');
-      setTimeout(() => {
-        fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
-        fetchResources(selectedClass, selectedSubject, selectedChapter);
-      }, 2000);
+      toast.success('Resource processed!');
+      fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
     } catch (error) {
       console.error('Error processing resource:', error);
       toast.error('Failed to process resource');
@@ -768,7 +789,7 @@ export default function Statistics() {
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      onClick={() => handleProcessSingle(resource.id, resource.data[0])}
+                                      onClick={() => handleProcessSingle(resource.id, resource.data)}
                                       disabled={processingId === resource.id}
                                     >
                                       {processingId === resource.id ? (
