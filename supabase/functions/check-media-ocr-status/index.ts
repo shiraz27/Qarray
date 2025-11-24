@@ -17,79 +17,33 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('Checking for media pending OCR processing...');
+    console.log('Checking OCR status...');
 
-    // Find all resources with media that need OCR processing
+    // Get resources OCR statistics
     const { data: resources, error } = await supabaseClient
       .from('resources')
-      .select('id, data')
-      .eq('ocr_status', 'pending')
-      .eq('deleted', false)
-      .limit(10);
+      .select('id, ocr_status')
+      .eq('deleted', false);
 
     if (error) {
       throw error;
     }
 
-    if (!resources || resources.length === 0) {
-      console.log('No pending OCR jobs found');
-      return new Response(
-        JSON.stringify({ message: 'No pending OCR jobs', processed: 0 }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const stats = {
+      pending: resources?.filter(r => r.ocr_status === 'pending').length || 0,
+      processing: resources?.filter(r => r.ocr_status === 'processing').length || 0,
+      completed: resources?.filter(r => r.ocr_status === 'completed').length || 0,
+      failed: resources?.filter(r => r.ocr_status === 'failed').length || 0,
+      not_applicable: resources?.filter(r => r.ocr_status === 'not_applicable').length || 0,
+    };
 
-    console.log(`Found ${resources.length} resources pending OCR`);
-
-    let processedCount = 0;
-
-    // Process each resource
-    for (const resource of resources) {
-      // Check if resource has PDFs or images
-      const mediaUrls = resource.data?.filter((url: string) => {
-        const lowerUrl = url.toLowerCase();
-        return lowerUrl.endsWith('.pdf') || 
-               /\.(jpg|jpeg|png|gif|webp)$/i.test(lowerUrl);
-      });
-
-      if (!mediaUrls || mediaUrls.length === 0) {
-        // Mark as not_applicable if no processable media
-        await supabaseClient
-          .from('resources')
-          .update({ ocr_status: 'not_applicable' })
-          .eq('id', resource.id);
-        continue;
-      }
-
-      // Trigger OCR processing for the first media file
-      const mediaUrl = mediaUrls[0];
-      
-      console.log(`Triggering OCR for resource ${resource.id}`);
-
-      // Call the OCR processing function
-      const { error: invokeError } = await supabaseClient.functions.invoke(
-        'process-media-ocr',
-        {
-          body: { resourceId: resource.id, mediaUrl },
-        }
-      );
-
-      if (invokeError) {
-        console.error(`Failed to invoke OCR for resource ${resource.id}:`, invokeError);
-        await supabaseClient
-          .from('resources')
-          .update({ ocr_status: 'failed' })
-          .eq('id', resource.id);
-      } else {
-        processedCount++;
-      }
-    }
+    console.log('OCR statistics:', stats);
 
     return new Response(
       JSON.stringify({
-        message: 'OCR check completed',
-        processed: processedCount,
-        total: resources.length,
+        message: 'OCR status retrieved',
+        stats,
+        note: 'OCR is now processed client-side during upload'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
