@@ -5,9 +5,14 @@ import { Header } from '@/components/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { BarChart3, BookOpen, MessageCircle, Brain, FileText, CheckCircle2, Clock } from 'lucide-react';
+import { BarChart3, BookOpen, MessageCircle, Brain, FileText, CheckCircle2, Clock, Play, Loader2, Search } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
+import { Input } from '@/components/ui/input';
 
 interface Stats {
   total_questions: number;
@@ -22,23 +27,56 @@ interface Stats {
   devoirs_by_type: { type: string; count: number }[];
 }
 
+interface OcrStats {
+  total_ocrAble: number;
+  completed: number;
+  pending: number;
+  failed: number;
+  not_applicable: number;
+}
+
+interface ResourceRow {
+  id: number;
+  title: string;
+  data: string[];
+  ocr_status: string | null;
+  chapter_id: number | null;
+  chapters?: { name: string };
+  resource_types?: { type: string };
+}
+
 export default function Statistics() {
   const { isModerator, isAdmin, loading: roleLoading } = useUserRole();
   const [stats, setStats] = useState<Stats | null>(null);
+  const [ocrStats, setOcrStats] = useState<OcrStats | null>(null);
+  const [resources, setResources] = useState<ResourceRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [resourcesLoading, setResourcesLoading] = useState(true);
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+  const [processingId, setProcessingId] = useState<number | null>(null);
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedChapter, setSelectedChapter] = useState<string>('all');
+  const [ocrFilter, setOcrFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [chapters, setChapters] = useState<any[]>([]);
+  const itemsPerPage = 20;
 
   useEffect(() => {
     if (!roleLoading && (isModerator || isAdmin)) {
       fetchClasses();
       fetchStats(selectedClass, selectedSubject, selectedChapter);
+      fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
     }
   }, [selectedClass, selectedSubject, selectedChapter, isModerator, isAdmin, roleLoading]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [ocrFilter, searchQuery]);
 
   useEffect(() => {
     if (selectedClass !== 'all') {
@@ -230,6 +268,142 @@ export default function Statistics() {
       setLoading(false);
     }
   };
+
+  const fetchOcrStats = async (classId: string, subjectId: string, chapterId: string) => {
+    try {
+      const classFilter = classId !== 'all' ? parseInt(classId) : null;
+      const subjectFilter = subjectId !== 'all' ? parseInt(subjectId) : null;
+      const chapterFilter = chapterId !== 'all' ? parseInt(chapterId) : null;
+
+      let query = supabase
+        .from('resources')
+        .select('id, ocr_status, data, chapter_id, subject_id, chapters!inner(class_id, subject_id)')
+        .eq('deleted', false);
+
+      if (classFilter) query = query.eq('chapters.class_id', classFilter);
+      if (subjectFilter) query = query.eq('subject_id', subjectFilter);
+      if (chapterFilter) query = query.eq('chapter_id', chapterFilter);
+
+      const { data } = await query;
+
+      const completed = data?.filter(r => r.ocr_status === 'completed').length || 0;
+      const pending = data?.filter(r => r.ocr_status === 'pending').length || 0;
+      const failed = data?.filter(r => r.ocr_status === 'failed').length || 0;
+      const not_applicable = data?.filter(r => r.ocr_status === 'not_applicable' || !r.ocr_status).length || 0;
+
+      setOcrStats({
+        total_ocrAble: completed + pending + failed,
+        completed,
+        pending,
+        failed,
+        not_applicable,
+      });
+    } catch (error) {
+      console.error('Error fetching OCR stats:', error);
+    }
+  };
+
+  const fetchResources = async (classId: string, subjectId: string, chapterId: string) => {
+    setResourcesLoading(true);
+    try {
+      const classFilter = classId !== 'all' ? parseInt(classId) : null;
+      const subjectFilter = subjectId !== 'all' ? parseInt(subjectId) : null;
+      const chapterFilter = chapterId !== 'all' ? parseInt(chapterId) : null;
+
+      let query = supabase
+        .from('resources')
+        .select('id, title, data, ocr_status, chapter_id, chapters(name), resource_types(type)')
+        .eq('deleted', false);
+
+      if (classFilter) query = query.eq('chapters.class_id', classFilter);
+      if (subjectFilter) query = query.eq('subject_id', subjectFilter);
+      if (chapterFilter) query = query.eq('chapter_id', chapterFilter);
+
+      const { data, error } = await query.order('id', { ascending: false });
+
+      if (error) throw error;
+      setResources(data || []);
+    } catch (error) {
+      console.error('Error fetching resources:', error);
+      toast.error('Failed to load resources');
+    } finally {
+      setResourcesLoading(false);
+    }
+  };
+
+  const handleProcessAllPending = async () => {
+    setIsProcessingBatch(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('check-media-ocr-status');
+      
+      if (error) throw error;
+      
+      toast.success(`Started processing ${data?.processed || 0} items`);
+      setTimeout(() => {
+        fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
+        fetchResources(selectedClass, selectedSubject, selectedChapter);
+      }, 2000);
+    } catch (error) {
+      console.error('Error processing batch:', error);
+      toast.error('Failed to process pending OCR tasks');
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
+  const handleProcessSingle = async (resourceId: number, mediaUrl: string) => {
+    setProcessingId(resourceId);
+    try {
+      const { error } = await supabase.functions.invoke('process-media-ocr', {
+        body: { resourceId, mediaUrl }
+      });
+      
+      if (error) throw error;
+      
+      toast.success('Processing started');
+      setTimeout(() => {
+        fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
+        fetchResources(selectedClass, selectedSubject, selectedChapter);
+      }, 2000);
+    } catch (error) {
+      console.error('Error processing resource:', error);
+      toast.error('Failed to process resource');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const getOcrStatusBadge = (status: string | null) => {
+    switch (status) {
+      case 'completed':
+        return <Badge variant="secondary" className="gap-1"><CheckCircle2 className="w-3 h-3" />Completed</Badge>;
+      case 'pending':
+        return <Badge variant="outline" className="gap-1 border-yellow-500 text-yellow-600"><Clock className="w-3 h-3" />Pending</Badge>;
+      case 'failed':
+        return <Badge variant="destructive" className="gap-1">Failed</Badge>;
+      default:
+        return <Badge variant="outline" className="gap-1">N/A</Badge>;
+    }
+  };
+
+  const filteredResources = resources.filter(r => {
+    const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
+    const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
+  const totalPages = Math.ceil(filteredResources.length / itemsPerPage);
+  const paginatedResources = filteredResources.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const ocrChartData = ocrStats ? [
+    { name: 'Completed', value: ocrStats.completed, color: 'hsl(var(--chart-2))' },
+    { name: 'Pending', value: ocrStats.pending, color: 'hsl(var(--chart-3))' },
+    { name: 'Failed', value: ocrStats.failed, color: 'hsl(var(--chart-4))' },
+    { name: 'Not Applicable', value: ocrStats.not_applicable, color: 'hsl(var(--muted))' },
+  ] : [];
 
   if (roleLoading) {
     return (
@@ -432,6 +606,230 @@ export default function Statistics() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* OCR Processing Stats */}
+            {ocrStats && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>OCR Processing Status</CardTitle>
+                      <CardDescription>Text extraction from PDFs and images</CardDescription>
+                    </div>
+                    {ocrStats.pending > 0 && (
+                      <Button 
+                        onClick={handleProcessAllPending} 
+                        disabled={isProcessingBatch}
+                        size="sm"
+                      >
+                        {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Process All Pending ({ocrStats.pending})
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="h-[250px]">
+                      <ChartContainer config={{
+                        completed: { label: 'Completed', color: 'hsl(var(--chart-2))' },
+                        pending: { label: 'Pending', color: 'hsl(var(--chart-3))' },
+                        failed: { label: 'Failed', color: 'hsl(var(--chart-4))' },
+                        not_applicable: { label: 'Not Applicable', color: 'hsl(var(--muted))' }
+                      }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={ocrChartData}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {ocrChartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </ChartContainer>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">✅ Completed</span>
+                        <Badge variant="secondary">{ocrStats.completed}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">⏳ Pending</span>
+                        <Badge variant="outline" className="border-yellow-500 text-yellow-600">{ocrStats.pending}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">❌ Failed</span>
+                        <Badge variant="destructive">{ocrStats.failed}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">➖ Not Applicable</span>
+                        <Badge variant="outline">{ocrStats.not_applicable}</Badge>
+                      </div>
+                      <div className="pt-3 border-t">
+                        <div className="flex items-center justify-between font-semibold">
+                          <span className="text-sm">Total OCR-able</span>
+                          <span>{ocrStats.total_ocrAble}</span>
+                        </div>
+                        {ocrStats.total_ocrAble > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {Math.round((ocrStats.completed / ocrStats.total_ocrAble) * 100)}% completed
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Resources Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Resources & OCR Status</CardTitle>
+                <CardDescription>Detailed list of all resources with their OCR processing status</CardDescription>
+                <div className="flex gap-2 mt-4">
+                  <Select value={ocrFilter} onValueChange={setOcrFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="failed">Failed</SelectItem>
+                      <SelectItem value="not_applicable">Not Applicable</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="Search resources..." 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-8"
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {resourcesLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">Loading resources...</div>
+                ) : paginatedResources.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">No resources found</div>
+                ) : (
+                  <>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[80px]">ID</TableHead>
+                            <TableHead>Title</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Chapter</TableHead>
+                            <TableHead>OCR Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedResources.map((resource) => {
+                            const isPdfOrImage = resource.data.some(url => 
+                              url.toLowerCase().includes('.pdf') || 
+                              url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)/)
+                            );
+                            const canProcess = (resource.ocr_status === 'pending' || resource.ocr_status === 'failed') && isPdfOrImage;
+                            
+                            return (
+                              <TableRow key={resource.id}>
+                                <TableCell className="font-medium">{resource.id}</TableCell>
+                                <TableCell>
+                                  <div className="max-w-[300px] truncate">{resource.title}</div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">{resource.resource_types?.type || 'Unknown'}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {resource.chapters?.name || 'N/A'}
+                                </TableCell>
+                                <TableCell>
+                                  {getOcrStatusBadge(resource.ocr_status)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {canProcess && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleProcessSingle(resource.id, resource.data[0])}
+                                      disabled={processingId === resource.id}
+                                    >
+                                      {processingId === resource.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Play className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between mt-4">
+                        <div className="text-sm text-muted-foreground">
+                          Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredResources.length)} of {filteredResources.length} resources
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                          >
+                            Previous
+                          </Button>
+                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            const page = currentPage <= 3 ? i + 1 : 
+                                        currentPage >= totalPages - 2 ? totalPages - 4 + i :
+                                        currentPage - 2 + i;
+                            if (page < 1 || page > totalPages) return null;
+                            return (
+                              <Button
+                                key={page}
+                                variant={page === currentPage ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setCurrentPage(page)}
+                              >
+                                {page}
+                              </Button>
+                            );
+                          })}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
       </main>
