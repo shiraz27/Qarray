@@ -196,6 +196,8 @@ export async function processResourceOCR(
     }
 
     const extractedTexts: string[] = [];
+    let ocrableFileCount = 0;
+    let nonOcrableFileCount = 0;
 
     for (let i = 0; i < mediaFiles.length; i++) {
       const mediaFile = mediaFiles[i];
@@ -205,7 +207,8 @@ export async function processResourceOCR(
         `Processing file ${i + 1}/${mediaFiles.length}: ${fileType}...`
       );
 
-      if (fileType === 'video' || fileType === 'audio') {
+      if (fileType === 'video' || fileType === 'audio' || fileType === 'unknown') {
+        nonOcrableFileCount++;
         extractedTexts.push(
           `[${fileType.toUpperCase()} FILE - OCR not applicable]`
         );
@@ -221,9 +224,11 @@ export async function processResourceOCR(
         if (fileType === 'pdf') {
           // Two-stage processing for PDFs
           text = await processPdfWithFallback(blob);
+          ocrableFileCount++;
         } else if (fileType === 'image') {
           // Direct OCR for images
           text = await extractImageText(blob);
+          ocrableFileCount++;
         }
 
         extractedTexts.push(text || '[No text extracted]');
@@ -236,12 +241,26 @@ export async function processResourceOCR(
     // Combine all extracted text
     const combinedText = extractedTexts.join('\n\n---\n\n');
 
+    // Determine OCR status based on file types
+    let ocrStatus: 'completed' | 'not_applicable';
+    let ocrText: string;
+
+    if (ocrableFileCount === 0) {
+      // All files are non-OCR-able (video/audio only)
+      ocrStatus = 'not_applicable';
+      ocrText = 'Contains only video/audio files - OCR not applicable';
+    } else {
+      // At least one file was OCR-able
+      ocrStatus = 'completed';
+      ocrText = combinedText;
+    }
+
     // Update resource in database
     await supabase
       .from('resources')
       .update({
-        ocr_status: 'completed',
-        ocr_text: combinedText,
+        ocr_status: ocrStatus,
+        ocr_text: ocrText,
         ocr_processed_at: new Date().toISOString(),
       })
       .eq('id', resourceId);
