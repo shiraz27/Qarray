@@ -335,18 +335,18 @@ export default function Statistics() {
   const handleProcessAllPending = async () => {
     setIsProcessingBatch(true);
     try {
-      // Get all pending resources
-      const pendingResources = resources.filter(r => r.ocr_status === 'pending');
+      // Get all pending and failed resources
+      const resourcesToProcess = resources.filter(r => r.ocr_status === 'pending' || r.ocr_status === 'failed');
       
-      if (pendingResources.length === 0) {
-        toast.info('No pending resources to process');
+      if (resourcesToProcess.length === 0) {
+        toast.info('No resources to process');
         return;
       }
 
-      toast.info(`Processing ${pendingResources.length} resources...`);
+      toast.info(`Processing ${resourcesToProcess.length} resources...`);
       
       // Process each one
-      for (const resource of pendingResources) {
+      for (const resource of resourcesToProcess) {
         const pdfOrImageUrls = resource.data.filter((url: string) => {
           const lower = url.toLowerCase();
           return lower.match(/\.(pdf|jpg|jpeg|png|gif|webp)$/);
@@ -637,14 +637,14 @@ export default function Statistics() {
                       <CardTitle>OCR Processing Status</CardTitle>
                       <CardDescription>Text extraction from PDFs and images</CardDescription>
                     </div>
-                    {ocrStats.pending > 0 && (
+                    {(ocrStats.pending > 0 || ocrStats.failed > 0) && (
                       <Button 
                         onClick={handleProcessAllPending} 
                         disabled={isProcessingBatch}
                         size="sm"
                       >
                         {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Process All Pending ({ocrStats.pending})
+                        Process All ({ocrStats.pending + ocrStats.failed})
                       </Button>
                     )}
                   </div>
