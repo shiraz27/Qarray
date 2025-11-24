@@ -829,9 +829,10 @@ export type Database = {
           description: string
           id: number
           match_snippet: string
-          rank: number
           subject_id: number
           title: string
+          type_id: number
+          with_correction: boolean
         }[]
       }
     }
