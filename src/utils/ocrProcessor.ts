@@ -46,7 +46,11 @@ export async function processPDFOCR(pdfUrl: string): Promise<string> {
         canvas.height = viewport.height;
         canvas.width = viewport.width;
         
-        await page.render({ canvasContext: context, viewport }).promise;
+        await page.render({ 
+          canvasContext: context, 
+          viewport,
+          canvas 
+        }).promise;
         
         // Convert canvas to image URL and run OCR
         const imageUrl = canvas.toDataURL('image/png');
