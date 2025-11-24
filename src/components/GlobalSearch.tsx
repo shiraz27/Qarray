@@ -48,6 +48,7 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
   const [chapterFilter, setChapterFilter] = useState<string>('all');
   const [resourceTypeFilters, setResourceTypeFilters] = useState<Record<number, boolean>>({});
   const [withCorrectionOnly, setWithCorrectionOnly] = useState(false);
+  const [searchInOcrContent, setSearchInOcrContent] = useState(true);
   const [subjects, setSubjects] = useState<Array<{ id: number; name: string }>>([]);
   const [chapters, setChapters] = useState<Array<{ id: number; name: string }>>([]);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
@@ -210,9 +211,9 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
 
           const { data: resources } = await resourcesQuery.limit(10);
 
-          // Also search OCR content
+          // Also search OCR content (only if enabled)
           let ocrResults: any[] = [];
-          if (userClassId) {
+          if (searchInOcrContent && userClassId) {
             const { data: ocrData } = await supabase.rpc('search_pdf_content', {
               search_query: query,
               user_class_id: userClassId
@@ -338,7 +339,7 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
     }, 300);
 
     return () => clearTimeout(searchTimeout);
-  }, [query, filter, subjectFilter, chapterFilter, resourceTypeFilters, withCorrectionOnly, userClassId]);
+  }, [query, filter, subjectFilter, chapterFilter, resourceTypeFilters, withCorrectionOnly, searchInOcrContent, userClassId]);
 
   const handleResultClick = (result: SearchResult) => {
     if (result.type === 'chapter') {
@@ -511,15 +512,28 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="withCorrection"
-                checked={withCorrectionOnly}
-                onCheckedChange={(checked) => setWithCorrectionOnly(!!checked)}
-              />
-              <label htmlFor="withCorrection" className="text-xs cursor-pointer">
-                {t('withCorrectionOnly')}
-              </label>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="withCorrection"
+                  checked={withCorrectionOnly}
+                  onCheckedChange={(checked) => setWithCorrectionOnly(!!checked)}
+                />
+                <label htmlFor="withCorrection" className="text-xs cursor-pointer">
+                  {t('withCorrectionOnly')}
+                </label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="searchInOcr"
+                  checked={searchInOcrContent}
+                  onCheckedChange={(checked) => setSearchInOcrContent(!!checked)}
+                />
+                <label htmlFor="searchInOcr" className="text-xs cursor-pointer">
+                  {t('searchInPdfImageDocuments')}
+                </label>
+              </div>
             </div>
           </div>
 

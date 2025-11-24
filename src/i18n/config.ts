@@ -87,6 +87,7 @@ const resources = {
       selectSubjectFirst: "Select subject first",
       resourceTypes: "Resource Types",
       withCorrectionOnly: "With correction only",
+      searchInPdfImageDocuments: "Search in PDF/Image documents",
       // Flashcards
       createMemorization: "Create Memorization",
       editMemorization: "Edit Memorization",
@@ -244,6 +245,7 @@ const resources = {
       selectSubjectFirst: "Sélectionner d'abord une matière",
       resourceTypes: "Types de Ressources",
       withCorrectionOnly: "Avec correction seulement",
+      searchInPdfImageDocuments: "Rechercher dans les documents PDF/Image",
       // Flashcards
       createMemorization: "Créer une Mémorisation",
       editMemorization: "Modifier la Mémorisation",
@@ -386,6 +388,7 @@ const resources = {
       selectSubjectFirst: "اختر مادة أولاً",
       resourceTypes: "أنواع الموارد",
       withCorrectionOnly: "مع التصحيح فقط",
+      searchInPdfImageDocuments: "البحث في مستندات PDF/الصور",
       // Flashcards
       createMemorization: "إنشاء حفظ",
       editMemorization: "تعديل الحفظ",
