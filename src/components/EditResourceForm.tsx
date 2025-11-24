@@ -101,16 +101,31 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
         }
       }
 
+      // Check if any NEW media is PDF or image (only set pending if new files added)
+      const newMediaUrls = mediaUrls.filter(url => !initialData.data.includes(url));
+      const hasNewPdfOrImage = newMediaUrls.some(url => {
+        const lowerUrl = url.toLowerCase();
+        return lowerUrl.includes('.pdf') || 
+               lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)/);
+      });
+
+      const updateData: any = {
+        title: data.title,
+        description: data.description,
+        type_id: typeId,
+        devoir_type_id: data.devoir_type_id ? parseInt(data.devoir_type_id) : null,
+        with_correction: data.with_correction,
+        data: mediaUrls,
+      };
+
+      // Only update OCR status if new PDF/image was added
+      if (hasNewPdfOrImage) {
+        updateData.ocr_status = 'pending';
+      }
+
       const { error } = await supabase
         .from('resources')
-        .update({
-          title: data.title,
-          description: data.description,
-          type_id: typeId,
-          devoir_type_id: data.devoir_type_id ? parseInt(data.devoir_type_id) : null,
-          with_correction: data.with_correction,
-          data: mediaUrls,
-        })
+        .update(updateData)
         .eq('id', resourceId);
 
       if (error) throw error;

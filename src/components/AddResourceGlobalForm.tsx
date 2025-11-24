@@ -176,6 +176,13 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
         }
       }
 
+      // Check if any media is PDF or image
+      const isPdfOrImage = mediaUrls.some(url => {
+        const lowerUrl = url.toLowerCase();
+        return lowerUrl.includes('.pdf') || 
+               lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)/);
+      });
+
       const { error } = await supabase
         .from('resources')
         .insert({
@@ -189,6 +196,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
           data: mediaUrls,
           published_by: user.id,
           contributors: [user.id],
+          ocr_status: isPdfOrImage ? 'pending' : 'not_applicable',
         });
 
       if (error) throw error;

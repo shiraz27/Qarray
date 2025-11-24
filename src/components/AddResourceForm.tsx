@@ -94,6 +94,13 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
         }
       }
 
+      // Check if any media is PDF or image
+      const isPdfOrImage = mediaUrls.some(url => {
+        const lowerUrl = url.toLowerCase();
+        return lowerUrl.includes('.pdf') || 
+               lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)/);
+      });
+
       const { error } = await supabase
         .from('resources')
         .insert({
@@ -108,6 +115,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           published_by: user.id,
           contributors: [user.id],
           verified: isModerator || isAdmin,
+          ocr_status: isPdfOrImage ? 'pending' : 'not_applicable',
         });
 
       if (error) throw error;
