@@ -13,7 +13,6 @@ import { Navigate } from 'react-router-dom';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Input } from '@/components/ui/input';
-import { processResourceOCR } from '@/utils/ocrProcessor';
 
 interface Stats {
   total_questions: number;
@@ -345,24 +344,40 @@ export default function Statistics() {
 
       toast.info(`Processing ${resourcesToProcess.length} resources...`);
       
-      // Process each one
+      // Process each resource via edge function
+      let successCount = 0;
+      let failCount = 0;
+      
       for (const resource of resourcesToProcess) {
-        const pdfOrImageUrls = resource.data.filter((url: string) => {
-          const lower = url.toLowerCase();
-          return lower.match(/\.(pdf|jpg|jpeg|png|gif|webp)$/);
-        });
-        
-        if (pdfOrImageUrls.length > 0) {
-          await processResourceOCR(resource.id, pdfOrImageUrls);
+        try {
+          const { data, error } = await supabase.functions.invoke('process-ocr', {
+            body: {
+              resourceId: resource.id,
+              mediaUrls: resource.data
+            }
+          });
+
+          if (error) throw error;
+          
+          if (data?.success) {
+            successCount++;
+            console.log(`Resource ${resource.id}: ${data.message}`);
+          } else {
+            failCount++;
+            console.error(`Resource ${resource.id} failed:`, data?.error);
+          }
+        } catch (error) {
+          failCount++;
+          console.error(`Error processing resource ${resource.id}:`, error);
         }
       }
       
-      toast.success('All resources processed!');
+      toast.success(`Processed ${successCount} resources successfully${failCount > 0 ? `, ${failCount} failed` : ''}!`);
       fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
       fetchResources(selectedClass, selectedSubject, selectedChapter);
     } catch (error) {
       console.error('Error processing batch:', error);
-      toast.error('Failed to process some resources');
+      toast.error('Failed to process resources');
     } finally {
       setIsProcessingBatch(false);
     }
@@ -371,19 +386,21 @@ export default function Statistics() {
   const handleProcessSingle = async (resourceId: number, mediaUrls: string[]) => {
     setProcessingId(resourceId);
     try {
-      const pdfOrImageUrls = mediaUrls.filter(url => {
-        const lower = url.toLowerCase();
-        return lower.match(/\.(pdf|jpg|jpeg|png|gif|webp)$/);
+      const { data, error } = await supabase.functions.invoke('process-ocr', {
+        body: {
+          resourceId,
+          mediaUrls
+        }
       });
-      
-      if (pdfOrImageUrls.length === 0) {
-        toast.error('No PDFs or images to process');
-        return;
-      }
 
-      await processResourceOCR(resourceId, pdfOrImageUrls);
+      if (error) throw error;
+
+      if (data?.success) {
+        toast.success(data.message || 'Resource processed!');
+      } else {
+        throw new Error(data?.error || 'Processing failed');
+      }
       
-      toast.success('Resource processed!');
       fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
       fetchResources(selectedClass, selectedSubject, selectedChapter);
     } catch (error) {

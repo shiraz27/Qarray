@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.check-media-ocr-status]
 verify_jwt = false
+
+[functions.process-ocr]
+verify_jwt = false
