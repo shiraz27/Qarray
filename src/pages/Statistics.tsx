@@ -13,6 +13,7 @@ import { Navigate } from 'react-router-dom';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Input } from '@/components/ui/input';
+import { processResourceOCR } from '@/utils/clientOcrProcessor';
 
 interface Stats {
   total_questions: number;
@@ -334,77 +335,72 @@ export default function Statistics() {
   const handleProcessAllPending = async () => {
     setIsProcessingBatch(true);
     try {
-      // Get all pending and failed resources
-      const resourcesToProcess = resources.filter(r => r.ocr_status === 'pending' || r.ocr_status === 'failed');
+      const resourcesToProcess = resources.filter(
+        r => r.ocr_status === 'pending' || r.ocr_status === 'failed'
+      );
       
       if (resourcesToProcess.length === 0) {
         toast.info('No resources to process');
         return;
       }
 
-      toast.info(`Processing ${resourcesToProcess.length} resources...`);
-      
-      // Process each resource via edge function
       let successCount = 0;
       let failCount = 0;
       
-      for (const resource of resourcesToProcess) {
+      for (let i = 0; i < resourcesToProcess.length; i++) {
+        const resource = resourcesToProcess[i];
+        
         try {
-          const { data, error } = await supabase.functions.invoke('process-ocr', {
-            body: {
-              resourceId: resource.id,
-              mediaUrls: resource.data
-            }
+          const result = await processResourceOCR(resource.id, (message) => {
+            toast.loading(`[${i + 1}/${resourcesToProcess.length}] ${message}`, {
+              id: 'batch-progress',
+            });
           });
-
-          if (error) throw error;
           
-          if (data?.success) {
+          if (result.success) {
             successCount++;
-            console.log(`Resource ${resource.id}: ${data.message}`);
           } else {
             failCount++;
-            console.error(`Resource ${resource.id} failed:`, data?.error);
           }
         } catch (error) {
           failCount++;
-          console.error(`Error processing resource ${resource.id}:`, error);
         }
       }
       
-      toast.success(`Processed ${successCount} resources successfully${failCount > 0 ? `, ${failCount} failed` : ''}!`);
+      toast.dismiss('batch-progress');
+      toast.success(`Completed: ${successCount} | Failed: ${failCount}`);
+      
       fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
       fetchResources(selectedClass, selectedSubject, selectedChapter);
+      
     } catch (error) {
-      console.error('Error processing batch:', error);
+      console.error('Batch processing error:', error);
       toast.error('Failed to process resources');
     } finally {
       setIsProcessingBatch(false);
     }
   };
 
-  const handleProcessSingle = async (resourceId: number, mediaUrls: string[]) => {
+  const handleProcessSingle = async (resourceId: number) => {
     setProcessingId(resourceId);
     try {
-      const { data, error } = await supabase.functions.invoke('process-ocr', {
-        body: {
-          resourceId,
-          mediaUrls
-        }
+      const result = await processResourceOCR(resourceId, (message) => {
+        toast.loading(message, { id: `processing-${resourceId}` });
       });
-
-      if (error) throw error;
-
-      if (data?.success) {
-        toast.success(data.message || 'Resource processed!');
+      
+      toast.dismiss(`processing-${resourceId}`);
+      
+      if (result.success) {
+        toast.success(result.message);
       } else {
-        throw new Error(data?.error || 'Processing failed');
+        toast.error(result.message);
       }
       
       fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
       fetchResources(selectedClass, selectedSubject, selectedChapter);
+      
     } catch (error) {
-      console.error('Error processing resource:', error);
+      console.error('Processing error:', error);
       toast.error('Failed to process resource');
     } finally {
       setProcessingId(null);
@@ -806,7 +802,7 @@ export default function Statistics() {
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      onClick={() => handleProcessSingle(resource.id, resource.data)}
+                                      onClick={() => handleProcessSingle(resource.id)}
                                       disabled={processingId === resource.id}
                                     >
                                       {processingId === resource.id ? (
