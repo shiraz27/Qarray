@@ -12,12 +12,24 @@ type FileType = 'pdf' | 'image' | 'video' | 'audio' | 'unknown';
  * Fetch file via proxy to bypass CORS
  */
 async function fetchFileViaProxy(url: string): Promise<Blob> {
-  const { data, error } = await supabase.functions.invoke('fetch-media', {
-    body: { url },
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  
+  const response = await fetch(`${supabaseUrl}/functions/v1/fetch-media`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${supabaseKey}`,
+    },
+    body: JSON.stringify({ url }),
   });
 
-  if (error) throw new Error(`Failed to fetch file: ${error.message}`);
-  return data;
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to fetch file: ${errorText}`);
+  }
+
+  return await response.blob();
 }
 
 /**
