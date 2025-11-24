@@ -2,9 +2,10 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker } from 'tesseract.js';
 import { supabase } from '@/integrations/supabase/client';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Configure PDF.js worker using Vite URL import
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 type FileType = 'pdf' | 'image' | 'video' | 'audio' | 'unknown';
 
