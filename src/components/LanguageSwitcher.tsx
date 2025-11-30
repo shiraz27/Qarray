@@ -27,7 +27,7 @@ export const LanguageSwitcher: React.FC = () => {
   const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0];
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <Globe className="w-4 h-4" />
@@ -35,7 +35,7 @@ export const LanguageSwitcher: React.FC = () => {
           <span className="sm:hidden">{currentLanguage.flag}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-48 z-[100]" sideOffset={8}>
         {languages.map((lang) => (
           <DropdownMenuItem
             key={lang.code}
