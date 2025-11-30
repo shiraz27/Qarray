@@ -113,7 +113,7 @@ const Index: React.FC = () => {
       (_event, session) => {
         setSession(session);
         if (!session) {
-          navigate('/login');
+          navigate('/');
         } else {
           // Check if profile is complete and fetch user data
           setTimeout(async () => {
@@ -142,7 +142,7 @@ const Index: React.FC = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (!session) {
-        navigate('/login');
+        navigate('/');
       } else {
         // Check if profile is complete and fetch user data
         setTimeout(async () => {

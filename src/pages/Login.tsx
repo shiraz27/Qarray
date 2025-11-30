@@ -16,7 +16,12 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useTranslation();
-  const [isSignUp, setIsSignUp] = useState(false);
+  
+  // Check for signup param in URL
+  const [isSignUp, setIsSignUp] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('signup') === 'true';
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -86,7 +91,7 @@ const Login: React.FC = () => {
           title: t('welcomeBack'),
           description: t('welcomeBackMessage'),
         });
-        navigate('/');
+        navigate('/dashboard');
       }
     } catch (error: any) {
       toast({
@@ -104,7 +109,7 @@ const Login: React.FC = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/`
+          redirectTo: `${window.location.origin}/dashboard`
         }
       });
 
@@ -163,7 +168,7 @@ const Login: React.FC = () => {
       });
       setShowResetPassword(false);
       setNewPassword('');
-      navigate('/');
+      navigate('/dashboard');
     } catch (error: any) {
       toast({
         title: t('error'),
