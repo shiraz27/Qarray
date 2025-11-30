@@ -7,6 +7,7 @@ import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n/config";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
+import Landing from "./pages/Landing";
 import CompleteProfile from "./pages/CompleteProfile";
 import Bookmarks from "./pages/Bookmarks";
 import Classmates from "./pages/Classmates";
@@ -28,7 +29,8 @@ const AppContent = () => {
   
   return (
     <Routes>
-      <Route path="/" element={<Index />} />
+      <Route path="/" element={<Landing />} />
+      <Route path="/dashboard" element={<Index />} />
       <Route path="/login" element={<Login />} />
       <Route path="/complete-profile" element={<CompleteProfile />} />
       <Route path="/bookmarks" element={<Bookmarks />} />

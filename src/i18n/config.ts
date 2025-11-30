@@ -157,7 +157,18 @@ const resources = {
       uploadMedia: "Upload Media",
       removeMedia: "Remove Media",
       // Misc
-      optional: "Optional"
+      optional: "Optional",
+      // Landing page
+      landingTitle: "Your Learning Journey Starts Here",
+      landingSubtitle: "The ultimate platform for high school students to collaborate, learn, and excel together.",
+      landingFeature1Title: "Subjects & Chapters",
+      landingFeature1Desc: "Organized content across all subjects with chapters and study materials",
+      landingFeature2Title: "Questions & Answers",
+      landingFeature2Desc: "Ask questions and get answers from classmates and teachers",
+      landingFeature3Title: "Memorization Sets",
+      landingFeature3Desc: "Create flashcards with spaced repetition for efficient learning",
+      landingFeature4Title: "Global Search",
+      landingFeature4Desc: "Find any content across subjects, chapters, and resources instantly"
     }
   },
   fr: {
@@ -300,7 +311,18 @@ const resources = {
       uploadMedia: "Télécharger Média",
       removeMedia: "Supprimer Média",
       // Misc
-      optional: "Optionnel"
+      optional: "Optionnel",
+      // Landing page
+      landingTitle: "Votre Parcours d'Apprentissage Commence Ici",
+      landingSubtitle: "La plateforme ultime pour les lycéens pour collaborer, apprendre et exceller ensemble.",
+      landingFeature1Title: "Matières & Chapitres",
+      landingFeature1Desc: "Contenu organisé dans toutes les matières avec chapitres et supports d'étude",
+      landingFeature2Title: "Questions & Réponses",
+      landingFeature2Desc: "Posez des questions et obtenez des réponses de vos camarades et enseignants",
+      landingFeature3Title: "Ensembles de Mémorisation",
+      landingFeature3Desc: "Créez des cartes mémoire avec répétition espacée pour un apprentissage efficace",
+      landingFeature4Title: "Recherche Globale",
+      landingFeature4Desc: "Trouvez n'importe quel contenu dans les matières, chapitres et ressources instantanément"
     }
   },
   ar: {
@@ -443,7 +465,18 @@ const resources = {
       uploadMedia: "تحميل وسائط",
       removeMedia: "إزالة وسائط",
       // Misc
-      optional: "اختياري"
+      optional: "اختياري",
+      // Landing page
+      landingTitle: "رحلة التعلم تبدأ هنا",
+      landingSubtitle: "المنصة المثالية لطلاب الثانوية للتعاون والتعلم والتفوق معًا.",
+      landingFeature1Title: "المواد والفصول",
+      landingFeature1Desc: "محتوى منظم عبر جميع المواد مع فصول ومواد دراسية",
+      landingFeature2Title: "الأسئلة والأجوبة",
+      landingFeature2Desc: "اطرح الأسئلة واحصل على إجابات من زملائك ومعلميك",
+      landingFeature3Title: "مجموعات الحفظ",
+      landingFeature3Desc: "أنشئ بطاقات تعليمية مع تكرار متباعد للتعلم الفعال",
+      landingFeature4Title: "البحث الشامل",
+      landingFeature4Desc: "ابحث عن أي محتوى عبر المواد والفصول والموارد فورًا"
     }
   }
 };
