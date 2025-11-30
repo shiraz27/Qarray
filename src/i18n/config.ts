@@ -168,7 +168,12 @@ const resources = {
       landingFeature3Title: "Memorization Sets",
       landingFeature3Desc: "Create flashcards with spaced repetition for efficient learning",
       landingFeature4Title: "Global Search",
-      landingFeature4Desc: "Find any content across subjects, chapters, and resources instantly"
+      landingFeature4Desc: "Find any content across subjects, chapters, and resources instantly",
+      // Statistics
+      statisticsTitle: "Platform Statistics",
+      subjects: "Subjects",
+      subjectBreakdown: "Subject Breakdown",
+      noSubjectsYet: "No subjects available yet"
     }
   },
   fr: {
@@ -322,7 +327,12 @@ const resources = {
       landingFeature3Title: "Ensembles de Mémorisation",
       landingFeature3Desc: "Créez des cartes mémoire avec répétition espacée pour un apprentissage efficace",
       landingFeature4Title: "Recherche Globale",
-      landingFeature4Desc: "Trouvez n'importe quel contenu dans les matières, chapitres et ressources instantanément"
+      landingFeature4Desc: "Trouvez n'importe quel contenu dans les matières, chapitres et ressources instantanément",
+      // Statistics
+      statisticsTitle: "Statistiques de la Plateforme",
+      subjects: "Matières",
+      subjectBreakdown: "Répartition par Matière",
+      noSubjectsYet: "Aucune matière disponible pour le moment"
     }
   },
   ar: {
@@ -476,7 +486,12 @@ const resources = {
       landingFeature3Title: "مجموعات الحفظ",
       landingFeature3Desc: "أنشئ بطاقات تعليمية مع تكرار متباعد للتعلم الفعال",
       landingFeature4Title: "البحث الشامل",
-      landingFeature4Desc: "ابحث عن أي محتوى عبر المواد والفصول والموارد فورًا"
+      landingFeature4Desc: "ابحث عن أي محتوى عبر المواد والفصول والموارد فورًا",
+      // Statistics
+      statisticsTitle: "إحصائيات المنصة",
+      subjects: "المواد",
+      subjectBreakdown: "التوزيع حسب المادة",
+      noSubjectsYet: "لا توجد مواد متاحة بعد"
     }
   }
 };
