@@ -6,6 +6,7 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import qarayLogo from '@/assets/qarray-logo-new.png';
 import educationPattern from '@/assets/education-pattern.png';
 import { BookOpen, MessageCircle, Brain, Search } from 'lucide-react';
+import { StatisticsSection } from '@/components/StatisticsSection';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
@@ -84,8 +85,13 @@ const Landing: React.FC = () => {
           </div>
         </div>
 
+        {/* Statistics Section */}
+        <div className="w-full flex justify-center animate-fade-in" style={{ animationDelay: '0.3s' }}>
+          <StatisticsSection />
+        </div>
+
         {/* Features Section */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl w-full mt-12 animate-fade-in" style={{ animationDelay: '0.4s' }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl w-full mt-12 animate-fade-in" style={{ animationDelay: '0.5s' }}>
           {/* Feature 1 */}
           <div className="flex flex-col items-center p-6 rounded-lg bg-background/50 backdrop-blur-sm border border-border hover:border-primary transition-all hover-scale">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
