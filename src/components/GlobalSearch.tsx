@@ -63,17 +63,15 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const navigate = useNavigate();
 
-  // Effective class ID - either from user profile or from public mode selector
-  // In public mode, "all" or empty means no class filter; in private mode, use user's class
-  const effectiveClassId = publicMode 
-    ? (selectedClassId && selectedClassId !== 'all' ? parseInt(selectedClassId) : null) 
-    : userClassId;
+  // Effective class ID - selected class takes priority, then user's class in private mode
+  const effectiveClassId = selectedClassId && selectedClassId !== 'all' 
+    ? parseInt(selectedClassId) 
+    : (publicMode ? null : userClassId);
 
   useEffect(() => {
     if (open) {
-      if (publicMode) {
-        fetchClasses();
-      } else {
+      fetchClasses();
+      if (!publicMode) {
         fetchUserClass();
       }
     }
@@ -114,6 +112,10 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
 
     if (profile) {
       setUserClassId(profile.class_id);
+      // Pre-select user's class in dropdown if not already selected
+      if (!selectedClassId && profile.class_id) {
+        setSelectedClassId(profile.class_id.toString());
+      }
     }
   };
 
@@ -462,25 +464,23 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
         </DialogHeader>
 
         <div className="space-y-3 sm:space-y-4 overflow-hidden">
-          {/* Class selector for public mode */}
-          {publicMode && (
-            <div>
-              <Label className="text-xs mb-1 block">{t('selectClass')} ({t('optional')})</Label>
-              <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder={t('allClasses')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('allClasses')}</SelectItem>
-                  {classes.map((cls) => (
-                    <SelectItem key={cls.id} value={cls.id.toString()}>
-                      {cls.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {/* Class selector - optional in both modes */}
+          <div>
+            <Label className="text-xs mb-1 block">{t('selectClass')} ({t('optional')})</Label>
+            <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder={t('allClasses')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('allClasses')}</SelectItem>
+                {classes.map((cls) => (
+                  <SelectItem key={cls.id} value={cls.id.toString()}>
+                    {cls.name}{!publicMode && userClassId === cls.id ? ` (${t('myClass')})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
