@@ -423,7 +423,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-4 sm:p-6">
+      <DialogContent className="max-w-2xl max-h-[90vh] p-4 sm:p-6 overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Search className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -434,7 +434,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 sm:space-y-4">
+        <div className="space-y-3 sm:space-y-4 overflow-hidden">
           {/* Class selector for public mode */}
           {publicMode && (
             <div>
@@ -510,7 +510,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
           </div>
 
           {/* Additional Filters */}
-          <div className="space-y-2 sm:space-y-3 p-2 sm:p-3 border rounded-lg bg-muted/20">
+          <div className="space-y-2 sm:space-y-3 p-2 sm:p-3 border rounded-lg bg-muted/20 overflow-hidden">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
               <div>
                 <Label className="text-xs">{t('selectSubject')}</Label>
@@ -563,7 +563,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
                         setResourceTypeFilters(prev => ({ ...prev, [type.id]: !!checked }))
                       }
                     />
-                    <label htmlFor={`type-${type.id}`} className="text-xs cursor-pointer">
+                    <label htmlFor={`type-${type.id}`} className="text-xs cursor-pointer truncate max-w-[100px]">
                       {type.type}
                     </label>
                   </div>
@@ -571,7 +571,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="withCorrection"
@@ -628,12 +628,12 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
                             </Badge>
                           )}
                           {result.subjectName && (
-                            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0.5">
+                            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0.5 max-w-[120px] truncate">
                               {result.subjectName}
                             </Badge>
                           )}
                           {result.resourceType && (
-                            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0.5">
+                            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0.5 max-w-[100px] truncate">
                               {result.resourceType}
                             </Badge>
                           )}
