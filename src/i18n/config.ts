@@ -81,6 +81,9 @@ const resources = {
       globalSearch: "Global Search",
       searchPlaceholder: "Search chapters, resources, questions, answers...",
       searching: "Searching...",
+      selectClass: "Select a class",
+      selectClassFirst: "Select a class first to search",
+      searchPublicContent: "Search resources, questions...",
       // Filters
       allSubjects: "All subjects",
       allChapters: "All chapters",
@@ -255,6 +258,9 @@ const resources = {
       globalSearch: "Recherche Globale",
       searchPlaceholder: "Rechercher chapitres, ressources, questions, réponses...",
       searching: "Recherche...",
+      selectClass: "Sélectionner une classe",
+      selectClassFirst: "Sélectionnez d'abord une classe",
+      searchPublicContent: "Rechercher ressources, questions...",
       // Filters
       allSubjects: "Toutes les matières",
       allChapters: "Tous les chapitres",
@@ -414,6 +420,9 @@ const resources = {
       globalSearch: "البحث العام",
       searchPlaceholder: "ابحث عن فصول، موارد، أسئلة، إجابات...",
       searching: "جارٍ البحث...",
+      selectClass: "اختر فصلاً دراسياً",
+      selectClassFirst: "اختر فصلاً دراسياً أولاً",
+      searchPublicContent: "ابحث عن موارد، أسئلة...",
       // Filters
       allSubjects: "كل المواد",
       allChapters: "كل الفصول",

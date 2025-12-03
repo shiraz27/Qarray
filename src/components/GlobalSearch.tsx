@@ -38,7 +38,13 @@ interface SearchResult {
   hasCorrection?: boolean;
 }
 
-export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
+interface GlobalSearchProps {
+  open: boolean;
+  onClose: () => void;
+  publicMode?: boolean;
+}
+
+export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publicMode = false }) => {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -53,20 +59,29 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
   const [chapters, setChapters] = useState<Array<{ id: number; name: string }>>([]);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
   const [userClassId, setUserClassId] = useState<number | null>(null);
+  const [classes, setClasses] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
   const navigate = useNavigate();
+
+  // Effective class ID - either from user profile or from public mode selector
+  const effectiveClassId = publicMode ? (selectedClassId ? parseInt(selectedClassId) : null) : userClassId;
 
   useEffect(() => {
     if (open) {
-      fetchUserClass();
+      if (publicMode) {
+        fetchClasses();
+      } else {
+        fetchUserClass();
+      }
     }
-  }, [open]);
+  }, [open, publicMode]);
 
   useEffect(() => {
-    if (userClassId) {
+    if (effectiveClassId) {
       fetchSubjects();
       fetchResourceTypes();
     }
-  }, [userClassId]);
+  }, [effectiveClassId]);
 
   useEffect(() => {
     if (subjectFilter !== 'all') {
@@ -76,6 +91,15 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
       setChapterFilter('all');
     }
   }, [subjectFilter]);
+
+  const fetchClasses = async () => {
+    const { data } = await supabase
+      .from('classes')
+      .select('id, name')
+      .eq('hidden', false)
+      .order('name');
+    setClasses(data || []);
+  };
 
   const fetchUserClass = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -93,10 +117,11 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
   };
 
   const fetchSubjects = async () => {
+    if (!effectiveClassId) return;
     const { data: subjectsData } = await supabase
       .from('subjects')
       .select('id, name')
-      .eq('class_id', userClassId)
+      .eq('class_id', effectiveClassId)
       .eq('deleted', false)
       .order('name');
 
@@ -157,9 +182,9 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
             chaptersQuery = chaptersQuery.eq('id', parseInt(chapterFilter));
           }
 
-          // Filter by user's class
-          if (userClassId) {
-            chaptersQuery = chaptersQuery.eq('subjects.class_id', userClassId);
+          // Filter by class
+          if (effectiveClassId) {
+            chaptersQuery = chaptersQuery.eq('subjects.class_id', effectiveClassId);
           }
 
           const { data: chapters } = await chaptersQuery.limit(5);
@@ -191,9 +216,9 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
             resourcesQuery = resourcesQuery.eq('chapter_id', parseInt(chapterFilter));
           }
 
-          // Filter by user's class
-          if (userClassId) {
-            resourcesQuery = resourcesQuery.eq('chapters.subjects.class_id', userClassId);
+          // Filter by class
+          if (effectiveClassId) {
+            resourcesQuery = resourcesQuery.eq('chapters.subjects.class_id', effectiveClassId);
           }
 
           // Filter by resource types
@@ -213,10 +238,10 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
 
           // Also search OCR content (only if enabled)
           let ocrResults: any[] = [];
-          if (searchInOcrContent && userClassId) {
+          if (searchInOcrContent && effectiveClassId) {
             const { data: ocrData } = await supabase.rpc('search_pdf_content', {
               search_query: query,
-              user_class_id: userClassId
+              user_class_id: effectiveClassId
             });
             ocrResults = ocrData || [];
           }
@@ -293,9 +318,9 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
             questionsQuery = questionsQuery.eq('chapter_id', parseInt(chapterFilter));
           }
 
-          // Filter by user's class
-          if (userClassId) {
-            questionsQuery = questionsQuery.eq('chapters.subjects.class_id', userClassId);
+          // Filter by class
+          if (effectiveClassId) {
+            questionsQuery = questionsQuery.eq('chapters.subjects.class_id', effectiveClassId);
           }
 
           const { data: questions } = await questionsQuery.limit(5);
@@ -339,17 +364,31 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
     }, 300);
 
     return () => clearTimeout(searchTimeout);
-  }, [query, filter, subjectFilter, chapterFilter, resourceTypeFilters, withCorrectionOnly, searchInOcrContent, userClassId]);
+  }, [query, filter, subjectFilter, chapterFilter, resourceTypeFilters, withCorrectionOnly, searchInOcrContent, effectiveClassId]);
 
   const handleResultClick = (result: SearchResult) => {
-    if (result.type === 'chapter') {
-      navigate(`/chapter/${result.id}`);
-    } else if (result.type === 'resource') {
-      navigate(`/resource/${result.id}`);
-    } else if (result.type === 'question') {
-      navigate(`/question/${result.id}`);
-    } else if (result.type === 'answer' && result.questionId) {
-      navigate(`/question/${result.questionId}`);
+    if (publicMode) {
+      // In public mode, redirect to login first
+      const targetPath = result.type === 'chapter' 
+        ? `/chapter/${result.id}`
+        : result.type === 'resource'
+        ? `/resource/${result.id}`
+        : result.type === 'question'
+        ? `/question/${result.id}`
+        : result.questionId
+        ? `/question/${result.questionId}`
+        : '/';
+      navigate(`/login?redirect=${encodeURIComponent(targetPath)}`);
+    } else {
+      if (result.type === 'chapter') {
+        navigate(`/chapter/${result.id}`);
+      } else if (result.type === 'resource') {
+        navigate(`/resource/${result.id}`);
+      } else if (result.type === 'question') {
+        navigate(`/question/${result.id}`);
+      } else if (result.type === 'answer' && result.questionId) {
+        navigate(`/question/${result.questionId}`);
+      }
     }
     onClose();
   };
@@ -396,14 +435,34 @@ export const GlobalSearch: React.FC<{ open: boolean; onClose: () => void }> = ({
         </DialogHeader>
 
         <div className="space-y-3 sm:space-y-4">
+          {/* Class selector for public mode */}
+          {publicMode && (
+            <div>
+              <Label className="text-xs mb-1 block">{t('selectClass')}</Label>
+              <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder={t('selectClass')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.id.toString()}>
+                      {cls.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('searchPlaceholder')}
+              placeholder={publicMode && !effectiveClassId ? t('selectClassFirst') : t('searchPlaceholder')}
               className="pl-10 text-sm"
               autoFocus
+              disabled={publicMode && !effectiveClassId}
             />
           </div>
 
