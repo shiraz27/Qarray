@@ -64,7 +64,10 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
   const navigate = useNavigate();
 
   // Effective class ID - either from user profile or from public mode selector
-  const effectiveClassId = publicMode ? (selectedClassId ? parseInt(selectedClassId) : null) : userClassId;
+  // In public mode, "all" or empty means no class filter; in private mode, use user's class
+  const effectiveClassId = publicMode 
+    ? (selectedClassId && selectedClassId !== 'all' ? parseInt(selectedClassId) : null) 
+    : userClassId;
 
   useEffect(() => {
     if (open) {
@@ -77,10 +80,8 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
   }, [open, publicMode]);
 
   useEffect(() => {
-    if (effectiveClassId) {
-      fetchSubjects();
-      fetchResourceTypes();
-    }
+    fetchSubjects();
+    fetchResourceTypes();
   }, [effectiveClassId]);
 
   useEffect(() => {
@@ -117,14 +118,17 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
   };
 
   const fetchSubjects = async () => {
-    if (!effectiveClassId) return;
-    const { data: subjectsData } = await supabase
+    let query = supabase
       .from('subjects')
-      .select('id, name')
-      .eq('class_id', effectiveClassId)
+      .select('id, name, class_id')
       .eq('deleted', false)
       .order('name');
 
+    if (effectiveClassId) {
+      query = query.eq('class_id', effectiveClassId);
+    }
+
+    const { data: subjectsData } = await query;
     setSubjects(subjectsData || []);
   };
 
@@ -168,11 +172,18 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
 
         // Search chapters
         if (filter === 'all' || filter === 'chapters') {
-          let chaptersQuery = supabase
-            .from('chapters')
-            .select('id, name, subject_id, subjects(name, class_id)')
-            .ilike('name', `%${query}%`)
-            .eq('deleted', false);
+          let chaptersQuery = effectiveClassId
+            ? supabase
+                .from('chapters')
+                .select('id, name, subject_id, subjects!inner(name, class_id)')
+                .ilike('name', `%${query}%`)
+                .eq('deleted', false)
+                .eq('subjects.class_id', effectiveClassId)
+            : supabase
+                .from('chapters')
+                .select('id, name, subject_id, subjects(name, class_id)')
+                .ilike('name', `%${query}%`)
+                .eq('deleted', false);
 
           if (subjectFilter !== 'all') {
             chaptersQuery = chaptersQuery.eq('subject_id', parseInt(subjectFilter));
@@ -182,15 +193,12 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
             chaptersQuery = chaptersQuery.eq('id', parseInt(chapterFilter));
           }
 
-          // Filter by class
-          if (effectiveClassId) {
-            chaptersQuery = chaptersQuery.eq('subjects.class_id', effectiveClassId);
-          }
-
-          const { data: chapters } = await chaptersQuery.limit(5);
+          const { data: chapters } = await chaptersQuery.limit(10);
 
           if (chapters) {
-            searchResults.push(...chapters.map((ch: any) => ({
+            // Filter out results where subjects is null (failed inner join)
+            const validChapters = chapters.filter((ch: any) => ch.subjects);
+            searchResults.push(...validChapters.map((ch: any) => ({
               id: ch.id,
               type: 'chapter' as const,
               title: ch.name,
@@ -201,12 +209,24 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
 
         // Search resources
         if (filter === 'all' || filter === 'resources') {
-          // Search by title and description
-          let resourcesQuery = supabase
-            .from('resources')
-            .select('id, title, description, chapter_id, type_id, with_correction, data, resource_types(type), chapters(subject_id, subjects(name, class_id))')
-            .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
-            .eq('deleted', false);
+          // Filter by resource types
+          const selectedResourceTypes = Object.entries(resourceTypeFilters)
+            .filter(([_, checked]) => checked)
+            .map(([id, _]) => parseInt(id));
+
+          // Search by title and description with proper class filtering
+          let resourcesQuery = effectiveClassId
+            ? supabase
+                .from('resources')
+                .select('id, title, description, chapter_id, type_id, with_correction, data, resource_types(type), chapters!inner(subject_id, subjects!inner(name, class_id))')
+                .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+                .eq('deleted', false)
+                .eq('chapters.subjects.class_id', effectiveClassId)
+            : supabase
+                .from('resources')
+                .select('id, title, description, chapter_id, type_id, with_correction, data, resource_types(type), chapters(subject_id, subjects(name, class_id))')
+                .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+                .eq('deleted', false);
 
           if (subjectFilter !== 'all') {
             resourcesQuery = resourcesQuery.eq('chapters.subject_id', parseInt(subjectFilter));
@@ -216,16 +236,6 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
             resourcesQuery = resourcesQuery.eq('chapter_id', parseInt(chapterFilter));
           }
 
-          // Filter by class
-          if (effectiveClassId) {
-            resourcesQuery = resourcesQuery.eq('chapters.subjects.class_id', effectiveClassId);
-          }
-
-          // Filter by resource types
-          const selectedResourceTypes = Object.entries(resourceTypeFilters)
-            .filter(([_, checked]) => checked)
-            .map(([id, _]) => parseInt(id));
-
           if (selectedResourceTypes.length > 0) {
             resourcesQuery = resourcesQuery.in('type_id', selectedResourceTypes);
           }
@@ -234,9 +244,9 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
             resourcesQuery = resourcesQuery.eq('with_correction', true);
           }
 
-          const { data: resources } = await resourcesQuery.limit(10);
+          const { data: resources } = await resourcesQuery.limit(15);
 
-          // Also search OCR content (only if enabled)
+          // Also search OCR content (only if enabled and class is selected)
           let ocrResults: any[] = [];
           if (searchInOcrContent && effectiveClassId) {
             const { data: ocrData } = await supabase.rpc('search_pdf_content', {
@@ -252,8 +262,10 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
           // Add title/description matches
           if (resources) {
             resources.forEach((r: any) => {
+              // Skip if chapters is null (failed join when class filter is active)
+              if (effectiveClassId && !r.chapters) return;
+              
               const titleMatch = r.title.toLowerCase().includes(query.toLowerCase());
-              const descMatch = r.description?.toLowerCase().includes(query.toLowerCase());
               
               resourcesMap.set(r.id, {
                 id: r.id,
@@ -299,16 +311,23 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
             }
           });
 
-          searchResults.push(...Array.from(resourcesMap.values()).slice(0, 10));
+          searchResults.push(...Array.from(resourcesMap.values()).slice(0, 15));
         }
 
         // Search questions
         if (filter === 'all' || filter === 'questions') {
-          let questionsQuery = supabase
-            .from('questions')
-            .select('id, data, chapter_id, chapters(subject_id, subjects(name, class_id))')
-            .ilike('data', `%${query}%`)
-            .eq('deleted', false);
+          let questionsQuery = effectiveClassId
+            ? supabase
+                .from('questions')
+                .select('id, data, chapter_id, chapters!inner(subject_id, subjects!inner(name, class_id))')
+                .ilike('data', `%${query}%`)
+                .eq('deleted', false)
+                .eq('chapters.subjects.class_id', effectiveClassId)
+            : supabase
+                .from('questions')
+                .select('id, data, chapter_id, chapters(subject_id, subjects(name, class_id))')
+                .ilike('data', `%${query}%`)
+                .eq('deleted', false);
 
           if (subjectFilter !== 'all') {
             questionsQuery = questionsQuery.eq('chapters.subject_id', parseInt(subjectFilter));
@@ -318,15 +337,12 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
             questionsQuery = questionsQuery.eq('chapter_id', parseInt(chapterFilter));
           }
 
-          // Filter by class
-          if (effectiveClassId) {
-            questionsQuery = questionsQuery.eq('chapters.subjects.class_id', effectiveClassId);
-          }
-
-          const { data: questions } = await questionsQuery.limit(5);
+          const { data: questions } = await questionsQuery.limit(10);
 
           if (questions) {
-            searchResults.push(...questions.map((q: any) => ({
+            // Filter out results where chapters is null (failed inner join)
+            const validQuestions = questions.filter((q: any) => !effectiveClassId || q.chapters);
+            searchResults.push(...validQuestions.map((q: any) => ({
               id: q.id,
               type: 'question' as const,
               title: q.data.substring(0, 100),
@@ -336,21 +352,32 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
           }
         }
 
-        // Search answers
+        // Search answers with class filtering through questions -> chapters -> subjects
         if (filter === 'all' || filter === 'answers') {
-          const { data: answers } = await supabase
-            .from('answers')
-            .select('id, data, question_id')
-            .ilike('data', `%${query}%`)
-            .eq('deleted', false)
-            .limit(5);
+          let answersQuery = effectiveClassId
+            ? supabase
+                .from('answers')
+                .select('id, data, question_id, questions!inner(chapter_id, chapters!inner(subjects!inner(name, class_id)))')
+                .ilike('data', `%${query}%`)
+                .eq('deleted', false)
+                .eq('questions.chapters.subjects.class_id', effectiveClassId)
+            : supabase
+                .from('answers')
+                .select('id, data, question_id, questions(chapter_id, chapters(subjects(name, class_id)))')
+                .ilike('data', `%${query}%`)
+                .eq('deleted', false);
+
+          const { data: answers } = await answersQuery.limit(10);
 
           if (answers) {
-            searchResults.push(...answers.map(a => ({
+            // Filter out results where questions is null (failed inner join)
+            const validAnswers = answers.filter((a: any) => !effectiveClassId || a.questions);
+            searchResults.push(...validAnswers.map((a: any) => ({
               id: a.id,
               type: 'answer' as const,
               title: a.data.substring(0, 100),
               questionId: a.question_id,
+              subjectName: a.questions?.chapters?.subjects?.name,
             })));
           }
         }
@@ -438,12 +465,13 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
           {/* Class selector for public mode */}
           {publicMode && (
             <div>
-              <Label className="text-xs mb-1 block">{t('selectClass')}</Label>
+              <Label className="text-xs mb-1 block">{t('selectClass')} ({t('optional')})</Label>
               <Select value={selectedClassId} onValueChange={setSelectedClassId}>
                 <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder={t('selectClass')} />
+                  <SelectValue placeholder={t('allClasses')} />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">{t('allClasses')}</SelectItem>
                   {classes.map((cls) => (
                     <SelectItem key={cls.id} value={cls.id.toString()}>
                       {cls.name}
@@ -459,10 +487,9 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={publicMode && !effectiveClassId ? t('selectClassFirst') : t('searchPlaceholder')}
+              placeholder={t('searchPlaceholder')}
               className="pl-10 text-sm"
               autoFocus
-              disabled={publicMode && !effectiveClassId}
             />
           </div>
 
