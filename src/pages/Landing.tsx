@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
@@ -7,13 +7,18 @@ import qarayLogo from '@/assets/qarray-logo-new.png';
 import educationPattern from '@/assets/education-pattern.png';
 import { BookOpen, MessageCircle, Brain, Search } from 'lucide-react';
 import { StatisticsSection } from '@/components/StatisticsSection';
+import { GlobalSearch } from '@/components/GlobalSearch';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-background">
+      {/* Global Search Dialog */}
+      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} publicMode />
+
       {/* Animated Background Pattern */}
       <div className="absolute inset-0 -z-10">
         {/* Education pattern background */}
@@ -57,13 +62,22 @@ const Landing: React.FC = () => {
         </div>
 
         {/* Hero Section */}
-        <div className="text-center max-w-2xl mb-12 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+        <div className="text-center max-w-2xl mb-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
             {t('landingTitle')}
           </h2>
-          <p className="text-lg md:text-xl text-muted-foreground mb-8">
+          <p className="text-lg md:text-xl text-muted-foreground mb-6">
             {t('landingSubtitle')}
           </p>
+
+          {/* Search Bar */}
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="w-full max-w-md mx-auto flex items-center gap-3 px-4 py-3 mb-6 rounded-full bg-background/80 backdrop-blur-sm border border-border hover:border-primary transition-colors text-muted-foreground"
+          >
+            <Search className="w-5 h-5" />
+            <span>{t('searchPublicContent')}</span>
+          </button>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -125,8 +139,11 @@ const Landing: React.FC = () => {
             </p>
           </div>
 
-          {/* Feature 4 */}
-          <div className="flex flex-col items-center p-6 rounded-lg bg-background/50 backdrop-blur-sm border border-border hover:border-primary transition-all hover-scale">
+          {/* Feature 4 - Clickable Search */}
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="flex flex-col items-center p-6 rounded-lg bg-background/50 backdrop-blur-sm border border-border hover:border-primary transition-all hover-scale cursor-pointer text-left"
+          >
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
               <Search className="w-8 h-8 text-primary" />
             </div>
@@ -134,7 +151,7 @@ const Landing: React.FC = () => {
             <p className="text-sm text-muted-foreground text-center">
               {t('landingFeature4Desc')}
             </p>
-          </div>
+          </button>
         </div>
       </div>
     </div>
