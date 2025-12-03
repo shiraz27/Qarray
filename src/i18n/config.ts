@@ -85,6 +85,7 @@ const resources = {
       selectClassFirst: "Select a class first to search",
       searchPublicContent: "Search resources, questions...",
       // Filters
+      allClasses: "All Classes",
       allSubjects: "All subjects",
       allChapters: "All chapters",
       selectSubjectFirst: "Select subject first",
@@ -262,6 +263,7 @@ const resources = {
       selectClassFirst: "Sélectionnez d'abord une classe",
       searchPublicContent: "Rechercher ressources, questions...",
       // Filters
+      allClasses: "Toutes les classes",
       allSubjects: "Toutes les matières",
       allChapters: "Tous les chapitres",
       selectSubjectFirst: "Sélectionner d'abord une matière",
@@ -424,6 +426,7 @@ const resources = {
       selectClassFirst: "اختر فصلاً دراسياً أولاً",
       searchPublicContent: "ابحث عن موارد، أسئلة...",
       // Filters
+      allClasses: "كل الأقسام",
       allSubjects: "كل المواد",
       allChapters: "كل الفصول",
       selectSubjectFirst: "اختر مادة أولاً",
