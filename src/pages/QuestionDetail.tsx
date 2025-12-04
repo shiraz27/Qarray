@@ -19,6 +19,7 @@ import { EditQuestionForm } from '@/components/EditQuestionForm';
 import { EditAnswerForm } from '@/components/EditAnswerForm';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { EmptyState } from '@/components/EmptyState';
+import { SEO, createQAPageSchema } from '@/components/SEO';
 
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -534,8 +535,17 @@ export default function QuestionDetail() {
 
   if (!question) return null;
 
+  const { text: questionText } = extractMediaFromText(question.data);
+  const questionPreview = questionText.substring(0, 100) + (questionText.length > 100 ? '...' : '');
+
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
+      <SEO
+        title={questionPreview}
+        description={`Question with ${answers.length} answers`}
+        url={`/question/${id}`}
+        jsonLd={createQAPageSchema(questionText, answers.length, `/question/${id}`)}
+      />
       <div className="sticky top-0 z-50 bg-white border-b">
         <div className="flex items-center justify-between px-4 py-3">
           <Button variant="ghost" size="icon" onClick={() => {

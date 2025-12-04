@@ -17,6 +17,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
 import { EmptyState } from '@/components/EmptyState';
+import { SEO, createLearningResourceSchema } from '@/components/SEO';
 
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -449,6 +450,17 @@ export default function ResourceDetail() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
+      <SEO
+        title={resource.title}
+        description={resource.description}
+        url={`/resource/${id}`}
+        jsonLd={createLearningResourceSchema(
+          resource.title,
+          resource.description,
+          `/resource/${id}`,
+          'Educational Resource'
+        )}
+      />
       <div className="sticky top-0 z-50 bg-white border-b">
         <div className="flex items-center justify-between px-4 py-3">
           <Button variant="ghost" size="icon" onClick={() => {

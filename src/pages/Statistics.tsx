@@ -14,6 +14,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Input } from '@/components/ui/input';
 import { processResourceOCR } from '@/utils/clientOcrProcessor';
+import { SEO, createWebPageSchema } from '@/components/SEO';
 
 interface Stats {
   total_questions: number;
@@ -453,6 +454,13 @@ export default function Statistics() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <SEO
+        title="Statistics"
+        description="Platform content statistics and analytics"
+        url="/statistics"
+        noindex={true}
+        jsonLd={createWebPageSchema('Statistics - Qarray', 'Platform statistics', '/statistics')}
+      />
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-6">

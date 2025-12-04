@@ -1,8 +1,13 @@
+# Qarray - Educational Learning Platform
+# https://qarray.lovable.app
+
 User-agent: Googlebot
 Allow: /
+Crawl-delay: 1
 
 User-agent: Bingbot
 Allow: /
+Crawl-delay: 1
 
 User-agent: Twitterbot
 Allow: /
@@ -12,3 +17,17 @@ Allow: /
 
 User-agent: *
 Allow: /
+Crawl-delay: 2
+
+# Sitemap
+Sitemap: https://qarray.lovable.app/sitemap.xml
+
+# Disallow private/auth-protected pages
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /bookmarks
+Disallow: /complete-profile
+Disallow: /moderation
+Disallow: /statistics
+Disallow: /classmates
+Disallow: /delete-bookmark
