@@ -10,6 +10,7 @@ import { StudySessionDialog } from '@/components/StudySessionDialog';
 import { EditMemorizationDialog } from '@/components/EditMemorizationDialog';
 import { MediaPreview } from '@/components/MediaPreview';
 import { useUserRole } from '@/hooks/useUserRole';
+import { SEO, createLearningResourceSchema } from '@/components/SEO';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -201,6 +202,18 @@ export default function MemorizationDetail() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <SEO
+        title={`${memorization.title} - Flashcards`}
+        description={memorization.description || `Flashcard set with ${flashcards.length} cards`}
+        url={`/memorization/${id}`}
+        jsonLd={createLearningResourceSchema(
+          memorization.title,
+          memorization.description || 'Flashcard memorization set',
+          `/memorization/${id}`,
+          'Flashcards'
+        )}
+      />
+      
       {/* Top Navigation */}
       <div className="sticky top-0 z-50 bg-background border-b">
         <div className="flex items-center justify-between px-4 py-3">

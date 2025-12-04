@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import qarayLogo from '@/assets/qarray-logo-new.png';
 import educationPattern from '@/assets/education-pattern.png';
 import { TutorialDialog } from '@/components/TutorialDialog';
+import { SEO, createWebPageSchema } from '@/components/SEO';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -175,6 +176,13 @@ const Index: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background relative">
+      <SEO
+        title="Dashboard"
+        description="Your personalized learning dashboard"
+        url="/dashboard"
+        noindex={true}
+        jsonLd={createWebPageSchema('Dashboard - Qarray', 'Your learning dashboard', '/dashboard')}
+      />
       <div className="w-full mx-auto flex flex-col min-h-screen">
         <div className="flex-1 w-full overflow-auto pb-24">
           {activeTab === 'subjects' && (

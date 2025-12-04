@@ -17,6 +17,7 @@ import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { AddResourceForm } from '@/components/AddResourceForm';
 import { UserAvatar } from '@/components/UserAvatar';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
+import { SEO, createCourseSchema } from '@/components/SEO';
 
 interface ChapterData {
   id: number;
@@ -634,6 +635,17 @@ export default function Chapter() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
+      <SEO
+        title={chapter.name}
+        description={`${chapter.name} - ${chapter.questionCount} questions, ${chapter.resourceCount} resources`}
+        url={`/chapter/${id}`}
+        jsonLd={createCourseSchema(
+          chapter.name,
+          `Study materials for ${chapter.name} including questions, answers and resources`,
+          `/chapter/${id}`
+        )}
+      />
+      
       {/* Header with back button and logo */}
       <div className="sticky top-0 z-50 bg-white border-b">
         <div className="flex items-center justify-between px-4 py-3">

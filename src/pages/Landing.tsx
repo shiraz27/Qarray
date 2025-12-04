@@ -8,14 +8,31 @@ import educationPattern from '@/assets/education-pattern.png';
 import { BookOpen, MessageCircle, Brain, Search } from 'lucide-react';
 import { StatisticsSection } from '@/components/StatisticsSection';
 import { GlobalSearch } from '@/components/GlobalSearch';
+import { SEO } from '@/components/SEO';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [searchOpen, setSearchOpen] = useState(false);
 
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'EducationalOrganization',
+    name: 'Qarray',
+    description: t('landingSubtitle'),
+    url: 'https://qarray.lovable.app',
+    logo: 'https://qarray.lovable.app/qarray-logo-new.png',
+  };
+
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-background">
+      <SEO
+        title={t('landingTitle')}
+        description={t('landingSubtitle')}
+        url="/"
+        jsonLd={organizationSchema}
+      />
+      
       {/* Global Search Dialog */}
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} publicMode />
 

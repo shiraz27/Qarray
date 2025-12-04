@@ -11,6 +11,7 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import qarayLogo from '@/assets/qarray-logo-new.png';
 import educationPattern from '@/assets/education-pattern.png';
+import { SEO, createWebPageSchema } from '@/components/SEO';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -182,6 +183,17 @@ const Login: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
+      <SEO
+        title={isSignUp ? t('createAccount') : t('signIn')}
+        description={isSignUp ? t('signUpMessage') : t('signInMessage')}
+        url="/login"
+        jsonLd={createWebPageSchema(
+          isSignUp ? 'Create Account - Qarray' : 'Sign In - Qarray',
+          isSignUp ? 'Sign up to start learning with Qarray' : 'Sign in to continue your learning journey',
+          '/login'
+        )}
+      />
+      
       {/* Animated Background Pattern */}
       <div className="absolute inset-0 -z-10">
         {/* Gradient overlay */}

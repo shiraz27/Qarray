@@ -11,6 +11,7 @@ import { BookmarkSkeleton } from "@/components/LoadingSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import qarayLogo from "@/assets/qarray-logo-new.png";
 import { extractMediaFromText } from "@/utils/mediaHelpers";
+import { SEO, createWebPageSchema } from "@/components/SEO";
 
 interface BookmarkedItem {
   id: string;
@@ -327,6 +328,14 @@ export default function Bookmarks() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <SEO
+        title={t('bookmarks')}
+        description="Your saved bookmarks on Qarray"
+        url="/bookmarks"
+        noindex={true}
+        jsonLd={createWebPageSchema('Bookmarks - Qarray', 'View your saved bookmarks', '/bookmarks')}
+      />
+      
       {/* Top Navigation */}
       <div className="sticky top-0 z-50 bg-background border-b">
         <div className="flex items-center justify-between px-4 py-3">

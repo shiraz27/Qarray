@@ -11,6 +11,7 @@ import { EditProfileDialog } from '@/components/EditProfileDialog';
 import { TutorialDialog } from '@/components/TutorialDialog';
 import { Card } from '@/components/ui/card';
 import { useUserRole } from '@/hooks/useUserRole';
+import { SEO, createWebPageSchema } from '@/components/SEO';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -315,6 +316,14 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
+      <SEO
+        title={t('profile')}
+        description="Manage your Qarray profile and settings"
+        url="/profile"
+        noindex={true}
+        jsonLd={createWebPageSchema('Profile - Qarray', 'Manage your profile', '/profile')}
+      />
+      
       <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
           <ArrowLeft size={20} />

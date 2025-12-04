@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <!-- Landing Page -->
+  <url>
+    <loc>https://qarray.lovable.app/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://qarray.lovable.app/?lang=en" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://qarray.lovable.app/?lang=fr" />
+    <xhtml:link rel="alternate" hreflang="ar" href="https://qarray.lovable.app/?lang=ar" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://qarray.lovable.app/" />
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  
+  <!-- Login Page -->
+  <url>
+    <loc>https://qarray.lovable.app/login</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://qarray.lovable.app/login?lang=en" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://qarray.lovable.app/login?lang=fr" />
+    <xhtml:link rel="alternate" hreflang="ar" href="https://qarray.lovable.app/login?lang=ar" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://qarray.lovable.app/login" />
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- Note: Dynamic pages (chapters, questions, resources) are crawlable but not listed here -->
+  <!-- They can be discovered through internal linking from the main pages -->
+</urlset>
