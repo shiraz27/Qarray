@@ -22,6 +22,7 @@ import {
 import { StatisticsSection } from '@/components/StatisticsSection';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { SEO } from '@/components/SEO';
+import { DarkModeToggle } from '@/components/DarkModeToggle';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
@@ -132,6 +133,7 @@ const Landing: React.FC = () => {
               <Rocket className="w-4 h-4 mr-1" />
               {t('createAccount')}
             </Button>
+            <DarkModeToggle />
             <LanguageSwitcher />
           </div>
         </div>
