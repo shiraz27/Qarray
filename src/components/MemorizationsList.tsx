@@ -358,7 +358,7 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3">
                   <h3
-                    className="font-semibold text-sm tracking-wide text-foreground flex-1 cursor-pointer"
+                    className="font-semibold text-sm tracking-wide text-gray-900 flex-1 cursor-pointer"
                     onClick={() => navigate(`/memorization/${mem.id}`)}
                   >
                     {mem.title.toUpperCase()}
@@ -373,7 +373,7 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
                           }}
                           className="hover:scale-110 transition-transform"
                         >
-                          <Edit size={18} className="text-foreground" />
+                          <Edit size={18} className="text-gray-700" />
                         </button>
                         <button
                           onClick={(e) => {
@@ -382,7 +382,7 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
                           }}
                           className="hover:scale-110 transition-transform"
                         >
-                          <Trash2 size={18} className="text-destructive" />
+                          <Trash2 size={18} className="text-red-600" />
                         </button>
                       </>
                     )}
@@ -395,7 +395,7 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
                     >
                       <Bookmark
                         size={18}
-                        className={`text-foreground ${mem.isBookmarked ? 'fill-foreground' : ''}`}
+                        className={`text-gray-700 ${mem.isBookmarked ? 'fill-gray-700' : ''}`}
                       />
                     </button>
                   </div>
@@ -412,9 +412,9 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
                     >
                       <ThumbsUp
                         size={14}
-                        className={mem.userVote === 'up' ? 'fill-foreground text-foreground' : 'text-muted-foreground'}
+                        className={mem.userVote === 'up' ? 'fill-gray-700 text-gray-700' : 'text-gray-500'}
                       />
-                      <span className="font-medium text-muted-foreground">{mem.upvotes}</span>
+                      <span className="font-medium text-gray-600">{mem.upvotes}</span>
                     </button>
                     <button
                       onClick={(e) => {
@@ -425,12 +425,12 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
                     >
                       <ThumbsDown
                         size={14}
-                        className={mem.userVote === 'down' ? 'fill-foreground text-foreground' : 'text-muted-foreground'}
+                        className={mem.userVote === 'down' ? 'fill-gray-700 text-gray-700' : 'text-gray-500'}
                       />
-                      <span className="font-medium text-muted-foreground">{mem.downvotes}</span>
+                      <span className="font-medium text-gray-600">{mem.downvotes}</span>
                     </button>
                   </div>
-                  <div className="flex items-center gap-3 text-muted-foreground">
+                  <div className="flex items-center gap-3 text-gray-600">
                     <span className="font-medium">{mem.flashcard_count} cards</span>
                     <span className="text-xs">by {mem.creator_name}</span>
                   </div>

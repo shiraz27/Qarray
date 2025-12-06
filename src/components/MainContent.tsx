@@ -327,7 +327,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
               
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold text-sm tracking-wide text-foreground flex-1">
+                  <h3 className="font-semibold text-sm tracking-wide text-gray-900 flex-1">
                     {chapter.name.toUpperCase()}
                   </h3>
                   <div className="flex items-center gap-2">
@@ -337,7 +337,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
                         className="opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
                         title="Edit Chapter"
                       >
-                        <Edit size={16} className="text-foreground" />
+                        <Edit size={16} className="text-gray-700" />
                       </button>
                     )}
                     <button
@@ -349,21 +349,21 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
                     >
                       <Bookmark
                         size={20}
-                        className={`text-foreground ${chapter.isBookmarked ? 'fill-foreground' : ''}`}
+                        className={`text-gray-700 ${chapter.isBookmarked ? 'fill-gray-700' : ''}`}
                       />
                     </button>
                   </div>
                 </div>
                 
                 <div className="flex gap-4 text-xs">
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <MessageSquare size={14} className="text-muted-foreground" />
+                  <div className="flex items-center gap-1.5 text-gray-600">
+                    <MessageSquare size={14} className="text-gray-600" />
                     <span className="font-medium">
                       {chapter.questionCount} {t('questions') || 'Questions'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <FileText size={14} className="text-muted-foreground" />
+                  <div className="flex items-center gap-1.5 text-gray-600">
+                    <FileText size={14} className="text-gray-600" />
                     <span className="font-medium">
                       {chapter.resourceCount} {t('resources') || 'Resources'}
                     </span>
