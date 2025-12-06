@@ -65,7 +65,7 @@ const Landing: React.FC = () => {
       icon: Brain,
       title: t('landingFeature3Title'),
       description: t('landingFeature3Desc'),
-      color: 'primary',
+      color: 'black',
     },
     {
       icon: Search,
@@ -251,12 +251,16 @@ const Landing: React.FC = () => {
                   <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${
                     feature.color === 'coral' 
                       ? 'bg-[hsl(14,92%,76%)]/15' 
-                      : 'bg-primary/15'
+                      : feature.color === 'black'
+                        ? 'bg-gray-900/15 dark:bg-gray-100/15'
+                        : 'bg-primary/15'
                   }`}>
                     <IconComponent className={`w-7 h-7 sm:w-8 sm:h-8 ${
                       feature.color === 'coral' 
                         ? 'text-[hsl(14,92%,76%)]' 
-                        : 'text-primary'
+                        : feature.color === 'black'
+                          ? 'text-gray-900 dark:text-gray-100'
+                          : 'text-primary'
                     }`} />
                   </div>
 
