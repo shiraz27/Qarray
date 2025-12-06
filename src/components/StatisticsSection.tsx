@@ -1,11 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AnimatedCounter } from './AnimatedCounter';
-import { Card } from './ui/card';
 import { Skeleton } from './ui/skeleton';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import { ChevronDown, BookOpen, FileText, MessageCircle, Brain } from 'lucide-react';
+import { 
+  BookOpen, 
+  FileText, 
+  MessageCircle, 
+  Brain, 
+  Trophy,
+  Zap,
+  ChevronDown,
+  Layers
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 
 interface SubjectStats {
   id: number;
@@ -30,12 +44,11 @@ export const StatisticsSection: React.FC = () => {
   const { t } = useTranslation();
   const [classStats, setClassStats] = useState<ClassStats[]>([]);
   const [loading, setLoading] = useState(true);
-  const [openClasses, setOpenClasses] = useState<Set<number>>(new Set());
+  const [selectedClassId, setSelectedClassId] = useState<string>('all');
 
   useEffect(() => {
     const fetchStatistics = async () => {
       try {
-        // Fetch all non-hidden classes
         const { data: classes, error: classError } = await supabase
           .from('classes')
           .select('id, name')
@@ -45,14 +58,12 @@ export const StatisticsSection: React.FC = () => {
         if (classError) throw classError;
 
         const statsPromises = classes?.map(async (cls) => {
-          // Get subjects for this class
           const { data: subjects } = await supabase
             .from('subjects')
             .select('id, name')
             .eq('class_id', cls.id)
             .eq('deleted', false);
 
-          // Get resources count
           const { count: resourceCount } = await supabase
             .from('resources')
             .select('*', { count: 'exact', head: true })
@@ -61,7 +72,6 @@ export const StatisticsSection: React.FC = () => {
               (await supabase.from('chapters').select('id').eq('class_id', cls.id).eq('deleted', false)).data?.map(c => c.id) || []
             );
 
-          // Get questions count
           const { count: questionCount } = await supabase
             .from('questions')
             .select('*', { count: 'exact', head: true })
@@ -70,14 +80,12 @@ export const StatisticsSection: React.FC = () => {
               (await supabase.from('chapters').select('id').eq('class_id', cls.id).eq('deleted', false)).data?.map(c => c.id) || []
             );
 
-          // Get memorizations count
           const { count: memorizationCount } = await supabase
             .from('memorizations')
             .select('*', { count: 'exact', head: true })
             .eq('deleted', false)
             .eq('class_id', cls.id);
 
-          // Get answers count
           const { count: answerCount } = await supabase
             .from('answers')
             .select('*', { count: 'exact', head: true })
@@ -88,7 +96,6 @@ export const StatisticsSection: React.FC = () => {
               )).data?.map(q => q.id) || []
             );
 
-          // Get per-subject stats
           const subjectStats = await Promise.all(
             subjects?.map(async (subject) => {
               const { count: subjectResourceCount } = await supabase
@@ -147,138 +154,206 @@ export const StatisticsSection: React.FC = () => {
     fetchStatistics();
   }, []);
 
-  const toggleClass = (classId: number) => {
-    setOpenClasses(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(classId)) {
-        newSet.delete(classId);
-      } else {
-        newSet.add(classId);
-      }
-      return newSet;
-    });
-  };
+  // Calculate aggregated stats
+  const aggregatedStats = useMemo(() => {
+    return classStats.reduce(
+      (acc, cls) => ({
+        totalResources: acc.totalResources + cls.totalResources,
+        totalQuestions: acc.totalQuestions + cls.totalQuestions,
+        totalMemorizations: acc.totalMemorizations + cls.totalMemorizations,
+        totalAnswers: acc.totalAnswers + cls.totalAnswers,
+        totalSubjects: acc.totalSubjects + cls.subjectCount,
+        totalClasses: acc.totalClasses + 1,
+      }),
+      { totalResources: 0, totalQuestions: 0, totalMemorizations: 0, totalAnswers: 0, totalSubjects: 0, totalClasses: 0 }
+    );
+  }, [classStats]);
+
+  // Get current display stats based on selection
+  const displayStats = useMemo(() => {
+    if (selectedClassId === 'all') {
+      return {
+        resources: aggregatedStats.totalResources,
+        questions: aggregatedStats.totalQuestions,
+        memorizations: aggregatedStats.totalMemorizations,
+        answers: aggregatedStats.totalAnswers,
+        subjects: aggregatedStats.totalSubjects,
+        label: t('allClasses'),
+      };
+    }
+    const selectedClass = classStats.find(c => c.id.toString() === selectedClassId);
+    if (!selectedClass) return null;
+    return {
+      resources: selectedClass.totalResources,
+      questions: selectedClass.totalQuestions,
+      memorizations: selectedClass.totalMemorizations,
+      answers: selectedClass.totalAnswers,
+      subjects: selectedClass.subjectCount,
+      label: selectedClass.name,
+    };
+  }, [selectedClassId, classStats, aggregatedStats, t]);
+
+  // Get subjects for selected class
+  const selectedClassSubjects = useMemo(() => {
+    if (selectedClassId === 'all') return [];
+    const selectedClass = classStats.find(c => c.id.toString() === selectedClassId);
+    return selectedClass?.subjects || [];
+  }, [selectedClassId, classStats]);
 
   if (loading) {
     return (
-      <div className="w-full max-w-6xl px-6 py-12">
-        <Skeleton className="h-10 w-64 mb-8 mx-auto" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-48 w-full" />
+      <div className="w-full max-w-4xl px-4">
+        <Skeleton className="h-8 w-48 mb-6 mx-auto" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
           ))}
         </div>
       </div>
     );
   }
 
-  if (classStats.length === 0) {
+  if (classStats.length === 0 || !displayStats) {
     return null;
   }
 
+  const statItems = [
+    {
+      icon: FileText,
+      value: displayStats.resources,
+      label: t('resources'),
+      color: 'primary',
+      bgClass: 'bg-primary/10',
+      textClass: 'text-primary',
+    },
+    {
+      icon: MessageCircle,
+      value: displayStats.questions,
+      label: t('questions'),
+      color: 'coral',
+      bgClass: 'bg-[hsl(14,92%,76%)]/15',
+      textClass: 'text-[hsl(14,92%,76%)]',
+    },
+    {
+      icon: Brain,
+      value: displayStats.memorizations,
+      label: t('memorizations'),
+      color: 'blue',
+      bgClass: 'bg-primary/10',
+      textClass: 'text-primary',
+    },
+    {
+      icon: BookOpen,
+      value: displayStats.subjects,
+      label: t('subjects'),
+      color: 'gold',
+      bgClass: 'bg-[hsl(45,93%,47%)]/15',
+      textClass: 'text-[hsl(45,93%,47%)]',
+    },
+  ];
+
   return (
-    <div className="w-full max-w-6xl px-6 py-12">
-      <h2 className="text-3xl md:text-4xl font-bold text-center text-foreground mb-12">
-        {t('statisticsTitle')}
-      </h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {classStats.map((cls) => (
-          <Collapsible
-            key={cls.id}
-            open={openClasses.has(cls.id)}
-            onOpenChange={() => toggleClass(cls.id)}
-          >
-            <Card className="overflow-hidden hover:border-primary transition-all cursor-pointer bg-background/50 backdrop-blur-sm">
-              <CollapsibleTrigger className="w-full text-left p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-foreground">{cls.name}</h3>
-                  <ChevronDown
-                    className={`w-5 h-5 text-muted-foreground transition-transform ${
-                      openClasses.has(cls.id) ? 'rotate-180' : ''
-                    }`}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 rounded-lg bg-primary/10">
-                    <div className="flex items-center justify-center mb-2">
-                      <FileText className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="text-2xl font-bold text-primary">
-                      <AnimatedCounter value={cls.totalResources} />
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">{t('resources')}</div>
-                  </div>
-
-                  <div className="text-center p-3 rounded-lg bg-[#F6A18A]/10">
-                    <div className="flex items-center justify-center mb-2">
-                      <MessageCircle className="w-5 h-5 text-[#F6A18A]" />
-                    </div>
-                    <div className="text-2xl font-bold text-[#F6A18A]">
-                      <AnimatedCounter value={cls.totalQuestions} />
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">{t('questions')}</div>
-                  </div>
-
-                  <div className="text-center p-3 rounded-lg bg-[hsl(207,89%,54%)]/10">
-                    <div className="flex items-center justify-center mb-2">
-                      <Brain className="w-5 h-5 text-[hsl(207,89%,54%)]" />
-                    </div>
-                    <div className="text-2xl font-bold text-[hsl(207,89%,54%)]">
-                      <AnimatedCounter value={cls.totalMemorizations} />
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">{t('memorizations')}</div>
-                  </div>
-
-                  <div className="text-center p-3 rounded-lg bg-secondary/50">
-                    <div className="flex items-center justify-center mb-2">
-                      <BookOpen className="w-5 h-5 text-secondary-foreground" />
-                    </div>
-                    <div className="text-2xl font-bold text-secondary-foreground">
-                      <AnimatedCounter value={cls.subjectCount} />
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">{t('subjects')}</div>
-                  </div>
-                </div>
-              </CollapsibleTrigger>
-
-              <CollapsibleContent>
-                <div className="border-t border-border p-6 pt-4 space-y-3">
-                  <h4 className="font-semibold text-sm text-muted-foreground mb-3">
-                    {t('subjectBreakdown')}
-                  </h4>
-                  {cls.subjects.length > 0 ? (
-                    cls.subjects.map((subject) => (
-                      <div
-                        key={subject.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                      >
-                        <span className="font-medium text-sm">{subject.name}</span>
-                        <div className="flex gap-3 text-xs">
-                          <span className="text-primary">
-                            <AnimatedCounter value={subject.resourceCount} suffix=" res" />
-                          </span>
-                          <span className="text-[#F6A18A]">
-                            <AnimatedCounter value={subject.questionCount} suffix=" q" />
-                          </span>
-                          <span className="text-[hsl(207,89%,54%)]">
-                            <AnimatedCounter value={subject.memorizationCount} suffix=" mem" />
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      {t('noSubjectsYet')}
-                    </p>
-                  )}
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-        ))}
+    <div className="w-full max-w-4xl px-4">
+      {/* Class Selector */}
+      <div className="flex items-center justify-center gap-3 mb-6">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Layers className="w-4 h-4" />
+          <span>{t('viewStatsFor')}:</span>
+        </div>
+        <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+          <SelectTrigger className="w-[180px] bg-card border-2 border-border hover:border-primary transition-colors">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-card border-2 border-border z-50">
+            <SelectItem value="all" className="cursor-pointer">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-[hsl(45,93%,47%)]" />
+                <span>{t('allClasses')}</span>
+              </div>
+            </SelectItem>
+            {classStats.map((cls) => (
+              <SelectItem key={cls.id} value={cls.id.toString()} className="cursor-pointer">
+                {cls.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        {statItems.map((stat, index) => {
+          const IconComponent = stat.icon;
+          return (
+            <div
+              key={index}
+              className="gamified-card p-4 sm:p-5 flex flex-col items-center text-center group relative overflow-hidden"
+            >
+              {/* Background glow */}
+              <div className={`absolute inset-0 ${stat.bgClass} opacity-0 group-hover:opacity-100 transition-opacity`} />
+              
+              {/* Icon */}
+              <div className={`relative w-10 h-10 sm:w-12 sm:h-12 rounded-xl ${stat.bgClass} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                <IconComponent className={`w-5 h-5 sm:w-6 sm:h-6 ${stat.textClass}`} />
+              </div>
+
+              {/* Value */}
+              <div className={`relative text-2xl sm:text-3xl font-bold ${stat.textClass} mb-1`}>
+                <AnimatedCounter value={stat.value} />
+              </div>
+
+              {/* Label */}
+              <div className="relative text-xs sm:text-sm text-muted-foreground font-medium">
+                {stat.label}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Subject Breakdown (only when specific class is selected) */}
+      {selectedClassId !== 'all' && selectedClassSubjects.length > 0 && (
+        <div className="mt-6 p-4 rounded-2xl bg-card/50 border-2 border-border">
+          <div className="flex items-center gap-2 mb-4">
+            <Zap className="w-4 h-4 text-primary" />
+            <h4 className="font-semibold text-sm text-foreground">{t('subjectBreakdown')}</h4>
+          </div>
+          <div className="grid gap-2">
+            {selectedClassSubjects.map((subject) => (
+              <div
+                key={subject.id}
+                className="flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+              >
+                <span className="font-medium text-sm text-foreground">{subject.name}</span>
+                <div className="flex gap-4 text-xs font-medium">
+                  <span className="text-primary flex items-center gap-1">
+                    <FileText className="w-3 h-3" />
+                    <AnimatedCounter value={subject.resourceCount} />
+                  </span>
+                  <span className="text-[hsl(14,92%,76%)] flex items-center gap-1">
+                    <MessageCircle className="w-3 h-3" />
+                    <AnimatedCounter value={subject.questionCount} />
+                  </span>
+                  <span className="text-primary flex items-center gap-1">
+                    <Brain className="w-3 h-3" />
+                    <AnimatedCounter value={subject.memorizationCount} />
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* All Classes Summary (when viewing all) */}
+      {selectedClassId === 'all' && (
+        <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Trophy className="w-4 h-4 text-[hsl(45,93%,47%)]" />
+          <span>
+            {t('across')} <span className="font-semibold text-foreground">{aggregatedStats.totalClasses}</span> {t('classes')}
+          </span>
+        </div>
+      )}
     </div>
   );
 };

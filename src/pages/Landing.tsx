@@ -214,13 +214,7 @@ const Landing: React.FC = () => {
 
         {/* Statistics Section */}
         <div className="w-full flex justify-center mb-8 animate-slide-up" style={{ animationDelay: '0.3s' }}>
-          <div className="relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1 rounded-full bg-[hsl(45,93%,47%)] text-[hsl(45,93%,10%)] text-xs font-bold z-10">
-              <Trophy className="w-3 h-3" />
-              Community Achievements
-            </div>
-            <StatisticsSection />
-          </div>
+          <StatisticsSection />
         </div>
 
         {/* Features Section */}
