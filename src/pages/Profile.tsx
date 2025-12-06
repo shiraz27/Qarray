@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, ThumbsUp, ThumbsDown, FileText, Palette, Upload, X, GraduationCap, Bell, BookOpen, Brain } from 'lucide-react';
+import { ArrowLeft, LogOut, Trash2, Edit, Mail, TrendingUp, MessageSquare, ThumbsUp, ThumbsDown, FileText, Palette, Upload, X, GraduationCap, Bell, BookOpen, Brain, Moon } from 'lucide-react';
+import { DarkModeToggle } from '@/components/DarkModeToggle';
 import { Session } from '@supabase/supabase-js';
 import { EditProfileDialog } from '@/components/EditProfileDialog';
 import { TutorialDialog } from '@/components/TutorialDialog';
@@ -397,6 +398,21 @@ export default function Profile() {
                 </div>
                 <p className="text-3xl font-bold">{stats.downvotes}</p>
               </div>
+            </div>
+          </Card>
+
+          {/* Appearance Card */}
+          <Card className="gamified-card p-6">
+            <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+              <Palette className="w-5 h-5 text-primary" />
+              Appearance
+            </h3>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
+              <div className="flex items-center gap-3">
+                <Moon className="w-5 h-5 text-muted-foreground" />
+                <span className="font-medium">Dark Mode</span>
+              </div>
+              <DarkModeToggle />
             </div>
           </Card>
 
