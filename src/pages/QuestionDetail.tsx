@@ -49,6 +49,12 @@ interface Answer {
   userVote: string | null;
 }
 
+interface ContextData {
+  className?: string;
+  subjectName?: string;
+  chapterName?: string;
+}
+
 export default function QuestionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -65,6 +71,7 @@ export default function QuestionDetail() {
   const [editingAnswerId, setEditingAnswerId] = useState<number | null>(null);
   const [deletingAnswerId, setDeletingAnswerId] = useState<number | null>(null);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
+  const [contextData, setContextData] = useState<ContextData | null>(null);
   const { isModerator } = useUserRole();
 
   useEffect(() => {
@@ -155,6 +162,46 @@ export default function QuestionDetail() {
         answerCount: answerCount || 0,
         isBookmarked,
       });
+
+      // Fetch context data (chapter -> subject -> class)
+      if (questionData.chapter_id) {
+        const { data: chapterData } = await supabase
+          .from('chapters')
+          .select('name, subject_id')
+          .eq('id', questionData.chapter_id)
+          .single();
+        
+        if (chapterData?.subject_id) {
+          const { data: subjectData } = await supabase
+            .from('subjects')
+            .select('name, class_id')
+            .eq('id', chapterData.subject_id)
+            .single();
+          
+          if (subjectData?.class_id) {
+            const { data: classData } = await supabase
+              .from('classes')
+              .select('name')
+              .eq('id', subjectData.class_id)
+              .single();
+            
+            setContextData({
+              chapterName: chapterData.name,
+              subjectName: subjectData.name,
+              className: classData?.name
+            });
+          } else {
+            setContextData({
+              chapterName: chapterData.name,
+              subjectName: subjectData.name
+            });
+          }
+        } else {
+          setContextData({
+            chapterName: chapterData?.name
+          });
+        }
+      }
 
       // Fetch answers
       const { data: answersData } = await supabase
@@ -541,10 +588,37 @@ export default function QuestionDetail() {
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
       <SEO
-        title={questionPreview}
-        description={`Question with ${answers.length} answers`}
+        title={`${questionPreview}${contextData?.subjectName ? ` - ${contextData.subjectName}` : ''}${contextData?.className ? ` | ${contextData.className}` : ''}`}
+        description={(() => {
+          const answerSnippets = answers.slice(0, 2).map(a => {
+            const { text } = extractMediaFromText(a.data);
+            return text.substring(0, 80);
+          }).join(' | ');
+          const context = [contextData?.subjectName, contextData?.className, 'Tunisie'].filter(Boolean).join(' - ');
+          return `${questionText.substring(0, 150)} | ${answers.length} réponses${answerSnippets ? ` - ${answerSnippets}` : ''} | ${context}`;
+        })()}
         url={`/question/${id}`}
-        jsonLd={createQAPageSchema(questionText, answers.length, `/question/${id}`)}
+        keywords={[
+          'question', 'réponse',
+          contextData?.subjectName,
+          contextData?.chapterName,
+          contextData?.className,
+          'exercices', 'baccalauréat'
+        ].filter(Boolean) as string[]}
+        jsonLd={createQAPageSchema(
+          questionText,
+          answers.length,
+          `/question/${id}`,
+          {
+            answers: answers.slice(0, 5).map(a => {
+              const { text } = extractMediaFromText(a.data);
+              return text;
+            }),
+            className: contextData?.className,
+            subjectName: contextData?.subjectName,
+            chapterName: contextData?.chapterName
+          }
+        )}
       />
       <div className="sticky top-0 z-50 bg-white border-b">
         <div className="flex items-center justify-between px-4 py-3">
