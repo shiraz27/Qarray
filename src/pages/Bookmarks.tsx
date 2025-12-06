@@ -34,7 +34,7 @@ export default function Bookmarks() {
 
   const handleTabChange = (tab: string) => {
     if (tab === "subjects") {
-      navigate("/");
+      navigate("/dashboard");
     } else if (tab === "profile") {
       navigate("/profile");
     } else {
@@ -339,7 +339,7 @@ export default function Bookmarks() {
       {/* Top Navigation */}
       <div className="sticky top-0 z-50 bg-background border-b">
         <div className="flex items-center justify-between px-4 py-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="hover-scale">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="hover-scale">
             <ArrowLeft size={20} />
           </Button>
           <div className="flex items-center gap-2">

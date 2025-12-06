@@ -386,7 +386,7 @@ export default function ResourceDetail() {
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-    if (tab === 'subjects') navigate('/');
+    if (tab === 'subjects') navigate('/dashboard');
     else if (tab === 'bookmarks') navigate('/bookmarks');
     else if (tab === 'classmates') navigate('/classmates');
     else if (tab === 'profile') navigate('/profile');
