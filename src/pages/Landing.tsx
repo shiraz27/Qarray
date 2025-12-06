@@ -114,7 +114,7 @@ const Landing: React.FC = () => {
           {/* Left: Logo */}
           <div className="flex items-center gap-2">
             <img src={qarayLogo} alt="Qarray" className="w-8 h-8" />
-            <span className="font-bold text-lg gradient-text hidden sm:inline">Qarray</span>
+            <span className="font-bold text-lg text-foreground hidden sm:inline">Qarray</span>
           </div>
           
           {/* Right: Auth Buttons + Language */}
@@ -162,7 +162,7 @@ const Landing: React.FC = () => {
           </div>
 
           {/* Brand Name with Gradient */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold gradient-text mb-2">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-2">
             Qarray
           </h1>
 
