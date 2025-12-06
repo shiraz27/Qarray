@@ -37,6 +37,14 @@ interface Resource {
   downvotes: number;
   userVote: string | null;
   isBookmarked?: boolean;
+  ocr_text?: string | null;
+  ocr_status?: string | null;
+}
+
+interface ContextData {
+  className?: string;
+  subjectName?: string;
+  chapterName?: string;
 }
 
 interface Question {
@@ -68,6 +76,7 @@ export default function ResourceDetail() {
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
   const [devoirTypes, setDevoirTypes] = useState<Array<{ id: number; devoir_type: string }>>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [contextData, setContextData] = useState<ContextData | null>(null);
   const { isModerator } = useUserRole();
 
   useEffect(() => {
@@ -150,6 +159,46 @@ export default function ResourceDetail() {
         userVote,
         isBookmarked,
       });
+
+      // Fetch context data (chapter -> subject -> class)
+      if (resourceData.chapter_id) {
+        const { data: chapterData } = await supabase
+          .from('chapters')
+          .select('name, subject_id')
+          .eq('id', resourceData.chapter_id)
+          .single();
+        
+        if (chapterData?.subject_id) {
+          const { data: subjectData } = await supabase
+            .from('subjects')
+            .select('name, class_id')
+            .eq('id', chapterData.subject_id)
+            .single();
+          
+          if (subjectData?.class_id) {
+            const { data: classData } = await supabase
+              .from('classes')
+              .select('name')
+              .eq('id', subjectData.class_id)
+              .single();
+            
+            setContextData({
+              chapterName: chapterData.name,
+              subjectName: subjectData.name,
+              className: classData?.name
+            });
+          } else {
+            setContextData({
+              chapterName: chapterData.name,
+              subjectName: subjectData.name
+            });
+          }
+        } else {
+          setContextData({
+            chapterName: chapterData?.name
+          });
+        }
+      }
 
       // Fetch questions related to this resource
       const { data: questionsData } = await supabase
@@ -451,14 +500,33 @@ export default function ResourceDetail() {
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
       <SEO
-        title={resource.title}
-        description={resource.description}
+        title={`${resource.title}${contextData?.subjectName ? ` - ${contextData.subjectName}` : ''}${contextData?.className ? ` | ${contextData.className}` : ''}`}
+        description={(() => {
+          const ocrSnippet = resource.ocr_text?.substring(0, 200)?.replace(/\s+/g, ' ')?.trim() || '';
+          const baseDesc = resource.description;
+          const context = [contextData?.subjectName, contextData?.className, 'Tunisie'].filter(Boolean).join(' - ');
+          return `${baseDesc}${ocrSnippet ? ` - ${ocrSnippet}...` : ''} | ${context}`;
+        })()}
         url={`/resource/${id}`}
+        keywords={[
+          resource.title,
+          contextData?.subjectName,
+          contextData?.chapterName,
+          contextData?.className,
+          'cours', 'exercices', 'ressources éducatives', 'baccalauréat'
+        ].filter(Boolean) as string[]}
         jsonLd={createLearningResourceSchema(
           resource.title,
           resource.description,
           `/resource/${id}`,
-          'Educational Resource'
+          'Educational Resource',
+          {
+            textContent: resource.ocr_text || undefined,
+            className: contextData?.className,
+            subjectName: contextData?.subjectName,
+            chapterName: contextData?.chapterName,
+            keywords: [resource.title]
+          }
         )}
       />
       <div className="sticky top-0 z-50 bg-white border-b">

@@ -68,6 +68,11 @@ interface DevoirType {
   devoir_type: string;
 }
 
+interface ContextData {
+  className?: string;
+  subjectName?: string;
+}
+
 export default function Chapter() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -86,6 +91,7 @@ export default function Chapter() {
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
   const [isResourceDialogOpen, setIsResourceDialogOpen] = useState(false);
   const [subjectId, setSubjectId] = useState<number | null>(null);
+  const [contextData, setContextData] = useState<ContextData | null>(null);
 
   const handleTabChange = (tab: string) => {
     if (tab === 'subjects') {
@@ -215,6 +221,32 @@ export default function Chapter() {
           resourceCount: resourceCount || 0,
           isBookmarked,
         });
+
+        // Fetch context data (subject -> class)
+        if (chapterData.subject_id) {
+          const { data: subjectData } = await supabase
+            .from('subjects')
+            .select('name, class_id')
+            .eq('id', chapterData.subject_id)
+            .single();
+          
+          if (subjectData?.class_id) {
+            const { data: classData } = await supabase
+              .from('classes')
+              .select('name')
+              .eq('id', subjectData.class_id)
+              .single();
+            
+            setContextData({
+              subjectName: subjectData.name,
+              className: classData?.name
+            });
+          } else {
+            setContextData({
+              subjectName: subjectData?.name
+            });
+          }
+        }
 
         // Fetch questions with vote counts
         const { data: questionsData } = await supabase
@@ -636,13 +668,24 @@ export default function Chapter() {
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
       <SEO
-        title={chapter.name}
-        description={`${chapter.name} - ${chapter.questionCount} questions, ${chapter.resourceCount} resources`}
+        title={`${chapter.name}${contextData?.subjectName ? ` - ${contextData.subjectName}` : ''}${contextData?.className ? ` | ${contextData.className}` : ''}`}
+        description={`${chapter.name} | ${chapter.questionCount} questions, ${chapter.resourceCount} ressources${contextData?.subjectName ? ` | ${contextData.subjectName}` : ''}${contextData?.className ? ` - ${contextData.className}` : ''} | Éducation Tunisie`}
         url={`/chapter/${id}`}
+        keywords={[
+          chapter.name,
+          contextData?.subjectName,
+          contextData?.className,
+          'cours', 'exercices', 'ressources', 'baccalauréat'
+        ].filter(Boolean) as string[]}
         jsonLd={createCourseSchema(
           chapter.name,
-          `Study materials for ${chapter.name} including questions, answers and resources`,
-          `/chapter/${id}`
+          `Cours et exercices pour ${chapter.name}${contextData?.subjectName ? ` - ${contextData.subjectName}` : ''} | Éducation Tunisie`,
+          `/chapter/${id}`,
+          {
+            className: contextData?.className,
+            subjectName: contextData?.subjectName,
+            partNames: resources.slice(0, 10).map(r => r.title)
+          }
         )}
       />
       
