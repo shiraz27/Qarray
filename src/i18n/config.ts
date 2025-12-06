@@ -178,7 +178,10 @@ const resources = {
       statisticsTitle: "Platform Statistics",
       subjects: "Subjects",
       subjectBreakdown: "Subject Breakdown",
-      noSubjectsYet: "No subjects available yet"
+      noSubjectsYet: "No subjects available yet",
+      viewStatsFor: "View statistics for",
+      across: "Across",
+      classes: "classes"
     }
   },
   fr: {
@@ -342,7 +345,10 @@ const resources = {
       statisticsTitle: "Statistiques de la Plateforme",
       subjects: "Matières",
       subjectBreakdown: "Répartition par Matière",
-      noSubjectsYet: "Aucune matière disponible pour le moment"
+      noSubjectsYet: "Aucune matière disponible pour le moment",
+      viewStatsFor: "Voir les statistiques pour",
+      across: "Dans",
+      classes: "classes"
     }
   },
   ar: {
@@ -506,7 +512,10 @@ const resources = {
       statisticsTitle: "إحصائيات المنصة",
       subjects: "المواد",
       subjectBreakdown: "التوزيع حسب المادة",
-      noSubjectsYet: "لا توجد مواد متاحة بعد"
+      noSubjectsYet: "لا توجد مواد متاحة بعد",
+      viewStatsFor: "عرض إحصائيات",
+      across: "عبر",
+      classes: "أقسام"
     }
   }
 };
