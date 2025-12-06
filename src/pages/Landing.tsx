@@ -104,13 +104,40 @@ const Landing: React.FC = () => {
         <Target className="absolute top-64 right-[30%] w-5 h-5 text-primary/20 animate-sparkle" />
       </div>
 
-      {/* Language Switcher */}
-      <div className="absolute top-4 right-4 z-50">
-        <LanguageSwitcher />
-      </div>
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-background/80 border-b border-border/50">
+        <div className="flex items-center justify-between px-4 py-3 max-w-7xl mx-auto">
+          {/* Left: Logo */}
+          <div className="flex items-center gap-2">
+            <img src={qarayLogo} alt="Qarray" className="w-8 h-8" />
+            <span className="font-bold text-lg gradient-text hidden sm:inline">Qarray</span>
+          </div>
+          
+          {/* Right: Auth Buttons + Language */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate('/login')}
+              className="text-sm"
+            >
+              {t('signIn')}
+            </Button>
+            <Button 
+              size="sm" 
+              className="gradient-primary text-sm"
+              onClick={() => navigate('/login?signup=true')}
+            >
+              <Rocket className="w-4 h-4 mr-1" />
+              {t('createAccount')}
+            </Button>
+            <LanguageSwitcher />
+          </div>
+        </div>
+      </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12 relative z-10">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12 pt-20 relative z-10">
         
         {/* Hero Section */}
         <div className="flex flex-col items-center mb-8 animate-fade-in">
@@ -168,26 +195,6 @@ const Landing: React.FC = () => {
               Explore
             </div>
           </button>
-
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
-            <Button
-              onClick={() => navigate('/login')}
-              variant="outline"
-              size="lg"
-              className="text-base sm:text-lg px-6 sm:px-8 py-5 sm:py-6 h-auto border-2 hover:bg-muted/50 group"
-            >
-              <span>{t('signIn')}</span>
-            </Button>
-            <Button
-              onClick={() => navigate('/login?signup=true')}
-              size="lg"
-              className="text-base sm:text-lg px-6 sm:px-8 py-5 sm:py-6 h-auto gradient-primary hover:opacity-90 animate-glow-pulse group"
-            >
-              <Rocket className="w-5 h-5 mr-2 group-hover:translate-x-1 transition-transform" />
-              <span>{t('createAccount')}</span>
-            </Button>
-          </div>
 
           {/* Social Proof */}
           <div className="flex items-center justify-center gap-2 mt-4">
