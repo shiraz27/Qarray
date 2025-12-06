@@ -4,8 +4,20 @@ import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import qarayLogo from '@/assets/qarray-logo-new.png';
-import educationPattern from '@/assets/education-pattern.png';
-import { BookOpen, MessageCircle, Brain, Search } from 'lucide-react';
+import { 
+  BookOpen, 
+  MessageCircle, 
+  Brain, 
+  Search, 
+  Trophy, 
+  Star, 
+  Sparkles, 
+  Zap,
+  Target,
+  Award,
+  Users,
+  Rocket
+} from 'lucide-react';
 import { StatisticsSection } from '@/components/StatisticsSection';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { SEO } from '@/components/SEO';
@@ -24,6 +36,42 @@ const Landing: React.FC = () => {
     logo: 'https://qarray.lovable.app/qarray-logo-new.png',
   };
 
+  const features = [
+    {
+      icon: BookOpen,
+      title: t('landingFeature1Title'),
+      description: t('landingFeature1Desc'),
+      xp: '+50 XP',
+      color: 'primary',
+      progress: 75,
+    },
+    {
+      icon: MessageCircle,
+      title: t('landingFeature2Title'),
+      description: t('landingFeature2Desc'),
+      xp: '+30 XP',
+      color: 'coral',
+      progress: 60,
+    },
+    {
+      icon: Brain,
+      title: t('landingFeature3Title'),
+      description: t('landingFeature3Desc'),
+      xp: '+100 XP',
+      color: 'primary',
+      progress: 85,
+    },
+    {
+      icon: Search,
+      title: t('landingFeature4Title'),
+      description: t('landingFeature4Desc'),
+      xp: '+20 XP',
+      color: 'coral',
+      progress: 45,
+      onClick: () => setSearchOpen(true),
+    },
+  ];
+
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-background">
       <SEO
@@ -33,142 +81,237 @@ const Landing: React.FC = () => {
         jsonLd={organizationSchema}
       />
       
-      {/* Global Search Dialog */}
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} publicMode />
 
-      {/* Animated Background Pattern */}
+      {/* Animated Background */}
       <div className="absolute inset-0 -z-10">
-        {/* Education pattern background */}
-        <div 
-          className="absolute inset-0 opacity-20"
-          style={{
-            backgroundImage: `url(${educationPattern})`,
-            backgroundSize: '400px 400px',
-            backgroundRepeat: 'repeat',
-            backgroundPosition: 'center'
-          }}
-        />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-[hsl(14,92%,76%)]/5" />
         
-        {/* Gradient overlay on top of pattern */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#F6A18A]/10 via-transparent to-[hsl(207,89%,54%)]/10" />
-        
-        {/* Geometric shapes for e-learning theme */}
-        <div className="absolute top-20 left-10 w-64 h-64 bg-[#F6A18A]/15 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-40 right-20 w-72 h-72 bg-[hsl(207,89%,54%)]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute bottom-20 left-1/4 w-56 h-56 bg-[#F6A18A]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
-        <div className="absolute bottom-40 right-1/3 w-60 h-60 bg-[hsl(207,89%,54%)]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '3s' }} />
+        {/* Floating decorative elements */}
+        <div className="absolute top-20 left-[10%] w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-float" />
+        <div className="absolute top-40 right-[15%] w-64 h-64 bg-[hsl(14,92%,76%)]/10 rounded-full blur-3xl animate-float-delayed" />
+        <div className="absolute bottom-32 left-[20%] w-56 h-56 bg-primary/8 rounded-full blur-3xl animate-float-slow" />
+        <div className="absolute bottom-20 right-[25%] w-48 h-48 bg-[hsl(14,92%,76%)]/8 rounded-full blur-3xl animate-float" />
+      </div>
+
+      {/* Floating Gamification Icons */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <Trophy className="absolute top-24 left-[8%] w-8 h-8 text-primary/30 animate-float" />
+        <Star className="absolute top-32 right-[12%] w-6 h-6 text-[hsl(14,92%,76%)]/40 animate-float-delayed" />
+        <Sparkles className="absolute top-48 left-[25%] w-5 h-5 text-primary/25 animate-sparkle" />
+        <Award className="absolute bottom-40 right-[8%] w-7 h-7 text-primary/30 animate-float-slow" />
+        <Zap className="absolute bottom-32 left-[12%] w-6 h-6 text-[hsl(14,92%,76%)]/35 animate-float-delayed" />
+        <Target className="absolute top-64 right-[30%] w-5 h-5 text-primary/20 animate-sparkle" />
       </div>
 
       {/* Language Switcher */}
-      <div className="absolute top-4 right-4 z-50 pointer-events-auto">
+      <div className="absolute top-4 right-4 z-50">
         <LanguageSwitcher />
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
-        {/* Logo and Brand */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12 relative z-10">
+        
+        {/* Hero Section */}
         <div className="flex flex-col items-center mb-8 animate-fade-in">
-          <img
-            src={qarayLogo}
-            alt="Qarray Logo"
-            className="w-32 h-32 md:w-40 md:h-40 object-contain mb-4 hover-scale"
-          />
-          <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-2">
+          {/* Level Badge */}
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6 animate-bounce-slow">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium text-primary">Level Up Your Learning</span>
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary text-primary-foreground text-xs font-bold">
+              <Zap className="w-3 h-3" />
+              XP
+            </div>
+          </div>
+
+          {/* Logo with glow effect */}
+          <div className="relative mb-4">
+            <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-glow-pulse" />
+            <img
+              src={qarayLogo}
+              alt="Qarray Logo"
+              className="relative w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 object-contain hover-scale"
+            />
+          </div>
+
+          {/* Brand Name with Gradient */}
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold gradient-text mb-2">
             Qarray
           </h1>
+
+          {/* Achievement Badge */}
+          <div className="flex items-center gap-2 mt-2">
+            <Trophy className="w-5 h-5 text-[hsl(45,93%,47%)]" />
+            <span className="text-sm text-muted-foreground">Educational Platform</span>
+            <Trophy className="w-5 h-5 text-[hsl(45,93%,47%)]" />
+          </div>
         </div>
 
-        {/* Hero Section */}
-        <div className="text-center max-w-2xl mb-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+        {/* Hero Text */}
+        <div className="text-center max-w-2xl mb-8 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-4">
             {t('landingTitle')}
           </h2>
-          <p className="text-lg md:text-xl text-muted-foreground mb-6">
+          <p className="text-base sm:text-lg text-muted-foreground mb-6 px-4">
             {t('landingSubtitle')}
           </p>
 
-          {/* Search Bar */}
+          {/* Gamified Search Bar */}
           <button
             onClick={() => setSearchOpen(true)}
-            className="w-full max-w-md mx-auto flex items-center gap-3 px-4 py-3 mb-6 rounded-full bg-background/80 backdrop-blur-sm border border-border hover:border-primary transition-colors text-muted-foreground"
+            className="w-full max-w-md mx-auto flex items-center gap-3 px-4 py-3 mb-6 rounded-full bg-card/80 backdrop-blur-sm border-2 border-border hover:border-primary hover:shadow-lg hover:shadow-primary/10 transition-all group"
           >
-            <Search className="w-5 h-5" />
-            <span>{t('searchPublicContent')}</span>
+            <Search className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+            <span className="text-muted-foreground group-hover:text-foreground transition-colors">{t('searchPublicContent')}</span>
+            <div className="ml-auto flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+              <Sparkles className="w-3 h-3" />
+              Explore
+            </div>
           </button>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
             <Button
               onClick={() => navigate('/login')}
               variant="outline"
               size="lg"
-              className="text-lg px-8 py-6 h-auto"
+              className="text-base sm:text-lg px-6 sm:px-8 py-5 sm:py-6 h-auto border-2 hover:bg-muted/50 group"
             >
-              {t('signIn')}
+              <span>{t('signIn')}</span>
             </Button>
             <Button
               onClick={() => navigate('/login?signup=true')}
               size="lg"
-              className="text-lg px-8 py-6 h-auto bg-primary hover:bg-primary/90"
+              className="text-base sm:text-lg px-6 sm:px-8 py-5 sm:py-6 h-auto gradient-primary hover:opacity-90 animate-glow-pulse group"
             >
-              {t('createAccount')}
+              <Rocket className="w-5 h-5 mr-2 group-hover:translate-x-1 transition-transform" />
+              <span>{t('createAccount')}</span>
             </Button>
+          </div>
+
+          {/* Social Proof */}
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <div className="flex -space-x-2">
+              {[...Array(4)].map((_, i) => (
+                <div 
+                  key={i} 
+                  className="w-8 h-8 rounded-full border-2 border-background flex items-center justify-center text-xs font-bold text-primary-foreground"
+                  style={{ 
+                    background: i % 2 === 0 ? 'hsl(var(--primary))' : 'hsl(14, 92%, 76%)',
+                    zIndex: 4 - i 
+                  }}
+                >
+                  {['🎓', '📚', '⭐', '🏆'][i]}
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Users className="w-4 h-4" />
+              <span>Join thousands of students</span>
+            </div>
           </div>
         </div>
 
         {/* Statistics Section */}
-        <div className="w-full flex justify-center animate-fade-in" style={{ animationDelay: '0.3s' }}>
-          <StatisticsSection />
+        <div className="w-full flex justify-center mb-8 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+          <div className="relative">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1 rounded-full bg-[hsl(45,93%,47%)] text-[hsl(45,93%,10%)] text-xs font-bold z-10">
+              <Trophy className="w-3 h-3" />
+              Community Achievements
+            </div>
+            <StatisticsSection />
+          </div>
         </div>
 
         {/* Features Section */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl w-full mt-12 animate-fade-in" style={{ animationDelay: '0.5s' }}>
-          {/* Feature 1 */}
-          <div className="flex flex-col items-center p-6 rounded-lg bg-background/50 backdrop-blur-sm border border-border hover:border-primary transition-all hover-scale">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <BookOpen className="w-8 h-8 text-primary" />
-            </div>
-            <h3 className="font-semibold text-lg mb-2">{t('landingFeature1Title')}</h3>
-            <p className="text-sm text-muted-foreground text-center">
-              {t('landingFeature1Desc')}
-            </p>
+        <div className="w-full max-w-5xl px-4 animate-slide-up" style={{ animationDelay: '0.4s' }}>
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <Award className="w-5 h-5 text-primary" />
+            <h3 className="text-lg sm:text-xl font-bold text-foreground">Unlock Features & Earn XP</h3>
+            <Award className="w-5 h-5 text-primary" />
           </div>
 
-          {/* Feature 2 */}
-          <div className="flex flex-col items-center p-6 rounded-lg bg-background/50 backdrop-blur-sm border border-border hover:border-primary transition-all hover-scale">
-            <div className="w-16 h-16 rounded-full bg-[#F6A18A]/10 flex items-center justify-center mb-4">
-              <MessageCircle className="w-8 h-8 text-[#F6A18A]" />
-            </div>
-            <h3 className="font-semibold text-lg mb-2">{t('landingFeature2Title')}</h3>
-            <p className="text-sm text-muted-foreground text-center">
-              {t('landingFeature2Desc')}
-            </p>
-          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {features.map((feature, index) => {
+              const IconComponent = feature.icon;
+              const isClickable = !!feature.onClick;
+              const cardClasses = `gamified-card p-5 sm:p-6 flex flex-col items-center text-center group ${isClickable ? 'cursor-pointer' : ''}`;
+              
+              const cardContent = (
+                <>
+                  {/* XP Badge */}
+                  <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-[hsl(45,93%,47%)] text-[hsl(45,93%,10%)] text-xs font-bold shadow-lg">
+                    <Zap className="w-3 h-3" />
+                    {feature.xp}
+                  </div>
 
-          {/* Feature 3 */}
-          <div className="flex flex-col items-center p-6 rounded-lg bg-background/50 backdrop-blur-sm border border-border hover:border-primary transition-all hover-scale">
-            <div className="w-16 h-16 rounded-full bg-[hsl(207,89%,54%)]/10 flex items-center justify-center mb-4">
-              <Brain className="w-8 h-8 text-[hsl(207,89%,54%)]" />
-            </div>
-            <h3 className="font-semibold text-lg mb-2">{t('landingFeature3Title')}</h3>
-            <p className="text-sm text-muted-foreground text-center">
-              {t('landingFeature3Desc')}
-            </p>
-          </div>
+                  {/* Icon */}
+                  <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${
+                    feature.color === 'coral' 
+                      ? 'bg-[hsl(14,92%,76%)]/15' 
+                      : 'bg-primary/15'
+                  }`}>
+                    <IconComponent className={`w-7 h-7 sm:w-8 sm:h-8 ${
+                      feature.color === 'coral' 
+                        ? 'text-[hsl(14,92%,76%)]' 
+                        : 'text-primary'
+                    }`} />
+                  </div>
 
-          {/* Feature 4 - Clickable Search */}
-          <button
-            onClick={() => setSearchOpen(true)}
-            className="flex flex-col items-center p-6 rounded-lg bg-background/50 backdrop-blur-sm border border-border hover:border-primary transition-all hover-scale cursor-pointer text-left"
-          >
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <Search className="w-8 h-8 text-primary" />
-            </div>
-            <h3 className="font-semibold text-lg mb-2">{t('landingFeature4Title')}</h3>
-            <p className="text-sm text-muted-foreground text-center">
-              {t('landingFeature4Desc')}
-            </p>
-          </button>
+                  {/* Title */}
+                  <h4 className="font-semibold text-base sm:text-lg mb-2 text-foreground">{feature.title}</h4>
+
+                  {/* Description */}
+                  <p className="text-sm text-muted-foreground mb-4 flex-1">
+                    {feature.description}
+                  </p>
+
+                  {/* Progress Bar */}
+                  <div className="w-full">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Progress</span>
+                      <span className={feature.color === 'coral' ? 'text-[hsl(14,92%,76%)]' : 'text-primary'}>
+                        {feature.progress}%
+                      </span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-1000 ${
+                          feature.color === 'coral' 
+                            ? 'bg-[hsl(14,92%,76%)]' 
+                            : 'bg-primary'
+                        }`}
+                        style={{ width: `${feature.progress}%` }}
+                      />
+                    </div>
+                  </div>
+                </>
+              );
+
+              return isClickable ? (
+                <button
+                  key={index}
+                  onClick={feature.onClick}
+                  className={`${cardClasses} relative`}
+                >
+                  {cardContent}
+                </button>
+              ) : (
+                <div key={index} className={`${cardClasses} relative`}>
+                  {cardContent}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Bottom CTA */}
+        <div className="mt-12 text-center animate-slide-up" style={{ animationDelay: '0.5s' }}>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Star className="w-5 h-5 text-[hsl(45,93%,47%)] animate-sparkle" />
+            <span className="text-sm text-muted-foreground">Start your learning journey today</span>
+            <Star className="w-5 h-5 text-[hsl(45,93%,47%)] animate-sparkle" style={{ animationDelay: '0.5s' }} />
+          </div>
         </div>
       </div>
     </div>
