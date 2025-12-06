@@ -41,33 +41,25 @@ const Landing: React.FC = () => {
       icon: BookOpen,
       title: t('landingFeature1Title'),
       description: t('landingFeature1Desc'),
-      xp: '+50 XP',
       color: 'primary',
-      progress: 75,
     },
     {
       icon: MessageCircle,
       title: t('landingFeature2Title'),
       description: t('landingFeature2Desc'),
-      xp: '+30 XP',
       color: 'coral',
-      progress: 60,
     },
     {
       icon: Brain,
       title: t('landingFeature3Title'),
       description: t('landingFeature3Desc'),
-      xp: '+100 XP',
       color: 'primary',
-      progress: 85,
     },
     {
       icon: Search,
       title: t('landingFeature4Title'),
       description: t('landingFeature4Desc'),
-      xp: '+20 XP',
       color: 'coral',
-      progress: 45,
       onClick: () => setSearchOpen(true),
     },
   ];
@@ -141,14 +133,10 @@ const Landing: React.FC = () => {
         
         {/* Hero Section */}
         <div className="flex flex-col items-center mb-8 animate-fade-in">
-          {/* Level Badge */}
+          {/* Welcome Badge */}
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6 animate-bounce-slow">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Level Up Your Learning</span>
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary text-primary-foreground text-xs font-bold">
-              <Zap className="w-3 h-3" />
-              XP
-            </div>
+            <span className="text-sm font-medium text-primary">Learn Smarter, Not Harder</span>
           </div>
 
           {/* Logo with glow effect */}
@@ -228,7 +216,7 @@ const Landing: React.FC = () => {
         <div className="w-full max-w-5xl px-4 animate-slide-up" style={{ animationDelay: '0.4s' }}>
           <div className="flex items-center justify-center gap-2 mb-6">
             <Award className="w-5 h-5 text-primary" />
-            <h3 className="text-lg sm:text-xl font-bold text-foreground">Unlock Features & Earn XP</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-foreground">Key Features</h3>
             <Award className="w-5 h-5 text-primary" />
           </div>
 
@@ -240,12 +228,6 @@ const Landing: React.FC = () => {
               
               const cardContent = (
                 <>
-                  {/* XP Badge */}
-                  <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-[hsl(45,93%,47%)] text-[hsl(45,93%,10%)] text-xs font-bold shadow-lg">
-                    <Zap className="w-3 h-3" />
-                    {feature.xp}
-                  </div>
-
                   {/* Icon */}
                   <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${
                     feature.color === 'coral' 
@@ -263,29 +245,9 @@ const Landing: React.FC = () => {
                   <h4 className="font-semibold text-base sm:text-lg mb-2 text-foreground">{feature.title}</h4>
 
                   {/* Description */}
-                  <p className="text-sm text-muted-foreground mb-4 flex-1">
+                  <p className="text-sm text-muted-foreground flex-1">
                     {feature.description}
                   </p>
-
-                  {/* Progress Bar */}
-                  <div className="w-full">
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">Progress</span>
-                      <span className={feature.color === 'coral' ? 'text-[hsl(14,92%,76%)]' : 'text-primary'}>
-                        {feature.progress}%
-                      </span>
-                    </div>
-                    <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full transition-all duration-1000 ${
-                          feature.color === 'coral' 
-                            ? 'bg-[hsl(14,92%,76%)]' 
-                            : 'bg-primary'
-                        }`}
-                        style={{ width: `${feature.progress}%` }}
-                      />
-                    </div>
-                  </div>
                 </>
               );
 
