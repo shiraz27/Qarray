@@ -195,6 +195,10 @@ All colors MUST be HSL.
     background: linear-gradient(145deg, hsl(0 0% 100%), hsl(207 89% 98%));
   }
   
+  .dark .gamified-card {
+    background: linear-gradient(145deg, hsl(222.2 84% 6.9%), hsl(222.2 84% 8.9%));
+  }
+  
   .gradient-text {
     background: var(--gradient-primary);
     -webkit-background-clip: text;
