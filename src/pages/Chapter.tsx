@@ -95,7 +95,7 @@ export default function Chapter() {
 
   const handleTabChange = (tab: string) => {
     if (tab === 'subjects') {
-      navigate('/');
+      navigate('/dashboard');
     } else if (tab === 'bookmarks') {
       navigate('/bookmarks');
     } else if (tab === 'profile') {

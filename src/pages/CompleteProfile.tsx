@@ -331,7 +331,7 @@ const CompleteProfile: React.FC = () => {
         title: t('success'),
         description: t('profileCompleted'),
       });
-      navigate('/');
+      navigate('/dashboard');
     } catch (error: any) {
       toast({
         title: t('error'),

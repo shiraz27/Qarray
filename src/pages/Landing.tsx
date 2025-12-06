@@ -111,11 +111,8 @@ const Landing: React.FC = () => {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-background/80 border-b border-border/50">
         <div className="flex items-center justify-between px-4 py-3 max-w-7xl mx-auto">
-          {/* Left: Logo */}
-          <div className="flex items-center gap-2">
-            <img src={qarayLogo} alt="Qarray" className="w-8 h-8" />
-            <span className="font-bold text-lg text-foreground hidden sm:inline">Qarray</span>
-          </div>
+          {/* Left: Spacer for layout balance */}
+          <div className="flex-1" />
           
           {/* Right: Auth Buttons + Language */}
           <div className="flex items-center gap-2 sm:gap-3">

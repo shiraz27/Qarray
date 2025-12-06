@@ -46,7 +46,7 @@ export default function Profile() {
 
   const handleTabChange = (tab: string) => {
     if (tab === 'subjects') {
-      navigate('/');
+      navigate('/dashboard');
     } else if (tab === 'bookmarks') {
       navigate('/bookmarks');
     } else {
@@ -325,7 +325,7 @@ export default function Profile() {
       />
       
       <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
           <ArrowLeft size={20} />
         </Button>
         <h1 className="text-lg font-semibold flex-1">{t('profile') || 'Profile'}</h1>

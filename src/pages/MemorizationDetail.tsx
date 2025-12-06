@@ -82,7 +82,7 @@ export default function MemorizationDetail() {
       if (error) throw error;
       if (!data) {
         toast.error('Memorization not found');
-        navigate('/');
+        navigate('/dashboard');
         return;
       }
 
@@ -99,7 +99,7 @@ export default function MemorizationDetail() {
     } catch (error: any) {
       console.error('Error fetching memorization:', error);
       toast.error('Failed to load memorization');
-      navigate('/');
+      navigate('/dashboard');
     }
   };
 
@@ -183,7 +183,7 @@ export default function MemorizationDetail() {
       if (error) throw error;
 
       toast.success('Memorization deleted');
-      navigate('/');
+      navigate('/dashboard');
     } catch (error: any) {
       console.error('Error deleting:', error);
       toast.error('Failed to delete memorization');
@@ -325,7 +325,7 @@ export default function MemorizationDetail() {
       </main>
 
       <BottomNavigation onTabChange={(tab) => {
-        if (tab === 'subjects') navigate('/');
+        if (tab === 'subjects') navigate('/dashboard');
         else if (tab === 'bookmarks') navigate('/bookmarks');
         else if (tab === 'profile') navigate('/profile');
       }} activeTab="" />
