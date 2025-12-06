@@ -238,9 +238,9 @@ export const StatisticsSection: React.FC = () => {
       icon: Brain,
       value: displayStats.memorizations,
       label: t('memorizations'),
-      color: 'blue',
-      bgClass: 'bg-primary/10',
-      textClass: 'text-primary',
+      color: 'black',
+      bgClass: 'bg-gray-900/10 dark:bg-gray-100/10',
+      textClass: 'text-gray-900 dark:text-gray-100',
     },
     {
       icon: BookOpen,
@@ -334,7 +334,7 @@ export const StatisticsSection: React.FC = () => {
                     <MessageCircle className="w-3 h-3" />
                     <AnimatedCounter value={subject.questionCount} />
                   </span>
-                  <span className="text-primary flex items-center gap-1">
+                  <span className="text-gray-900 dark:text-gray-100 flex items-center gap-1">
                     <Brain className="w-3 h-3" />
                     <AnimatedCounter value={subject.memorizationCount} />
                   </span>
