@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { supabase } from '@/integrations/supabase/client';
 import qarayLogo from '@/assets/qarray-logo-new.png';
 import { 
   BookOpen, 
@@ -26,6 +27,17 @@ const Landing: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [studentCount, setStudentCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchStudentCount = async () => {
+      const { count } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+      setStudentCount(count || 0);
+    };
+    fetchStudentCount();
+  }, []);
 
   const organizationSchema = {
     '@context': 'https://schema.org',
@@ -202,7 +214,14 @@ const Landing: React.FC = () => {
             </div>
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Users className="w-4 h-4" />
-              <span>Join thousands of students</span>
+              <span>
+                {studentCount === null 
+                  ? 'Join our community' 
+                  : studentCount < 10 
+                    ? `Join our ${studentCount} students`
+                    : `Join ${studentCount.toLocaleString()}+ students`
+                }
+              </span>
             </div>
           </div>
         </div>
