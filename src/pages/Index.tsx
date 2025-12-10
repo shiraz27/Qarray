@@ -206,15 +206,6 @@ const Index: React.FC = () => {
         <div className="absolute top-[600px] right-1/3 w-48 h-48 bg-[hsl(207,89%,54%)]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '3s' }} />
       </div>
 
-      {/* Floating Gamification Icons - Always visible */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <Trophy className="absolute top-24 left-[8%] w-8 h-8 text-primary/30 animate-float" />
-        <Star className="absolute top-32 right-[12%] w-6 h-6 text-[hsl(14,92%,76%)]/40 animate-float-delayed" />
-        <Sparkles className="absolute top-48 left-[25%] w-5 h-5 text-primary/25 animate-sparkle" />
-        <Award className="absolute bottom-40 right-[8%] w-7 h-7 text-primary/30 animate-float-slow" />
-        <Zap className="absolute bottom-32 left-[12%] w-6 h-6 text-[hsl(14,92%,76%)]/35 animate-float-delayed" />
-        <Target className="absolute top-64 right-[30%] w-5 h-5 text-primary/20 animate-sparkle" />
-      </div>
 
       <div className="w-full mx-auto flex flex-col min-h-screen relative z-10">
         <div className="flex-1 w-full overflow-auto pb-24">
@@ -223,7 +214,17 @@ const Index: React.FC = () => {
               <section className="items-stretch flex w-full flex-col bg-background/90 backdrop-blur-sm relative z-10">
                 <Header userName={userProfile?.full_name || 'User'} />
                 
-                <div className="flex flex-col items-center mt-6 mb-4 gap-4">
+                <div className="flex flex-col items-center mt-6 mb-4 gap-4 relative">
+                  {/* Floating Gamification Icons - Around Welcome Badge */}
+                  <div className="absolute -top-4 left-0 right-0 h-32 pointer-events-none overflow-visible">
+                    <Trophy className="absolute top-0 left-[10%] w-6 h-6 text-primary/30 animate-float" />
+                    <Star className="absolute top-2 right-[10%] w-5 h-5 text-[hsl(14,92%,76%)]/40 animate-float-delayed" />
+                    <Sparkles className="absolute top-8 left-[5%] w-4 h-4 text-primary/25 animate-sparkle" />
+                    <Award className="absolute top-4 right-[5%] w-5 h-5 text-primary/30 animate-float-slow" />
+                    <Zap className="absolute top-10 left-[15%] w-4 h-4 text-[hsl(14,92%,76%)]/35 animate-float-delayed" />
+                    <Target className="absolute top-6 right-[15%] w-4 h-4 text-primary/20 animate-sparkle" />
+                  </div>
+                  
                   {/* Welcome Badge */}
                   <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 animate-bounce-slow">
                     <Sparkles className="w-4 h-4 text-primary" />
