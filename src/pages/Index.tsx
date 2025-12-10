@@ -183,43 +183,43 @@ const Index: React.FC = () => {
         noindex={true}
         jsonLd={createWebPageSchema('Dashboard - Qarray', 'Your learning dashboard', '/dashboard')}
       />
-      <div className="w-full mx-auto flex flex-col min-h-screen">
+      {/* Animated Background Pattern - Always visible */}
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        {/* Education pattern background */}
+        <div 
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage: `url(${educationPattern})`,
+            backgroundSize: '400px 400px',
+            backgroundRepeat: 'repeat',
+            backgroundPosition: 'center'
+          }}
+        />
+        
+        {/* Gradient overlay on top of pattern */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#F6A18A]/10 via-transparent to-[hsl(207,89%,54%)]/10" />
+        
+        {/* Geometric shapes for e-learning theme */}
+        <div className="absolute top-20 left-10 w-48 h-48 bg-[#F6A18A]/15 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-40 right-20 w-56 h-56 bg-[hsl(207,89%,54%)]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-96 left-1/4 w-52 h-52 bg-[#F6A18A]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-[600px] right-1/3 w-48 h-48 bg-[hsl(207,89%,54%)]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '3s' }} />
+      </div>
+
+      {/* Floating Gamification Icons - Always visible */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        <Trophy className="absolute top-24 left-[8%] w-8 h-8 text-primary/30 animate-float" />
+        <Star className="absolute top-32 right-[12%] w-6 h-6 text-[hsl(14,92%,76%)]/40 animate-float-delayed" />
+        <Sparkles className="absolute top-48 left-[25%] w-5 h-5 text-primary/25 animate-sparkle" />
+        <Award className="absolute bottom-40 right-[8%] w-7 h-7 text-primary/30 animate-float-slow" />
+        <Zap className="absolute bottom-32 left-[12%] w-6 h-6 text-[hsl(14,92%,76%)]/35 animate-float-delayed" />
+        <Target className="absolute top-64 right-[30%] w-5 h-5 text-primary/20 animate-sparkle" />
+      </div>
+
+      <div className="w-full mx-auto flex flex-col min-h-screen relative z-10">
         <div className="flex-1 w-full overflow-auto pb-24">
           {activeTab === 'subjects' && (
             <>
-              {/* Animated Background Pattern */}
-              <div className="absolute inset-0 -z-10 overflow-hidden">
-                {/* Education pattern background */}
-                <div 
-                  className="absolute inset-0 opacity-20"
-                  style={{
-                    backgroundImage: `url(${educationPattern})`,
-                    backgroundSize: '400px 400px',
-                    backgroundRepeat: 'repeat',
-                    backgroundPosition: 'center'
-                  }}
-                />
-                
-                {/* Gradient overlay on top of pattern */}
-                <div className="absolute inset-0 bg-gradient-to-br from-[#F6A18A]/10 via-transparent to-[hsl(207,89%,54%)]/10" />
-                
-                {/* Geometric shapes for e-learning theme */}
-                <div className="absolute top-20 left-10 w-48 h-48 bg-[#F6A18A]/15 rounded-full blur-3xl animate-pulse" />
-                <div className="absolute top-40 right-20 w-56 h-56 bg-[hsl(207,89%,54%)]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-                <div className="absolute top-96 left-1/4 w-52 h-52 bg-[#F6A18A]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
-                <div className="absolute top-[600px] right-1/3 w-48 h-48 bg-[hsl(207,89%,54%)]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '3s' }} />
-              </div>
-
-              {/* Floating Gamification Icons */}
-              <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <Trophy className="absolute top-24 left-[8%] w-8 h-8 text-primary/30 animate-float" />
-                <Star className="absolute top-32 right-[12%] w-6 h-6 text-[hsl(14,92%,76%)]/40 animate-float-delayed" />
-                <Sparkles className="absolute top-48 left-[25%] w-5 h-5 text-primary/25 animate-sparkle" />
-                <Award className="absolute bottom-40 right-[8%] w-7 h-7 text-primary/30 animate-float-slow" />
-                <Zap className="absolute bottom-32 left-[12%] w-6 h-6 text-[hsl(14,92%,76%)]/35 animate-float-delayed" />
-                <Target className="absolute top-64 right-[30%] w-5 h-5 text-primary/20 animate-sparkle" />
-              </div>
-
               <section className="items-stretch flex w-full flex-col bg-background/90 backdrop-blur-sm relative z-10">
                 <Header userName={userProfile?.full_name || 'User'} />
                 
