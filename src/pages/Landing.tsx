@@ -140,7 +140,7 @@ const Landing: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12 pt-20 relative z-10">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12 pt-28 relative z-10">
         
         {/* Hero Section */}
         <div className="flex flex-col items-center mb-8 animate-fade-in">

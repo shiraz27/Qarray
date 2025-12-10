@@ -9,7 +9,7 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
-import { LogOut, Trash2, Search } from 'lucide-react';
+import { LogOut, Trash2, Search, Trophy, Star, Sparkles, Award, Zap, Target } from 'lucide-react';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
@@ -210,16 +210,36 @@ const Index: React.FC = () => {
                 <div className="absolute top-[600px] right-1/3 w-48 h-48 bg-[hsl(207,89%,54%)]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '3s' }} />
               </div>
 
+              {/* Floating Gamification Icons */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                <Trophy className="absolute top-24 left-[8%] w-8 h-8 text-primary/30 animate-float" />
+                <Star className="absolute top-32 right-[12%] w-6 h-6 text-[hsl(14,92%,76%)]/40 animate-float-delayed" />
+                <Sparkles className="absolute top-48 left-[25%] w-5 h-5 text-primary/25 animate-sparkle" />
+                <Award className="absolute bottom-40 right-[8%] w-7 h-7 text-primary/30 animate-float-slow" />
+                <Zap className="absolute bottom-32 left-[12%] w-6 h-6 text-[hsl(14,92%,76%)]/35 animate-float-delayed" />
+                <Target className="absolute top-64 right-[30%] w-5 h-5 text-primary/20 animate-sparkle" />
+              </div>
+
               <section className="items-stretch flex w-full flex-col bg-background/90 backdrop-blur-sm relative z-10">
                 <Header userName={userProfile?.full_name || 'User'} />
                 
                 <div className="flex flex-col items-center mt-6 mb-4 gap-4">
+                  {/* Welcome Badge */}
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 animate-bounce-slow">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium text-primary">Welcome back!</span>
+                  </div>
+
                   <div className="flex items-center gap-3">
-                    <img
-                      src={qarayLogo}
-                      className="h-16 w-16 object-contain hover-scale"
-                      alt="Qarray Logo"
-                    />
+                    {/* Logo with glow effect */}
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-glow-pulse" />
+                      <img
+                        src={qarayLogo}
+                        className="relative h-16 w-16 object-contain hover-scale"
+                        alt="Qarray Logo"
+                      />
+                    </div>
                     <h1 className="text-4xl font-bold text-foreground">
                       Qarray
                     </h1>
