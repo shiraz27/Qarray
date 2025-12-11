@@ -55,6 +55,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
   const [resourceTypeFilters, setResourceTypeFilters] = useState<Record<number, boolean>>({});
   const [withCorrectionOnly, setWithCorrectionOnly] = useState(false);
   const [searchInOcrContent, setSearchInOcrContent] = useState(true);
+  const [searchInQuestionOcrContent, setSearchInQuestionOcrContent] = useState(true);
   const [subjects, setSubjects] = useState<Array<{ id: number; name: string }>>([]);
   const [chapters, setChapters] = useState<Array<{ id: number; name: string }>>([]);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
@@ -341,17 +342,62 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
 
           const { data: questions } = await questionsQuery.limit(10);
 
+          // Also search Question OCR content (only if enabled and class is selected)
+          let questionOcrResults: any[] = [];
+          if (searchInQuestionOcrContent && effectiveClassId) {
+            const { data: questionOcrData } = await supabase.rpc('search_question_content', {
+              search_query: query,
+              user_class_id: effectiveClassId
+            });
+            questionOcrResults = questionOcrData || [];
+          }
+
+          // Merge question results
+          const questionsMap = new Map<number, any>();
+
           if (questions) {
             // Filter out results where chapters is null (failed inner join)
             const validQuestions = questions.filter((q: any) => !effectiveClassId || q.chapters);
-            searchResults.push(...validQuestions.map((q: any) => ({
-              id: q.id,
-              type: 'question' as const,
-              title: q.data.substring(0, 100),
-              chapterId: q.chapter_id,
-              subjectName: q.chapters?.subjects?.name,
-            })));
+            validQuestions.forEach((q: any) => {
+              questionsMap.set(q.id, {
+                id: q.id,
+                type: 'question' as const,
+                title: q.data.substring(0, 100),
+                matchType: 'title',
+                chapterId: q.chapter_id,
+                subjectName: q.chapters?.subjects?.name,
+              });
+            });
           }
+
+          // Add or merge Question OCR matches
+          questionOcrResults.forEach((ocr: any) => {
+            // Apply additional filters to OCR results
+            const passesFilters = 
+              (subjectFilter === 'all' || ocr.subject_id === parseInt(subjectFilter)) &&
+              (chapterFilter === 'all' || ocr.chapter_id === parseInt(chapterFilter));
+
+            if (!passesFilters) return;
+
+            if (questionsMap.has(ocr.id)) {
+              // Already found via title, add OCR snippet
+              const existing = questionsMap.get(ocr.id);
+              existing.matchSnippet = ocr.match_snippet;
+              existing.matchType = 'content';
+            } else {
+              // New match from OCR content only
+              questionsMap.set(ocr.id, {
+                id: ocr.id,
+                type: 'question' as const,
+                title: ocr.data.substring(0, 100),
+                matchType: 'content',
+                matchSnippet: ocr.match_snippet,
+                chapterId: ocr.chapter_id,
+              });
+            }
+          });
+
+          searchResults.push(...Array.from(questionsMap.values()).slice(0, 15));
         }
 
         // Search answers with class filtering through questions -> chapters -> subjects
@@ -393,7 +439,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
     }, 300);
 
     return () => clearTimeout(searchTimeout);
-  }, [query, filter, subjectFilter, chapterFilter, resourceTypeFilters, withCorrectionOnly, searchInOcrContent, effectiveClassId]);
+  }, [query, filter, subjectFilter, chapterFilter, resourceTypeFilters, withCorrectionOnly, searchInOcrContent, searchInQuestionOcrContent, effectiveClassId]);
 
   const handleResultClick = (result: SearchResult) => {
     if (publicMode) {
@@ -618,6 +664,17 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
                 />
                 <label htmlFor="searchInOcr" className="text-xs cursor-pointer">
                   {t('searchInPdfImageDocuments')}
+                </label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="searchInQuestionOcr"
+                  checked={searchInQuestionOcrContent}
+                  onCheckedChange={(checked) => setSearchInQuestionOcrContent(!!checked)}
+                />
+                <label htmlFor="searchInQuestionOcr" className="text-xs cursor-pointer">
+                  {t('searchInQuestionDocuments')}
                 </label>
               </div>
             </div>

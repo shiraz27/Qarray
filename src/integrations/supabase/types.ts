@@ -538,6 +538,9 @@ export type Database = {
           data: string
           deleted: boolean
           id: number
+          ocr_processed_at: string | null
+          ocr_status: string | null
+          ocr_text: string | null
           resource_id: number | null
           type_id: number | null
           updated_at: string | null
@@ -550,6 +553,9 @@ export type Database = {
           data: string
           deleted?: boolean
           id?: number
+          ocr_processed_at?: string | null
+          ocr_status?: string | null
+          ocr_text?: string | null
           resource_id?: number | null
           type_id?: number | null
           updated_at?: string | null
@@ -562,6 +568,9 @@ export type Database = {
           data?: string
           deleted?: boolean
           id?: number
+          ocr_processed_at?: string | null
+          ocr_status?: string | null
+          ocr_text?: string | null
           resource_id?: number | null
           type_id?: number | null
           updated_at?: string | null
@@ -833,6 +842,16 @@ export type Database = {
           title: string
           type_id: number
           with_correction: boolean
+        }[]
+      }
+      search_question_content: {
+        Args: { search_query: string; user_class_id: number }
+        Returns: {
+          chapter_id: number
+          data: string
+          id: number
+          match_snippet: string
+          subject_id: number
         }[]
       }
     }
