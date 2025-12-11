@@ -225,10 +225,12 @@ const Index: React.FC = () => {
                     <Target className="absolute top-6 right-[15%] w-4 h-4 text-primary/20 animate-sparkle" />
                   </div>
                   
-                  {/* Welcome Badge */}
+                  {/* Welcome Badge with Username */}
                   <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 animate-bounce-slow">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <span className="text-sm font-medium text-primary">Welcome back!</span>
+                    <Sparkles className="w-4 h-4 text-primary animate-sparkle" />
+                    <span className="text-sm font-medium text-primary">
+                      Welcome back, {userProfile?.full_name || 'User'}!
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-3">
