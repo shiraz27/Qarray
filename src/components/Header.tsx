@@ -72,10 +72,8 @@ export const Header: React.FC<HeaderProps> = ({ userName = "User" }) => {
   return (
     <>
       <header className="flex w-full items-center gap-[40px_100px] justify-between px-4 py-3">
-        <div className="self-stretch text-base text-foreground font-medium tracking-[0.2px] my-auto">
-          <h1 className="text-foreground flex items-center gap-2">
-            <span>Welcome, {userName} 👋</span>
-          </h1>
+        <div className="self-stretch my-auto">
+          {/* Space for header balance */}
         </div>
         <nav className="self-stretch flex gap-2 my-auto px-2 py-1 rounded-3xl" aria-label="Header actions">
           {(isModerator || isAdmin) && (
