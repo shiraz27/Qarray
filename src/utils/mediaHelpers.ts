@@ -5,12 +5,17 @@ export interface MediaFile {
 }
 
 export function extractMediaFromText(text: string): { text: string; media: MediaFile[] } {
+  // Pre-process: encode spaces in URLs before extraction
+  const processedText = text.replace(/(https?:\/\/[^\n]+?)(?=\s*(?:https?:\/\/|$|\n|Attachments:))/g, (match) => 
+    match.replace(/ /g, '%20')
+  );
+  
   // Extract URLs from text
   const urlRegex = /(https?:\/\/[^\s\n]+)/g;
-  const urls = text.match(urlRegex) || [];
+  const urls = processedText.match(urlRegex) || [];
   
   // Remove URLs from text to get clean text
-  const cleanText = text.replace(urlRegex, '').replace(/Attachments:\s*/g, '').trim();
+  const cleanText = processedText.replace(urlRegex, '').replace(/Attachments:\s*/g, '').trim();
   
   // Categorize each URL
   const media: MediaFile[] = urls.map((url): MediaFile => {
