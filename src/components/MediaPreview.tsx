@@ -21,6 +21,9 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   const [audioModalOpen, setAudioModalOpen] = useState(false);
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
   
+  // Ensure URL has encoded spaces for proper loading
+  const encodedUrl = url.replace(/ /g, '%20');
+  
   // Check if it's a YouTube URL
   const getYouTubeEmbedUrl = (url: string) => {
     const patterns = [
@@ -101,12 +104,12 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
           onClick={() => setImageZoomOpen(true)}
         >
           <img 
-            src={url} 
+            src={encodedUrl} 
             alt="Media content" 
             className="w-full h-full object-cover rounded-lg" 
             style={{ minHeight: '200px', maxHeight: '500px' }}
             onError={(e) => {
-              console.error('Image failed to load:', url);
+              console.error('Image failed to load:', encodedUrl);
               e.currentTarget.style.display = 'none';
             }}
           />
@@ -123,7 +126,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
                 <X className="h-6 w-6" />
               </Button>
               <img 
-                src={url} 
+                src={encodedUrl} 
                 alt="Media content" 
                 className="max-w-full max-h-[90vh] object-contain"
               />
