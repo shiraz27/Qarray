@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { supabase } from '@/integrations/supabase/client';
 import qarayLogo from '@/assets/qarray-logo-new.png';
+import { Session } from '@supabase/supabase-js';
 import { 
   BookOpen, 
   MessageCircle, 
@@ -17,7 +18,8 @@ import {
   Target,
   Award,
   Users,
-  Rocket
+  Rocket,
+  Loader2
 } from 'lucide-react';
 import { StatisticsSection } from '@/components/StatisticsSection';
 import { GlobalSearch } from '@/components/GlobalSearch';
@@ -29,6 +31,32 @@ const Landing: React.FC = () => {
   const { t } = useTranslation();
   const [searchOpen, setSearchOpen] = useState(false);
   const [studentCount, setStudentCount] = useState<number | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Check authentication status
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setLoading(false);
+      }
+    );
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (!loading && session) {
+      navigate('/dashboard');
+    }
+  }, [session, loading, navigate]);
 
   useEffect(() => {
     const fetchStudentCount = async () => {
@@ -76,6 +104,15 @@ const Landing: React.FC = () => {
       onClick: () => setSearchOpen(true),
     },
   ];
+
+  // Show loading spinner while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-background">
