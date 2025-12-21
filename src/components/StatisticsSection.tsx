@@ -84,6 +84,7 @@ export const StatisticsSection: React.FC = () => {
             .from('memorizations')
             .select('*', { count: 'exact', head: true })
             .eq('deleted', false)
+            .eq('is_public', true)
             .eq('class_id', cls.id);
 
           const { count: answerCount } = await supabase
@@ -118,6 +119,7 @@ export const StatisticsSection: React.FC = () => {
                 .from('memorizations')
                 .select('*', { count: 'exact', head: true })
                 .eq('deleted', false)
+                .eq('is_public', true)
                 .eq('subject_id', subject.id);
 
               return {
