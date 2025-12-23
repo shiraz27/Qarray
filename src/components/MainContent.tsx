@@ -277,10 +277,32 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
   if (chapters.length === 0) {
     return (
       <main className="w-full px-4 pb-4">
+        {(isModerator || isAdmin) && (
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={handleAddChapter}
+            >
+              <Plus size={20} />
+              Add Chapter
+            </Button>
+          </div>
+        )}
         <EmptyState
           type="chapters"
           message={t('noChapters') || 'No chapters available for this subject'}
         />
+        {subjectId && classId && (
+          <ManageChapterDialog
+            open={manageDialogOpen}
+            onClose={handleDialogClose}
+            subjectId={subjectId}
+            classId={classId}
+            chapterId={editingChapterId}
+            onSuccess={handleSuccess}
+          />
+        )}
       </main>
     );
   }
