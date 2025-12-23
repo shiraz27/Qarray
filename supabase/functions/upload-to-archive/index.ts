@@ -93,18 +93,21 @@ serve(async (req) => {
       console.log(`Organized path: ${folderPath}`);
     }
 
-    metadataTitle = `${classData.name} - ${subject.name} - ${chapter.name}`;
+    // Encode metadata values to ASCII-safe format for HTTP headers
+    const encodeForHeader = (str: string) => encodeURIComponent(str).replace(/%20/g, ' ');
+    
+    metadataTitle = encodeForHeader(`${classData.name} - ${subject.name} - ${chapter.name}`);
     additionalMetadata = {
-      'x-archive-meta-class': classData.name,
-      'x-archive-meta-subject': subject.name,
-      'x-archive-meta-chapter': chapter.name,
+      'x-archive-meta-class': encodeForHeader(classData.name),
+      'x-archive-meta-subject': encodeForHeader(subject.name),
+      'x-archive-meta-chapter': encodeForHeader(chapter.name),
     };
     
     if (contentType) {
-      additionalMetadata['x-archive-meta-content-type'] = contentType;
+      additionalMetadata['x-archive-meta-content-type'] = encodeForHeader(contentType);
     }
     if (contentId) {
-      additionalMetadata['x-archive-meta-content-id'] = contentId;
+      additionalMetadata['x-archive-meta-content-id'] = encodeForHeader(contentId);
     }
 
     // Read file as array buffer
