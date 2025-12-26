@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.fetch-media]
 verify_jwt = false
+
+[functions.extract-metadata]
+verify_jwt = false

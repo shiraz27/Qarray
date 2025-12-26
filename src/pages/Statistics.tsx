@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { BarChart3, BookOpen, MessageCircle, Brain, FileText, CheckCircle2, Clock, Play, Loader2, Search, HelpCircle } from 'lucide-react';
+import { BarChart3, BookOpen, MessageCircle, Brain, FileText, CheckCircle2, Clock, Play, Loader2, Search, HelpCircle, Sparkles, Building2, User } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { processResourceOCR } from '@/utils/clientOcrProcessor';
 import { processQuestionOCR } from '@/utils/clientQuestionOcrProcessor';
+import { extractAndUpdateResourceMetadata, type ExtractedMetadata } from '@/utils/metadataExtractor';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
 interface Stats {
@@ -42,8 +43,10 @@ interface OcrStats {
 interface ResourceRow {
   id: number;
   title: string;
+  description: string;
   data: string[];
   ocr_status: string | null;
+  ocr_text: string | null;
   chapter_id: number | null;
   chapters?: { name: string };
   resource_types?: { type: string };
@@ -91,6 +94,8 @@ export default function Statistics() {
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [chapters, setChapters] = useState<any[]>([]);
+  const [extractingMetadataId, setExtractingMetadataId] = useState<number | null>(null);
+  const [isExtractingBatch, setIsExtractingBatch] = useState(false);
   const itemsPerPage = 20;
 
   useEffect(() => {
@@ -380,7 +385,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('resources')
-        .select('id, title, data, ocr_status, chapter_id, chapters(name), resource_types(type)')
+        .select('id, title, description, data, ocr_status, ocr_text, chapter_id, chapters(name), resource_types(type)')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -574,6 +579,100 @@ export default function Statistics() {
       toast.error('Failed to process question');
     } finally {
       setProcessingQuestionId(null);
+    }
+  };
+
+  // Metadata extraction handlers
+  const handleExtractMetadata = async (resourceId: number) => {
+    const resource = resources.find(r => r.id === resourceId);
+    if (!resource || !resource.ocr_text || resource.ocr_status !== 'completed') {
+      toast.error('Resource must have completed OCR first');
+      return;
+    }
+
+    setExtractingMetadataId(resourceId);
+    try {
+      const result = await extractAndUpdateResourceMetadata(
+        resourceId,
+        resource.ocr_text,
+        resource.description,
+        (message) => {
+          toast.loading(message, { id: `extracting-${resourceId}` });
+        }
+      );
+      
+      toast.dismiss(`extracting-${resourceId}`);
+      
+      if (result.success) {
+        toast.success(result.message);
+        // Refresh resources to show updated description
+        fetchResources(selectedClass, selectedSubject, selectedChapter);
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error('Metadata extraction error:', error);
+      toast.error('Failed to extract metadata');
+    } finally {
+      setExtractingMetadataId(null);
+    }
+  };
+
+  const handleExtractAllMetadata = async () => {
+    const eligibleResources = resources.filter(
+      r => r.ocr_status === 'completed' && r.ocr_text
+    );
+    
+    if (eligibleResources.length === 0) {
+      toast.info('No resources with completed OCR to process');
+      return;
+    }
+
+    setIsExtractingBatch(true);
+    let successCount = 0;
+    let failCount = 0;
+    let skippedCount = 0;
+    
+    try {
+      for (let i = 0; i < eligibleResources.length; i++) {
+        const resource = eligibleResources[i];
+        
+        toast.loading(`[${i + 1}/${eligibleResources.length}] Extracting metadata...`, {
+          id: 'batch-metadata-progress',
+        });
+        
+        try {
+          const result = await extractAndUpdateResourceMetadata(
+            resource.id,
+            resource.ocr_text!,
+            resource.description
+          );
+          
+          if (result.success && (result.metadata.school_name || result.metadata.teacher_name)) {
+            successCount++;
+          } else if (result.success) {
+            skippedCount++;
+          } else {
+            failCount++;
+          }
+        } catch (error) {
+          failCount++;
+        }
+        
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      toast.dismiss('batch-metadata-progress');
+      toast.success(`Completed: ${successCount} extracted, ${skippedCount} no data found, ${failCount} failed`);
+      
+      // Refresh resources
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
+    } catch (error) {
+      console.error('Batch metadata extraction error:', error);
+      toast.error('Failed to process resources');
+    } finally {
+      setIsExtractingBatch(false);
     }
   };
 
@@ -860,18 +959,32 @@ export default function Statistics() {
                   <TabsContent value="resources" className="space-y-6">
                     {ocrStats && (
                       <>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
                           <h4 className="font-medium">Resources OCR Stats</h4>
-                          {(ocrStats.pending > 0 || ocrStats.failed > 0) && (
-                            <Button 
-                              onClick={handleProcessAllPending} 
-                              disabled={isProcessingBatch}
-                              size="sm"
-                            >
-                              {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                              Process All ({ocrStats.pending + ocrStats.failed})
-                            </Button>
-                          )}
+                          <div className="flex gap-2">
+                            {ocrStats.completed > 0 && (
+                              <Button 
+                                onClick={handleExtractAllMetadata} 
+                                disabled={isExtractingBatch}
+                                size="sm"
+                                variant="outline"
+                              >
+                                {isExtractingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                <Sparkles className="mr-1 h-4 w-4" />
+                                Extract All Metadata ({ocrStats.completed})
+                              </Button>
+                            )}
+                            {(ocrStats.pending > 0 || ocrStats.failed > 0) && (
+                              <Button 
+                                onClick={handleProcessAllPending} 
+                                disabled={isProcessingBatch}
+                                size="sm"
+                              >
+                                {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Process All ({ocrStats.pending + ocrStats.failed})
+                              </Button>
+                            )}
+                          </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="h-[250px]">
@@ -1001,20 +1114,38 @@ export default function Statistics() {
                                             {getOcrStatusBadge(resource.ocr_status)}
                                           </TableCell>
                                           <TableCell className="text-right">
-                                            {canProcess && (
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => handleProcessSingle(resource.id)}
-                                                disabled={processingId === resource.id}
-                                              >
-                                                {processingId === resource.id ? (
-                                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                                ) : (
-                                                  <Play className="h-4 w-4" />
-                                                )}
-                                              </Button>
-                                            )}
+                                            <div className="flex items-center justify-end gap-1">
+                                              {resource.ocr_status === 'completed' && resource.ocr_text && (
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={() => handleExtractMetadata(resource.id)}
+                                                  disabled={extractingMetadataId === resource.id}
+                                                  title="Extract metadata with AI"
+                                                >
+                                                  {extractingMetadataId === resource.id ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                  ) : (
+                                                    <Sparkles className="h-4 w-4" />
+                                                  )}
+                                                </Button>
+                                              )}
+                                              {canProcess && (
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={() => handleProcessSingle(resource.id)}
+                                                  disabled={processingId === resource.id}
+                                                  title="Process OCR"
+                                                >
+                                                  {processingId === resource.id ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                  ) : (
+                                                    <Play className="h-4 w-4" />
+                                                  )}
+                                                </Button>
+                                              )}
+                                            </div>
                                           </TableCell>
                                         </TableRow>
                                       );
