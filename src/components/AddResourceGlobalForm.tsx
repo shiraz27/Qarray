@@ -197,6 +197,15 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
         }
       );
 
+      // Check if processing was successful
+      if (!result.success) {
+        toast.error(result.message || 'Could not process files. Please try again or use manual entry.');
+        setProcessingProgress(0);
+        setProcessingMessage('');
+        setStep('choose');
+        return;
+      }
+
       setExtractedData(result);
       setProcessingProgress(100);
 
@@ -236,6 +245,8 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
     } catch (error: any) {
       console.error('Processing error:', error);
       toast.error('Failed to process files: ' + error.message);
+      setProcessingProgress(0);
+      setProcessingMessage('');
       setStep('choose');
     }
   };
