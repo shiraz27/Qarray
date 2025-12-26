@@ -629,7 +629,9 @@ export type Database = {
           ocr_status: string | null
           ocr_text: string | null
           published_by: string | null
+          school_name: string | null
           subject_id: number | null
+          teacher_name: string | null
           title: string
           type_id: number | null
           updated_at: string | null
@@ -649,7 +651,9 @@ export type Database = {
           ocr_status?: string | null
           ocr_text?: string | null
           published_by?: string | null
+          school_name?: string | null
           subject_id?: number | null
+          teacher_name?: string | null
           title: string
           type_id?: number | null
           updated_at?: string | null
@@ -669,7 +673,9 @@ export type Database = {
           ocr_status?: string | null
           ocr_text?: string | null
           published_by?: string | null
+          school_name?: string | null
           subject_id?: number | null
+          teacher_name?: string | null
           title?: string
           type_id?: number | null
           updated_at?: string | null

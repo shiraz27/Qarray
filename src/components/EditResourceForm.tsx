@@ -19,6 +19,8 @@ const resourceSchema = z.object({
   type_id: z.string().optional(),
   devoir_type_id: z.string().optional(),
   with_correction: z.boolean().default(false),
+  school_name: z.string().max(200).optional(),
+  teacher_name: z.string().max(200).optional(),
 });
 
 type ResourceFormData = z.infer<typeof resourceSchema>;
@@ -33,6 +35,8 @@ interface EditResourceFormProps {
     type_id: number | null;
     devoir_type_id: number | null;
     with_correction: boolean;
+    school_name?: string | null;
+    teacher_name?: string | null;
   };
   resourceTypes: Array<{ id: number; type: string }>;
   devoirTypes: Array<{ id: number; devoir_type: string }>;
@@ -61,6 +65,8 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
       type_id: initialData.type_id?.toString() || '',
       devoir_type_id: initialData.devoir_type_id?.toString() || '',
       with_correction: initialData.with_correction,
+      school_name: initialData.school_name || '',
+      teacher_name: initialData.teacher_name || '',
     },
   });
 
@@ -116,6 +122,8 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
         devoir_type_id: data.devoir_type_id ? parseInt(data.devoir_type_id) : null,
         with_correction: data.with_correction,
         data: mediaUrls,
+        school_name: data.school_name || null,
+        teacher_name: data.teacher_name || null,
       };
 
       // Only update OCR status if new PDF/image was added
@@ -238,6 +246,36 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
             </FormItem>
           )}
         />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="school_name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>School Name (Optional - AI auto-detected)</FormLabel>
+                <FormControl>
+                  <Input placeholder="🏫 e.g. ثانوية محمد البشير الإبراهيمي" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="teacher_name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Teacher Name (Optional - AI auto-detected)</FormLabel>
+                <FormControl>
+                  <Input placeholder="👨‍🏫 e.g. الأستاذ أحمد بن محمد" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <FormField
           control={form.control}
