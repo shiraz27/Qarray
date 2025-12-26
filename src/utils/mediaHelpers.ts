@@ -29,7 +29,8 @@ export function extractMediaFromText(text: string): { text: string; media: Media
       };
     }
     
-    if (lowerUrl.includes('.pdf')) {
+    // Check for PDF (with dot or dash for Archive.org sanitized URLs)
+    if (lowerUrl.includes('.pdf') || lowerUrl.endsWith('-pdf') || lowerUrl.includes('-pdf/') || lowerUrl.includes('-pdf?')) {
       return {
         url,
         type: 'pdf' as const,
@@ -37,7 +38,10 @@ export function extractMediaFromText(text: string): { text: string; media: Media
       };
     }
     
-    if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) || lowerUrl.includes('image')) {
+    // Check for images (with dot or dash for Archive.org sanitized URLs)
+    if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)/i) || 
+        lowerUrl.match(/-(jpg|jpeg|png|gif|webp)($|[/?#])/i) ||
+        lowerUrl.includes('image')) {
       return {
         url,
         type: 'image' as const,
@@ -45,7 +49,10 @@ export function extractMediaFromText(text: string): { text: string; media: Media
       };
     }
     
-    if (lowerUrl.match(/\.(mp3|wav|webm|ogg|m4a)$/i) || lowerUrl.includes('audio')) {
+    // Check for audio (with dot or dash for Archive.org sanitized URLs)
+    if (lowerUrl.match(/\.(mp3|wav|webm|ogg|m4a)/i) || 
+        lowerUrl.match(/-(mp3|wav|webm|ogg|m4a)($|[/?#])/i) ||
+        lowerUrl.includes('audio')) {
       // Extract recording number for archive.org URLs
       const recordingMatch = url.match(/recording-(\d+)/);
       if (recordingMatch) {

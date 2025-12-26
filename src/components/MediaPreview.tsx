@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { AudioPlayer } from '@/components/AudioPlayer';
-import { Volume2 } from 'lucide-react';
+import { Volume2, Loader2, Clock, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { AudioPlayerModal } from '@/components/AudioPlayerModal';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -20,6 +20,8 @@ function extractRecordingNumber(url: string): string | undefined {
 export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   const [audioModalOpen, setAudioModalOpen] = useState(false);
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
   
   // Ensure URL has encoded spaces for proper loading
   const encodedUrl = url.replace(/ /g, '%20');
@@ -42,21 +44,23 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   };
 
   const youtubeEmbedUrl = getYouTubeEmbedUrl(url);
+  const lowerUrl = url.toLowerCase();
 
-  // Check if it's a PDF
-  const isPdf = url.toLowerCase().includes('.pdf') || url.toLowerCase().includes('pdf');
+  // Check if it's a PDF (including Archive.org sanitized URLs)
+  const isPdf = lowerUrl.includes('.pdf') || 
+                lowerUrl.endsWith('-pdf') ||
+                lowerUrl.includes('-pdf/') ||
+                lowerUrl.includes('-pdf?');
 
-  // Check if it's an image (more robust detection)
+  // Check if it's an image (including Archive.org sanitized URLs)
   const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg|ico)/i.test(url) || 
-                  url.toLowerCase().includes('image') ||
-                  url.toLowerCase().includes('.jpg') ||
-                  url.toLowerCase().includes('.jpeg') ||
-                  url.toLowerCase().includes('.png') ||
-                  url.toLowerCase().includes('.gif') ||
-                  url.toLowerCase().includes('.webp');
+                  /-(jpg|jpeg|png|gif|webp)($|[/?#])/i.test(url) ||
+                  lowerUrl.includes('image');
 
-  // Check if it's an audio file
-  const isAudio = /\.(mp3|wav|webm|ogg|m4a)/i.test(url) || url.toLowerCase().includes('audio');
+  // Check if it's an audio file (including Archive.org sanitized URLs)
+  const isAudio = /\.(mp3|wav|webm|ogg|m4a)/i.test(url) || 
+                  /-(mp3|wav|webm|ogg|m4a)($|[/?#])/i.test(url) ||
+                  lowerUrl.includes('audio');
 
   if (youtubeEmbedUrl) {
     return (
@@ -99,21 +103,57 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   if (isImage) {
     return (
       <>
+        {/* Loading state */}
+        {imageLoading && !imageError && (
+          <Card className={`overflow-hidden ${className} p-8 flex flex-col items-center justify-center gap-3 min-h-[200px]`}>
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading image...</p>
+          </Card>
+        )}
+        
+        {/* Error/Processing state */}
+        {imageError && (
+          <Card className={`overflow-hidden ${className} p-8 flex flex-col items-center justify-center gap-3 min-h-[200px] bg-muted/50`}>
+            <Clock className="h-8 w-8 text-muted-foreground" />
+            <div className="text-center">
+              <p className="text-sm font-medium">Image processing...</p>
+              <p className="text-xs text-muted-foreground">The file may still be uploading. Please wait a moment and refresh.</p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                setImageError(false);
+                setImageLoading(true);
+              }}
+              className="gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </Button>
+          </Card>
+        )}
+        
+        {/* Actual image - hidden when loading or error */}
         <Card 
           className={`overflow-hidden ${className} cursor-pointer hover:shadow-lg transition-all border-border`}
           onClick={() => setImageZoomOpen(true)}
+          style={{ display: imageLoading || imageError ? 'none' : 'block' }}
         >
           <img 
             src={encodedUrl} 
             alt="Media content" 
             className="w-full h-full object-cover rounded-lg" 
             style={{ minHeight: '200px', maxHeight: '500px' }}
+            onLoad={() => setImageLoading(false)}
             onError={(e) => {
               console.error('Image failed to load:', encodedUrl);
-              e.currentTarget.style.display = 'none';
+              setImageLoading(false);
+              setImageError(true);
             }}
           />
         </Card>
+        
         <Dialog open={imageZoomOpen} onOpenChange={setImageZoomOpen}>
           <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-none">
             <div className="relative w-full h-full flex items-center justify-center p-4">
