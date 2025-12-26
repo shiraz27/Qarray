@@ -14,6 +14,7 @@ interface ExtractMetadataRequest {
 interface ExtractedMetadata {
   school_name: string | null;
   teacher_name: string | null;
+  suggested_title: string | null;
 }
 
 serve(async (req) => {
@@ -34,7 +35,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          metadata: { school_name: null, teacher_name: null },
+          metadata: { school_name: null, teacher_name: null, suggested_title: null },
           message: 'No OCR text provided' 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -48,6 +49,7 @@ serve(async (req) => {
     const systemPrompt = `You are an AI assistant specialized in extracting metadata from educational documents in Algeria (Arabic and French).
 
 Your task is to analyze OCR-extracted text from educational documents (exams, homework, lessons) and extract:
+
 1. School/Institute name - Look for patterns like:
    - Arabic: ثانوية، متوسطة، ابتدائية، معهد، مدرسة، مركز، ليسي
    - French: Lycée, CEM, École, Institut, Collège, Centre
@@ -58,10 +60,18 @@ Your task is to analyze OCR-extracted text from educational documents (exams, ho
    - French: Prof., Professeur, Mr., Mme., M., Enseignant, Préparé par
    - May appear in headers or signatures at the bottom
 
+3. Document Title - Look for patterns like:
+   - Arabic: عنوان، الموضوع، اختبار، امتحان، فرض، الفرض، الاختبار، تمارين، سلسلة، درس
+   - French: Titre, Devoir, Examen, Contrôle, Composition, Exercices, Série, Cours
+   - Look for the main subject/topic of the document
+   - Generate a concise, descriptive title in the document's primary language
+   - Include the subject matter and type (e.g., "اختبار الفصل الأول في الرياضيات" or "Devoir de Mathématiques - 1er Trimestre")
+
 Important notes:
 - Extract ONLY if you find clear indicators, don't guess
 - Names should be returned in their original language (Arabic or French)
 - If multiple schools/teachers are mentioned, return the primary one (usually the first one)
+- For title: generate a clear, concise title based on document content if no explicit title exists
 - Return null if not found or uncertain`;
 
     // Truncate OCR text if too long (keep first 4000 chars which usually contain headers)
@@ -79,14 +89,14 @@ Important notes:
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Please analyze this OCR text and extract the school name and teacher name:\n\n${truncatedText}` }
+          { role: "user", content: `Please analyze this OCR text and extract the school name, teacher name, and suggest an appropriate title:\n\n${truncatedText}` }
         ],
         tools: [
           {
             type: "function",
             function: {
               name: "extract_document_metadata",
-              description: "Extract school/institute name and teacher name from educational document",
+              description: "Extract school/institute name, teacher name, and suggest a title from educational document",
               parameters: {
                 type: "object",
                 properties: {
@@ -99,9 +109,14 @@ Important notes:
                     type: "string", 
                     description: "Name of the teacher or professor. Null if not found.",
                     nullable: true
+                  },
+                  suggested_title: {
+                    type: "string",
+                    description: "Suggested title for the document based on its content. Should be concise and descriptive in the document's primary language.",
+                    nullable: true
                   }
                 },
-                required: ["school_name", "teacher_name"],
+                required: ["school_name", "teacher_name", "suggested_title"],
                 additionalProperties: false
               }
             }
@@ -135,7 +150,7 @@ Important notes:
     console.log("AI response:", JSON.stringify(data, null, 2));
 
     // Extract the tool call response
-    let metadata: ExtractedMetadata = { school_name: null, teacher_name: null };
+    let metadata: ExtractedMetadata = { school_name: null, teacher_name: null, suggested_title: null };
     
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (toolCall?.function?.arguments) {
@@ -143,7 +158,8 @@ Important notes:
         const args = JSON.parse(toolCall.function.arguments);
         metadata = {
           school_name: args.school_name || null,
-          teacher_name: args.teacher_name || null
+          teacher_name: args.teacher_name || null,
+          suggested_title: args.suggested_title || null
         };
       } catch (parseError) {
         console.error("Error parsing tool call arguments:", parseError);
@@ -167,10 +183,9 @@ Important notes:
       JSON.stringify({ 
         success: false, 
         error: error instanceof Error ? error.message : "Unknown error",
-        metadata: { school_name: null, teacher_name: null }
+        metadata: { school_name: null, teacher_name: null, suggested_title: null }
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
-
