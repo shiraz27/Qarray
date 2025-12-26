@@ -43,14 +43,26 @@ async function fetchFileViaProxy(url: string): Promise<Blob> {
 
 /**
  * Detect file type from URL
+ * Handles both standard extensions (.png) and Archive.org sanitized URLs (-png)
  */
 function detectFileType(url: string): FileType {
   const lower = url.toLowerCase();
 
-  if (lower.includes('.pdf')) return 'pdf';
-  if (lower.match(/\.(jpg|jpeg|png|gif|webp)/i)) return 'image';
-  if (lower.match(/\.(mp4|webm|mov)/i) || lower.includes('youtube')) return 'video';
-  if (lower.match(/\.(mp3|wav|webm|ogg|m4a)/i)) return 'audio';
+  // Check for PDF (with dot or dash for Archive.org sanitized URLs)
+  if (lower.includes('.pdf') || lower.endsWith('-pdf') || lower.includes('-pdf/') || lower.includes('-pdf?')) return 'pdf';
+  
+  // Check for images (with dot or dash for Archive.org sanitized URLs)
+  if (lower.match(/\.(jpg|jpeg|png|gif|webp)/i) || 
+      lower.match(/-(jpg|jpeg|png|gif|webp)($|[/?#])/i)) return 'image';
+  
+  // Check for video
+  if (lower.match(/\.(mp4|webm|mov)/i) || 
+      lower.match(/-(mp4|webm|mov)($|[/?#])/i) ||
+      lower.includes('youtube')) return 'video';
+  
+  // Check for audio
+  if (lower.match(/\.(mp3|wav|ogg|m4a)/i) || 
+      lower.match(/-(mp3|wav|ogg|m4a)($|[/?#])/i)) return 'audio';
 
   return 'unknown';
 }
