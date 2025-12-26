@@ -36,6 +36,8 @@ interface SearchResult {
   subjectName?: string;
   resourceType?: string;
   hasCorrection?: boolean;
+  schoolName?: string;
+  teacherName?: string;
 }
 
 interface GlobalSearchProps {
@@ -221,14 +223,14 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
           let resourcesQuery = effectiveClassId
             ? supabase
                 .from('resources')
-                .select('id, title, description, chapter_id, type_id, with_correction, data, resource_types(type), chapters!inner(subject_id, subjects!inner(name, class_id))')
-                .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+                .select('id, title, description, chapter_id, type_id, with_correction, data, school_name, teacher_name, resource_types(type), chapters!inner(subject_id, subjects!inner(name, class_id))')
+                .or(`title.ilike.%${query}%,description.ilike.%${query}%,school_name.ilike.%${query}%,teacher_name.ilike.%${query}%`)
                 .eq('deleted', false)
                 .eq('chapters.subjects.class_id', effectiveClassId)
             : supabase
                 .from('resources')
-                .select('id, title, description, chapter_id, type_id, with_correction, data, resource_types(type), chapters(subject_id, subjects(name, class_id))')
-                .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+                .select('id, title, description, chapter_id, type_id, with_correction, data, school_name, teacher_name, resource_types(type), chapters(subject_id, subjects(name, class_id))')
+                .or(`title.ilike.%${query}%,description.ilike.%${query}%,school_name.ilike.%${query}%,teacher_name.ilike.%${query}%`)
                 .eq('deleted', false);
 
           if (subjectFilter !== 'all') {
@@ -280,6 +282,8 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
                 resourceType: r.resource_types?.type,
                 hasCorrection: r.with_correction,
                 subjectName: r.chapters?.subjects?.name,
+                schoolName: r.school_name,
+                teacherName: r.teacher_name,
               });
             });
           }
@@ -730,6 +734,12 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
                         <p className="font-medium text-sm sm:text-base truncate">
                           {highlightKeyword(result.title, query)}
                         </p>
+                        {(result.schoolName || result.teacherName) && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                            {result.schoolName && <span>🏫 {result.schoolName}</span>}
+                            {result.teacherName && <span>👨‍🏫 {result.teacherName}</span>}
+                          </div>
+                        )}
                         {result.description && (
                           <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mt-1 break-words">
                             {highlightKeyword(result.description, query)}

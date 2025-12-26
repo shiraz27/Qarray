@@ -4,6 +4,8 @@ export interface ExtractedMetadata {
   school_name: string | null;
   teacher_name: string | null;
   suggested_title: string | null;
+  suggested_type_id: number | null;
+  suggested_devoir_type_id: number | null;
 }
 
 export interface MetadataExtractionResult {
@@ -13,7 +15,7 @@ export interface MetadataExtractionResult {
 }
 
 /**
- * Extract metadata (school name, teacher name, suggested title) from OCR text using AI
+ * Extract metadata (school name, teacher name, suggested title, types) from OCR text using AI
  */
 export async function extractMetadataFromOCR(
   ocrText: string,
@@ -23,7 +25,7 @@ export async function extractMetadataFromOCR(
     if (!ocrText || ocrText.trim().length === 0) {
       return {
         success: true,
-        metadata: { school_name: null, teacher_name: null, suggested_title: null },
+        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null },
         message: 'No OCR text to analyze'
       };
     }
@@ -40,21 +42,21 @@ export async function extractMetadataFromOCR(
       console.error('Error calling extract-metadata function:', error);
       return {
         success: false,
-        metadata: { school_name: null, teacher_name: null, suggested_title: null },
+        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null },
         message: error.message || 'Failed to extract metadata'
       };
     }
 
     return {
       success: data.success,
-      metadata: data.metadata || { school_name: null, teacher_name: null, suggested_title: null },
+      metadata: data.metadata || { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null },
       message: data.message || 'Metadata extraction complete'
     };
   } catch (error: any) {
     console.error('Error in extractMetadataFromOCR:', error);
     return {
       success: false,
-      metadata: { school_name: null, teacher_name: null, suggested_title: null },
+      metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null },
       message: error.message || 'Unknown error during metadata extraction'
     };
   }
@@ -133,6 +135,8 @@ export async function extractAndUpdateResourceMetadata(
   if (result.metadata.suggested_title) foundItems.push(`Title: ${result.metadata.suggested_title}`);
   if (school_name) foundItems.push(`School: ${school_name}`);
   if (teacher_name) foundItems.push(`Teacher: ${teacher_name}`);
+  if (result.metadata.suggested_type_id) foundItems.push(`Type: ${result.metadata.suggested_type_id}`);
+  if (result.metadata.suggested_devoir_type_id) foundItems.push(`Devoir: ${result.metadata.suggested_devoir_type_id}`);
   
   if (foundItems.length > 0) {
     return {

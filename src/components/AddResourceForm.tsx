@@ -13,6 +13,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
+import { ResourceUploadModeSelector } from './ResourceUploadModeSelector';
+import { AIResourceUploadForm } from './AIResourceUploadForm';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
@@ -43,6 +45,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
   onSuccess, 
   onCancel 
 }) => {
+  const [uploadMode, setUploadMode] = useState<'select' | 'ai' | 'manual'>('select');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
@@ -60,6 +63,30 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
       teacher_name: '',
     },
   });
+
+  // Mode selection screen
+  if (uploadMode === 'select') {
+    return (
+      <ResourceUploadModeSelector 
+        onSelectMode={(mode) => setUploadMode(mode)}
+      />
+    );
+  }
+
+  // AI Auto-fill mode
+  if (uploadMode === 'ai') {
+    return (
+      <AIResourceUploadForm
+        chapterId={chapterId}
+        subjectId={subjectId}
+        resourceTypes={resourceTypes}
+        devoirTypes={devoirTypes}
+        onSuccess={onSuccess}
+        onCancel={onCancel}
+        onSwitchToManual={() => setUploadMode('manual')}
+      />
+    );
+  }
 
   const handleMediaUploaded = (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => {
     setMediaUrls(prev => [...prev, url]);
