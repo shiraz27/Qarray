@@ -4,16 +4,26 @@ const corsHeaders = {
 };
 
 // Retry with exponential backoff for Archive.org files that need processing time
-async function fetchWithRetry(url: string, maxRetries = 5, initialDelayMs = 2000): Promise<Response> {
-  let lastError: Error | null = null;
+// Result type to distinguish between retriable and permanent failures
+type FetchResult = 
+  | { ok: true; response: Response }
+  | { ok: false; status: number; message: string };
+
+// Retry with exponential backoff for Archive.org files that need processing time
+async function fetchWithRetry(url: string, maxRetries = 5, initialDelayMs = 2000): Promise<FetchResult> {
+  let lastStatus = 0;
+  let lastMessage = 'Unknown error';
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const response = await fetch(url);
       
       if (response.ok) {
-        return response;
+        return { ok: true, response };
       }
+      
+      lastStatus = response.status;
+      lastMessage = response.statusText;
       
       // If 404, Archive.org might still be processing - retry
       if (response.status === 404 && attempt < maxRetries - 1) {
@@ -23,21 +33,24 @@ async function fetchWithRetry(url: string, maxRetries = 5, initialDelayMs = 2000
         continue;
       }
       
-      throw new Error(`Failed to fetch file: ${response.statusText}`);
+      // Non-retriable error or last attempt
+      return { ok: false, status: response.status, message: response.statusText };
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      lastMessage = errorMessage;
+      lastStatus = 500;
       
       // For network errors, also retry
       if (attempt < maxRetries - 1) {
         const delay = initialDelayMs * Math.pow(2, attempt);
-        console.log(`Fetch error (attempt ${attempt + 1}/${maxRetries}): ${lastError.message}, retrying in ${delay}ms...`);
+        console.log(`Fetch error (attempt ${attempt + 1}/${maxRetries}): ${errorMessage}, retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
     }
   }
   
-  throw lastError || new Error('Failed to fetch file after retries');
+  return { ok: false, status: lastStatus, message: lastMessage };
 }
 
 Deno.serve(async (req) => {
@@ -52,9 +65,20 @@ Deno.serve(async (req) => {
     console.log('Fetching media from:', url);
     
     // Fetch file with retry logic for Archive.org processing delay
-    const response = await fetchWithRetry(url);
+    const result = await fetchWithRetry(url);
     
-    const blob = await response.blob();
+    if (!result.ok) {
+      console.error(`Fetch media failed: ${result.status} - ${result.message}`);
+      return new Response(
+        JSON.stringify({ error: `File not available: ${result.message}` }),
+        {
+          status: result.status === 404 ? 404 : 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+    
+    const blob = await result.response.blob();
     
     console.log('Successfully fetched file, size:', blob.size);
     
@@ -62,7 +86,7 @@ Deno.serve(async (req) => {
     return new Response(blob, {
       headers: {
         ...corsHeaders,
-        'Content-Type': response.headers.get('Content-Type') || 'application/octet-stream',
+        'Content-Type': result.response.headers.get('Content-Type') || 'application/octet-stream',
       },
     });
   } catch (error) {
