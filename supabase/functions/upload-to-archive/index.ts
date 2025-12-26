@@ -18,12 +18,12 @@ serve(async (req) => {
     const file = formData.get('file') as File;
     const fileName = formData.get('fileName') as string;
     const fileType = formData.get('fileType') as string;
-    const chapterId = formData.get('chapterId') as string;
+    const chapterId = formData.get('chapterId') as string | null;
     const contentType = formData.get('contentType') as string; // 'question' or 'resource'
     const contentId = formData.get('contentId') as string;
     
-    if (!file || !fileName || !chapterId) {
-      throw new Error('File, fileName, and chapterId are required');
+    if (!file || !fileName) {
+      throw new Error('File and fileName are required');
     }
 
     const accessKey = Deno.env.get('ARCHIVE_ORG_ACCESS_KEY');
@@ -40,74 +40,82 @@ serve(async (req) => {
     let metadataTitle: string;
     let additionalMetadata: Record<string, string> = {};
     
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Fetch chapter, subject, and class information
-    const { data: chapter, error: chapterError } = await supabase
-      .from('chapters')
-      .select('id, name, subject_id, class_id')
-      .eq('id', parseInt(chapterId))
-      .single();
-
-    if (chapterError || !chapter) {
-      throw new Error('Chapter not found');
-    }
-
-    const { data: subject, error: subjectError } = await supabase
-      .from('subjects')
-      .select('id, name')
-      .eq('id', chapter.subject_id)
-      .single();
-
-    if (subjectError || !subject) {
-      throw new Error('Subject not found');
-    }
-
-    const { data: classData, error: classError } = await supabase
-      .from('classes')
-      .select('id, name')
-      .eq('id', chapter.class_id)
-      .single();
-
-    if (classError || !classData) {
-      throw new Error('Class not found');
-    }
-
     // Sanitize names for URL use
     const sanitize = (str: string) => str.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    const className = sanitize(classData.name);
-    const subjectName = sanitize(subject.name);
-    const chapterName = sanitize(chapter.name);
-    
-    // Create organized folder path within the collection
-    if (contentType && contentId) {
-      // Full organization: class/subject/chapter/content-type/content-id/filename
-      folderPath = `${className}/${subjectName}/${chapterName}/${contentType}/${contentId}/${fileName}`;
-      console.log(`Organized path: ${folderPath}`);
-    } else {
-      // Basic organization: class/subject/chapter/filename
-      folderPath = `${className}/${subjectName}/${chapterName}/${fileName}`;
-      console.log(`Organized path: ${folderPath}`);
-    }
-
     // Encode metadata values to ASCII-safe format for HTTP headers
     const encodeForHeader = (str: string) => encodeURIComponent(str).replace(/%20/g, ' ');
-    
-    metadataTitle = encodeForHeader(`${classData.name} - ${subject.name} - ${chapter.name}`);
-    additionalMetadata = {
-      'x-archive-meta-class': encodeForHeader(classData.name),
-      'x-archive-meta-subject': encodeForHeader(subject.name),
-      'x-archive-meta-chapter': encodeForHeader(chapter.name),
-    };
-    
-    if (contentType) {
-      additionalMetadata['x-archive-meta-content-type'] = encodeForHeader(contentType);
-    }
-    if (contentId) {
-      additionalMetadata['x-archive-meta-content-id'] = encodeForHeader(contentId);
+
+    // Check if chapterId is provided for organized path
+    if (chapterId) {
+      // Initialize Supabase client
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      // Fetch chapter, subject, and class information
+      const { data: chapter, error: chapterError } = await supabase
+        .from('chapters')
+        .select('id, name, subject_id, class_id')
+        .eq('id', parseInt(chapterId))
+        .single();
+
+      if (chapterError || !chapter) {
+        throw new Error('Chapter not found');
+      }
+
+      const { data: subject, error: subjectError } = await supabase
+        .from('subjects')
+        .select('id, name')
+        .eq('id', chapter.subject_id)
+        .single();
+
+      if (subjectError || !subject) {
+        throw new Error('Subject not found');
+      }
+
+      const { data: classData, error: classError } = await supabase
+        .from('classes')
+        .select('id, name')
+        .eq('id', chapter.class_id)
+        .single();
+
+      if (classError || !classData) {
+        throw new Error('Class not found');
+      }
+
+      const className = sanitize(classData.name);
+      const subjectName = sanitize(subject.name);
+      const chapterName = sanitize(chapter.name);
+      
+      // Create organized folder path within the collection
+      if (contentType && contentId) {
+        // Full organization: class/subject/chapter/content-type/content-id/filename
+        folderPath = `${className}/${subjectName}/${chapterName}/${contentType}/${contentId}/${fileName}`;
+      } else {
+        // Basic organization: class/subject/chapter/filename
+        folderPath = `${className}/${subjectName}/${chapterName}/${fileName}`;
+      }
+      console.log(`Organized path: ${folderPath}`);
+      
+      metadataTitle = encodeForHeader(`${classData.name} - ${subject.name} - ${chapter.name}`);
+      additionalMetadata = {
+        'x-archive-meta-class': encodeForHeader(classData.name),
+        'x-archive-meta-subject': encodeForHeader(subject.name),
+        'x-archive-meta-chapter': encodeForHeader(chapter.name),
+      };
+      
+      if (contentType) {
+        additionalMetadata['x-archive-meta-content-type'] = encodeForHeader(contentType);
+      }
+      if (contentId) {
+        additionalMetadata['x-archive-meta-content-id'] = encodeForHeader(contentId);
+      }
+    } else {
+      // No chapterId - use generic uploads folder with timestamp
+      const timestamp = Date.now();
+      folderPath = `uploads/${timestamp}-${sanitize(fileName)}`;
+      metadataTitle = encodeForHeader(`Upload - ${fileName}`);
+      console.log(`Generic upload path: ${folderPath}`);
     }
 
     // Read file as array buffer
