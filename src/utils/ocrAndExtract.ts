@@ -184,6 +184,8 @@ export async function processOcrAndExtractMetadata(
 
     const extractedTexts: string[] = [];
     let ocrableFileCount = 0;
+    let processedFileCount = 0;
+    let failedFileCount = 0;
 
     for (let i = 0; i < mediaUrls.length; i++) {
       const url = mediaUrls[i];
@@ -195,6 +197,8 @@ export async function processOcrAndExtractMetadata(
         continue; // Skip non-OCR-able files
       }
 
+      ocrableFileCount++; // Count files that should be OCR-able
+
       try {
         // Fetch file via proxy
         const blob = await fetchFileViaProxy(url);
@@ -204,11 +208,11 @@ export async function processOcrAndExtractMetadata(
         if (fileType === 'pdf') {
           // Two-stage processing for PDFs
           text = await processPdfWithFallback(blob);
-          ocrableFileCount++;
+          processedFileCount++;
         } else if (fileType === 'image') {
           // Direct OCR for images
           text = await extractImageText(blob);
-          ocrableFileCount++;
+          processedFileCount++;
         }
 
         if (text) {
@@ -216,15 +220,28 @@ export async function processOcrAndExtractMetadata(
         }
       } catch (error: any) {
         console.error(`Error processing ${url}:`, error);
+        failedFileCount++;
+        // Continue processing other files
       }
     }
 
+    // If no OCR-able files exist at all (only video/audio)
     if (ocrableFileCount === 0) {
       return {
         success: false,
         ocrText: '',
         metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null },
         message: 'No OCR-able files found (only video/audio)'
+      };
+    }
+
+    // If all OCR-able files failed to fetch (e.g., archive.org propagation delay)
+    if (processedFileCount === 0 && failedFileCount > 0) {
+      return {
+        success: false,
+        ocrText: '',
+        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null },
+        message: `Could not fetch ${failedFileCount} file(s). Files may still be processing on the server. Please try again in a few minutes.`
       };
     }
 
