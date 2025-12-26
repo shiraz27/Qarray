@@ -10,11 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Loader2, Bot, Edit3, Clock, Zap, AlertTriangle, Sparkles, ArrowLeft, Check, ArrowRight } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
-import { ResourceUploadModeSelector } from './ResourceUploadModeSelector';
-import { AIResourceUploadForm } from './AIResourceUploadForm';
+import { processOcrAndExtractMetadata, OcrAndExtractResult } from '@/utils/ocrAndExtract';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
@@ -27,6 +29,8 @@ const resourceSchema = z.object({
 });
 
 type ResourceFormData = z.infer<typeof resourceSchema>;
+
+type Step = 'upload' | 'choose' | 'processing' | 'review' | 'manual';
 
 interface AddResourceFormProps {
   chapterId: number;
@@ -45,10 +49,13 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
   onSuccess, 
   onCancel 
 }) => {
-  const [uploadMode, setUploadMode] = useState<'select' | 'ai' | 'manual'>('select');
+  const [step, setStep] = useState<Step>('upload');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingMessage, setProcessingMessage] = useState('');
+  const [extractedData, setExtractedData] = useState<OcrAndExtractResult | null>(null);
   const { isModerator, isAdmin } = useUserRole();
   
   const form = useForm<ResourceFormData>({
@@ -64,30 +71,6 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
     },
   });
 
-  // Mode selection screen
-  if (uploadMode === 'select') {
-    return (
-      <ResourceUploadModeSelector 
-        onSelectMode={(mode) => setUploadMode(mode)}
-      />
-    );
-  }
-
-  // AI Auto-fill mode
-  if (uploadMode === 'ai') {
-    return (
-      <AIResourceUploadForm
-        chapterId={chapterId}
-        subjectId={subjectId}
-        resourceTypes={resourceTypes}
-        devoirTypes={devoirTypes}
-        onSuccess={onSuccess}
-        onCancel={onCancel}
-        onSwitchToManual={() => setUploadMode('manual')}
-      />
-    );
-  }
-
   const handleMediaUploaded = (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => {
     setMediaUrls(prev => [...prev, url]);
     toast.success('Media added successfully');
@@ -95,6 +78,72 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
 
   const removeMedia = (index: number) => {
     setMediaUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleContinueToChoose = () => {
+    if (mediaUrls.length === 0) {
+      toast.error('Please add at least one file first');
+      return;
+    }
+    setStep('choose');
+  };
+
+  const handleChooseAI = async () => {
+    setStep('processing');
+    setProcessingProgress(10);
+    setProcessingMessage('Starting OCR processing...');
+
+    try {
+      const result = await processOcrAndExtractMetadata(
+        mediaUrls,
+        (message) => {
+          setProcessingMessage(message);
+          setProcessingProgress(prev => Math.min(prev + 15, 90));
+        }
+      );
+
+      setExtractedData(result);
+      setProcessingProgress(100);
+
+      // Pre-fill form with extracted data
+      if (result.metadata.suggested_title) {
+        form.setValue('title', result.metadata.suggested_title);
+      }
+      if (result.metadata.school_name) {
+        form.setValue('school_name', result.metadata.school_name);
+      }
+      if (result.metadata.teacher_name) {
+        form.setValue('teacher_name', result.metadata.teacher_name);
+      }
+      if (result.metadata.suggested_type_id) {
+        form.setValue('type_id', result.metadata.suggested_type_id.toString());
+      }
+      if (result.metadata.suggested_devoir_type_id) {
+        form.setValue('devoir_type_id', result.metadata.suggested_devoir_type_id.toString());
+      }
+
+      // Generate a default description if none exists
+      if (!form.getValues('description')) {
+        const parts: string[] = [];
+        if (result.metadata.suggested_title) parts.push(result.metadata.suggested_title);
+        if (result.metadata.school_name) parts.push(`🏫 ${result.metadata.school_name}`);
+        if (result.metadata.teacher_name) parts.push(`👨‍🏫 ${result.metadata.teacher_name}`);
+        form.setValue('description', parts.join(' - ') || 'Resource description');
+      }
+
+      setTimeout(() => {
+        setStep('review');
+      }, 500);
+
+    } catch (error: any) {
+      console.error('Processing error:', error);
+      toast.error('Failed to process files: ' + error.message);
+      setStep('choose');
+    }
+  };
+
+  const handleChooseManual = () => {
+    setStep('manual');
   };
 
   const onSubmit = async (data: ResourceFormData) => {
@@ -113,7 +162,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
       }
 
       // Auto-detect resource type based on media
-      let typeId = parseInt(data.type_id) || 1;
+      let typeId = parseInt(data.type_id || '1') || 1;
       if (!data.type_id && mediaUrls.length > 0) {
         const firstUrl = mediaUrls[0].toLowerCase();
         if (firstUrl.includes('youtube') || firstUrl.includes('youtu.be')) {
@@ -132,7 +181,10 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
                lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)/);
       });
 
-      const { data: insertedResource, error } = await supabase
+      // Determine OCR status based on step
+      const ocrStatus = step === 'review' ? 'completed' : (isPdfOrImage ? 'pending' : 'not_applicable');
+
+      const { error } = await supabase
         .from('resources')
         .insert({
           chapter_id: chapterId,
@@ -146,17 +198,15 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           published_by: user.id,
           contributors: [user.id],
           verified: isModerator || isAdmin,
-          ocr_status: isPdfOrImage ? 'pending' : 'not_applicable',
+          ocr_status: ocrStatus,
+          ocr_text: extractedData?.ocrText || null,
           school_name: data.school_name || null,
           teacher_name: data.teacher_name || null,
-        })
-        .select()
-        .single();
+        });
 
       if (error) throw error;
 
-      toast.success('Resource added successfully');
-      
+      toast.success(step === 'review' ? 'Resource added with AI-extracted metadata!' : 'Resource added successfully');
       form.reset();
       setMediaUrls([]);
       onSuccess();
@@ -168,15 +218,246 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
     }
   };
 
+  // Step 1: Upload Files
+  if (step === 'upload') {
+    return (
+      <div className="space-y-4">
+        <div className="text-center mb-4">
+          <h3 className="text-lg font-semibold">Upload Resource Files</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Add your files first, then choose how to fill the details
+          </p>
+        </div>
+
+        <div>
+          <FormLabel>Resource Files/URLs</FormLabel>
+          <MediaUploader 
+            onMediaUploaded={handleMediaUploaded}
+            uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
+            onRemoveMedia={removeMedia}
+            chapterId={chapterId}
+            contentType="resource"
+            onUploadStateChange={setIsUploading}
+          />
+        </div>
+
+        <div className="flex gap-2 justify-end">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleContinueToChoose} 
+            disabled={mediaUrls.length === 0 || isUploading}
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                Continue
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2: Choose Mode
+  if (step === 'choose') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 mb-4">
+          <Button variant="ghost" size="sm" onClick={() => setStep('upload')}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+        </div>
+
+        <div className="bg-muted/50 rounded-lg p-3 text-sm flex items-center gap-2">
+          <Check className="h-4 w-4 text-green-500" />
+          <span>{mediaUrls.length} file(s) uploaded</span>
+        </div>
+
+        <div className="text-center mb-4">
+          <h3 className="text-lg font-semibold">How do you want to fill the details?</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Choose AI extraction or manual entry
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* AI Auto-Fill Option */}
+          <Card 
+            className="cursor-pointer border-2 hover:border-primary/50 transition-colors"
+            onClick={handleChooseAI}
+          >
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-full bg-primary/10">
+                  <Bot className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-base">AI Auto-Fill</CardTitle>
+              </div>
+              <Badge variant="secondary" className="w-fit">
+                <Clock className="h-3 w-3 mr-1" />
+                15-30 seconds
+              </Badge>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <CardDescription className="text-sm space-y-2">
+                <p>AI will extract:</p>
+                <ul className="list-disc list-inside text-xs space-y-1 text-muted-foreground">
+                  <li>📝 Title</li>
+                  <li>🏫 School name</li>
+                  <li>👨‍🏫 Teacher name</li>
+                  <li>📂 Resource type</li>
+                  <li>📋 Devoir type</li>
+                </ul>
+                <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 text-xs mt-2">
+                  <AlertTriangle className="h-3 w-3" />
+                  <span>You can edit before submitting</span>
+                </div>
+              </CardDescription>
+            </CardContent>
+          </Card>
+
+          {/* Manual Fill Option */}
+          <Card 
+            className="cursor-pointer border-2 hover:border-primary/50 transition-colors"
+            onClick={handleChooseManual}
+          >
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-full bg-secondary">
+                  <Edit3 className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Manual Fill</CardTitle>
+              </div>
+              <Badge variant="outline" className="w-fit">
+                <Zap className="h-3 w-3 mr-1" />
+                Instant
+              </Badge>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <CardDescription className="text-sm space-y-2">
+                <p>Fill all fields yourself:</p>
+                <ul className="list-disc list-inside text-xs space-y-1 text-muted-foreground">
+                  <li>✏️ You control everything</li>
+                  <li>⚡ Fast submission</li>
+                  <li>🎯 Best for known content</li>
+                </ul>
+                <div className="flex items-center gap-1 text-green-600 dark:text-green-400 text-xs mt-2">
+                  <Zap className="h-3 w-3" />
+                  <span>Quick and immediate</span>
+                </div>
+              </CardDescription>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex justify-center gap-2 pt-2">
+          <Button 
+            variant="default" 
+            onClick={handleChooseAI}
+            className="gap-2"
+          >
+            <Bot className="h-4 w-4" />
+            Use AI Auto-Fill
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleChooseManual}
+            className="gap-2"
+          >
+            <Edit3 className="h-4 w-4" />
+            Fill Manually
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 3: Processing (AI only)
+  if (step === 'processing') {
+    return (
+      <div className="space-y-6 py-8">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center p-4 rounded-full bg-primary/10 mb-4">
+            <Bot className="h-8 w-8 text-primary animate-pulse" />
+          </div>
+          <h3 className="text-lg font-semibold">AI is processing your files</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            This may take 15-30 seconds
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Progress value={processingProgress} className="h-2" />
+          <p className="text-sm text-center text-muted-foreground">
+            {processingMessage}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 4: Review (AI) or Step 5: Manual Form
+  const isReviewMode = step === 'review';
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <div className="flex items-center gap-2 mb-4">
+          <Button variant="ghost" size="sm" onClick={() => setStep('choose')}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+          <div className="flex items-center gap-2">
+            {isReviewMode ? (
+              <>
+                <Check className="h-5 w-5 text-green-500" />
+                <span className="font-medium">Review AI-Extracted Data</span>
+              </>
+            ) : (
+              <>
+                <Edit3 className="h-5 w-5 text-primary" />
+                <span className="font-medium">Manual Entry</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {isReviewMode && (
+          <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 text-sm flex items-start gap-2">
+            <Sparkles className="h-4 w-4 text-green-600 mt-0.5" />
+            <p className="text-green-700 dark:text-green-300">
+              AI has extracted the data below. Review and edit if needed before submitting.
+            </p>
+          </div>
+        )}
+
+        <div className="bg-muted/50 rounded-lg p-2 text-xs text-muted-foreground">
+          Files: {mediaUrls.length} attached
+        </div>
+
         <FormField
           control={form.control}
           name="title"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Title</FormLabel>
+              <FormLabel className="flex items-center gap-2">
+                Title
+                {isReviewMode && extractedData?.metadata.suggested_title && (
+                  <Badge variant="secondary" className="text-xs">
+                    <Bot className="h-3 w-3 mr-1" />
+                    AI
+                  </Badge>
+                )}
+              </FormLabel>
               <FormControl>
                 <Input placeholder="Enter resource title" {...field} />
               </FormControl>
@@ -203,67 +484,73 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           )}
         />
 
-        <div>
-          <FormLabel>Resource Files/URLs</FormLabel>
-          <MediaUploader 
-            onMediaUploaded={handleMediaUploaded}
-            uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
-            onRemoveMedia={removeMedia}
-            chapterId={chapterId}
-            contentType="resource"
-            onUploadStateChange={setIsUploading}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="type_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="flex items-center gap-2">
+                  Resource Type
+                  {isReviewMode && extractedData?.metadata.suggested_type_id && (
+                    <Badge variant="secondary" className="text-xs">
+                      <Bot className="h-3 w-3 mr-1" />
+                      AI
+                    </Badge>
+                  )}
+                </FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select resource type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {resourceTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id.toString()}>
+                        {type.type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="devoir_type_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="flex items-center gap-2">
+                  Devoir Type
+                  {isReviewMode && extractedData?.metadata.suggested_devoir_type_id && (
+                    <Badge variant="secondary" className="text-xs">
+                      <Bot className="h-3 w-3 mr-1" />
+                      AI
+                    </Badge>
+                  )}
+                </FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select devoir type (optional)" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {devoirTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id.toString()}>
+                        {type.devoir_type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
           />
         </div>
-
-        <FormField
-          control={form.control}
-          name="type_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Resource Type (Optional - Auto-detected)</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select resource type (optional)" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {resourceTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id.toString()}>
-                      {type.type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="devoir_type_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Devoir Type (Optional)</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select devoir type" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {devoirTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id.toString()}>
-                      {type.devoir_type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
@@ -271,9 +558,17 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
             name="school_name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>School Name (Optional - AI auto-detected)</FormLabel>
+                <FormLabel className="flex items-center gap-2">
+                  School Name
+                  {isReviewMode && extractedData?.metadata.school_name && (
+                    <Badge variant="secondary" className="text-xs">
+                      <Bot className="h-3 w-3 mr-1" />
+                      AI
+                    </Badge>
+                  )}
+                </FormLabel>
                 <FormControl>
-                  <Input placeholder="🏫 e.g. ثانوية محمد البشير الإبراهيمي" {...field} />
+                  <Input placeholder="🏫 School name (optional)" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -285,9 +580,17 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
             name="teacher_name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Teacher Name (Optional - AI auto-detected)</FormLabel>
+                <FormLabel className="flex items-center gap-2">
+                  Teacher Name
+                  {isReviewMode && extractedData?.metadata.teacher_name && (
+                    <Badge variant="secondary" className="text-xs">
+                      <Bot className="h-3 w-3 mr-1" />
+                      AI
+                    </Badge>
+                  )}
+                </FormLabel>
                 <FormControl>
-                  <Input placeholder="👨‍🏫 e.g. الأستاذ أحمد بن محمد" {...field} />
+                  <Input placeholder="👨‍🏫 Teacher name (optional)" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -319,9 +622,9 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting || isUploading}>
-            {(isSubmitting || isUploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isUploading ? 'Uploading...' : 'Add Resource'}
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isReviewMode ? 'Submit Resource' : 'Add Resource'}
           </Button>
         </div>
       </form>
