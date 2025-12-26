@@ -177,7 +177,7 @@ export async function processOcrAndExtractMetadata(
       return {
         success: false,
         ocrText: '',
-        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null },
+        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null },
         message: 'No media files to process'
       };
     }
@@ -223,7 +223,7 @@ export async function processOcrAndExtractMetadata(
       return {
         success: false,
         ocrText: '',
-        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null },
+        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null },
         message: 'No OCR-able files found (only video/audio)'
       };
     }
@@ -246,7 +246,7 @@ export async function processOcrAndExtractMetadata(
     return {
       success: false,
       ocrText: '',
-      metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null },
+      metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null },
       message: error.message || 'Unknown error'
     };
   }

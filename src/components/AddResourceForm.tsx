@@ -17,6 +17,7 @@ import { Loader2, Bot, Edit3, Clock, Zap, AlertTriangle, Sparkles, ArrowLeft, Ch
 import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
 import { processOcrAndExtractMetadata, OcrAndExtractResult } from '@/utils/ocrAndExtract';
+import { SchoolAutocomplete } from './SchoolAutocomplete';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
@@ -56,6 +57,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
   const [processingProgress, setProcessingProgress] = useState(0);
   const [processingMessage, setProcessingMessage] = useState('');
   const [extractedData, setExtractedData] = useState<OcrAndExtractResult | null>(null);
+  const [selectedInstituteId, setSelectedInstituteId] = useState<string | undefined>();
   const { isModerator, isAdmin } = useUserRole();
   
   const form = useForm<ResourceFormData>({
@@ -122,8 +124,11 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
         form.setValue('devoir_type_id', result.metadata.suggested_devoir_type_id.toString());
       }
 
-      // Generate a default description if none exists
-      if (!form.getValues('description')) {
+      // Use AI-generated description if available
+      if (result.metadata.suggested_description) {
+        form.setValue('description', result.metadata.suggested_description);
+      } else if (!form.getValues('description')) {
+        // Fallback to old behavior if no AI description
         const parts: string[] = [];
         if (result.metadata.suggested_title) parts.push(result.metadata.suggested_title);
         if (result.metadata.school_name) parts.push(`🏫 ${result.metadata.school_name}`);
@@ -144,6 +149,11 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
 
   const handleChooseManual = () => {
     setStep('manual');
+  };
+
+  const handleSchoolChange = (value: string, instituteId?: string) => {
+    form.setValue('school_name', value);
+    setSelectedInstituteId(instituteId);
   };
 
   const onSubmit = async (data: ResourceFormData) => {
@@ -202,6 +212,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           ocr_text: extractedData?.ocrText || null,
           school_name: data.school_name || null,
           teacher_name: data.teacher_name || null,
+          institute_id: selectedInstituteId || null,
         });
 
       if (error) throw error;
@@ -313,8 +324,8 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
               <CardDescription className="text-sm space-y-2">
                 <p>AI will extract:</p>
                 <ul className="list-disc list-inside text-xs space-y-1 text-muted-foreground">
-                  <li>📝 Title</li>
-                  <li>🏫 School name</li>
+                  <li>📝 Title & Description</li>
+                  <li>🏫 School name (with autocomplete)</li>
                   <li>👨‍🏫 Teacher name</li>
                   <li>📂 Resource type</li>
                   <li>📋 Devoir type</li>
@@ -473,7 +484,15 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Description</FormLabel>
+              <FormLabel className="flex items-center gap-2">
+                Description
+                {isReviewMode && extractedData?.metadata.suggested_description && (
+                  <Badge variant="secondary" className="text-xs">
+                    <Bot className="h-3 w-3 mr-1" />
+                    AI
+                  </Badge>
+                )}
+              </FormLabel>
               <FormControl>
                 <Textarea 
                   placeholder="Describe the resource..."
@@ -570,7 +589,12 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
                   )}
                 </FormLabel>
                 <FormControl>
-                  <Input placeholder="🏫 School name (optional)" {...field} />
+                  <SchoolAutocomplete
+                    value={field.value || ''}
+                    onChange={handleSchoolChange}
+                    aiSuggested={extractedData?.metadata.school_name}
+                    placeholder="🏫 Search or add school..."
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

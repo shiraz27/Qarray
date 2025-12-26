@@ -625,6 +625,7 @@ export type Database = {
           description: string
           devoir_type_id: number | null
           id: number
+          institute_id: string | null
           ocr_processed_at: string | null
           ocr_status: string | null
           ocr_text: string | null
@@ -647,6 +648,7 @@ export type Database = {
           description: string
           devoir_type_id?: number | null
           id?: number
+          institute_id?: string | null
           ocr_processed_at?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
@@ -669,6 +671,7 @@ export type Database = {
           description?: string
           devoir_type_id?: number | null
           id?: number
+          institute_id?: string | null
           ocr_processed_at?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
@@ -695,6 +698,13 @@ export type Database = {
             columns: ["devoir_type_id"]
             isOneToOne: false
             referencedRelation: "devoir_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resources_institute_id_fkey"
+            columns: ["institute_id"]
+            isOneToOne: false
+            referencedRelation: "institutes"
             referencedColumns: ["id"]
           },
           {

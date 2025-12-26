@@ -17,6 +17,7 @@ interface ExtractedMetadata {
   suggested_title: string | null;
   suggested_type_id: number | null;
   suggested_devoir_type_id: number | null;
+  suggested_description: string | null;
 }
 
 serve(async (req) => {
@@ -37,7 +38,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          metadata: { school_name: null, teacher_name: null, suggested_title: null },
+          metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_description: null },
           message: 'No OCR text provided' 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -80,13 +81,21 @@ Your task is to analyze OCR-extracted text from educational documents (exams, ho
    - ID 2 (contrôle 2): الفرض الثاني، فرض2، الاختبار الثاني، contrôle 2, DS2, 2ème contrôle, second exam
    - ID 3 (synthèse): امتحان الفصل، اختبار الفصل، التركيبي، composition, examen, synthèse, bac, final
 
+6. Document Description - Generate a meaningful 2-3 sentence summary that:
+   - Describes what the document contains (topics, exercises, exam content)
+   - Mentions the educational level/class if detected
+   - Uses the document's primary language (Arabic or French)
+   - Is helpful for students searching for resources
+   - Example: "فرض مراقبة في مادة الرياضيات يتضمن تمارين حول الدوال والمتتاليات. مناسب لطلاب السنة الثالثة ثانوي شعبة علوم تجريبية."
+
 Important notes:
 - Extract ONLY if you find clear indicators, don't guess
 - Names should be returned in their original language (Arabic or French)
 - If multiple schools/teachers are mentioned, return the primary one (usually the first one)
 - For title: generate a clear, concise title based on document content if no explicit title exists
 - For type_id and devoir_type_id: return the numeric ID, not the name
-- Return null if not found or uncertain`;
+- For description: always generate a helpful summary based on document content
+- Return null if not found or uncertain (except description which should always be generated)`;
 
     // Truncate OCR text if too long (keep first 4000 chars which usually contain headers)
     const truncatedText = ocrText.length > 4000 
@@ -103,14 +112,14 @@ Important notes:
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Please analyze this OCR text and extract the school name, teacher name, and suggest an appropriate title:\n\n${truncatedText}` }
+          { role: "user", content: `Please analyze this OCR text and extract the school name, teacher name, suggest an appropriate title, and generate a helpful description:\n\n${truncatedText}` }
         ],
         tools: [
           {
             type: "function",
             function: {
               name: "extract_document_metadata",
-              description: "Extract school/institute name, teacher name, suggest a title, and detect document/devoir types from educational document",
+              description: "Extract school/institute name, teacher name, suggest a title, detect document/devoir types, and generate a description from educational document",
               parameters: {
                 type: "object",
                 properties: {
@@ -138,9 +147,14 @@ Important notes:
                     type: "number",
                     description: "Detected devoir type ID (only if document is a devoir/exam): 1=contrôle 1, 2=contrôle 2, 3=synthèse. Null if not a devoir or uncertain.",
                     nullable: true
+                  },
+                  suggested_description: {
+                    type: "string",
+                    description: "A helpful 2-3 sentence summary of the document content in the document's primary language. Should describe topics covered, educational level, and be useful for students searching.",
+                    nullable: true
                   }
                 },
-                required: ["school_name", "teacher_name", "suggested_title", "suggested_type_id", "suggested_devoir_type_id"],
+                required: ["school_name", "teacher_name", "suggested_title", "suggested_type_id", "suggested_devoir_type_id", "suggested_description"],
                 additionalProperties: false
               }
             }
@@ -174,7 +188,14 @@ Important notes:
     console.log("AI response:", JSON.stringify(data, null, 2));
 
     // Extract the tool call response
-    let metadata: ExtractedMetadata = { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null };
+    let metadata: ExtractedMetadata = { 
+      school_name: null, 
+      teacher_name: null, 
+      suggested_title: null, 
+      suggested_type_id: null, 
+      suggested_devoir_type_id: null,
+      suggested_description: null
+    };
     
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (toolCall?.function?.arguments) {
@@ -185,7 +206,8 @@ Important notes:
           teacher_name: args.teacher_name || null,
           suggested_title: args.suggested_title || null,
           suggested_type_id: args.suggested_type_id || null,
-          suggested_devoir_type_id: args.suggested_devoir_type_id || null
+          suggested_devoir_type_id: args.suggested_devoir_type_id || null,
+          suggested_description: args.suggested_description || null
         };
       } catch (parseError) {
         console.error("Error parsing tool call arguments:", parseError);
@@ -209,7 +231,14 @@ Important notes:
       JSON.stringify({ 
         success: false, 
         error: error instanceof Error ? error.message : "Unknown error",
-        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null }
+        metadata: { 
+          school_name: null, 
+          teacher_name: null, 
+          suggested_title: null, 
+          suggested_type_id: null, 
+          suggested_devoir_type_id: null,
+          suggested_description: null
+        }
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
