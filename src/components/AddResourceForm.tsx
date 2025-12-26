@@ -20,6 +20,8 @@ const resourceSchema = z.object({
   type_id: z.string().optional(),
   devoir_type_id: z.string().optional(),
   with_correction: z.boolean().default(false),
+  school_name: z.string().max(200).optional(),
+  teacher_name: z.string().max(200).optional(),
 });
 
 type ResourceFormData = z.infer<typeof resourceSchema>;
@@ -54,6 +56,8 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
       type_id: '',
       devoir_type_id: '',
       with_correction: false,
+      school_name: '',
+      teacher_name: '',
     },
   });
 
@@ -116,6 +120,8 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           contributors: [user.id],
           verified: isModerator || isAdmin,
           ocr_status: isPdfOrImage ? 'pending' : 'not_applicable',
+          school_name: data.school_name || null,
+          teacher_name: data.teacher_name || null,
         })
         .select()
         .single();
@@ -231,6 +237,36 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
             </FormItem>
           )}
         />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="school_name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>School Name (Optional - AI auto-detected)</FormLabel>
+                <FormControl>
+                  <Input placeholder="🏫 e.g. ثانوية محمد البشير الإبراهيمي" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="teacher_name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Teacher Name (Optional - AI auto-detected)</FormLabel>
+                <FormControl>
+                  <Input placeholder="👨‍🏫 e.g. الأستاذ أحمد بن محمد" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <FormField
           control={form.control}

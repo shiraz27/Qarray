@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, ThumbsUp, ThumbsDown, FileText, Edit, Trash2, AlertCircle, Share2, Bookmark, MessageSquare } from 'lucide-react';
+import { ArrowLeft, ThumbsUp, ThumbsDown, FileText, Edit, Trash2, AlertCircle, Share2, Bookmark, MessageSquare, Building2, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { ContentSkeleton } from '@/components/LoadingSkeleton';
@@ -39,6 +39,8 @@ interface Resource {
   isBookmarked?: boolean;
   ocr_text?: string | null;
   ocr_status?: string | null;
+  school_name?: string | null;
+  teacher_name?: string | null;
 }
 
 interface ContextData {
@@ -596,6 +598,25 @@ export default function ResourceDetail() {
             <div className="flex-1">
               <h2 className="text-xl font-bold text-foreground mb-2">{resource.title}</h2>
               <p className="text-sm text-muted-foreground mb-3">{resource.description}</p>
+              
+              {/* School and Teacher Info */}
+              {(resource.school_name || resource.teacher_name) && (
+                <div className="flex flex-wrap gap-3 mb-3 p-2 bg-background/50 rounded-lg">
+                  {resource.school_name && (
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Building2 size={14} className="text-primary" />
+                      <span>{resource.school_name}</span>
+                    </div>
+                  )}
+                  {resource.teacher_name && (
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <User size={14} className="text-primary" />
+                      <span>{resource.teacher_name}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              
               <MediaList data={resource.data.join('\n')} showText={true} />
             </div>
             {!resource.verified && (
@@ -662,6 +683,8 @@ export default function ResourceDetail() {
                       type_id: resource.type_id,
                       devoir_type_id: resource.devoir_type_id,
                       with_correction: resource.with_correction,
+                      school_name: resource.school_name,
+                      teacher_name: resource.teacher_name,
                     }}
                     resourceTypes={resourceTypes}
                     devoirTypes={devoirTypes}
@@ -683,7 +706,9 @@ export default function ResourceDetail() {
                           data: resourceData.data,
                           type_id: resourceData.type_id,
                           devoir_type_id: resourceData.devoir_type_id,
-                          with_correction: resourceData.with_correction
+                          with_correction: resourceData.with_correction,
+                          school_name: resourceData.school_name,
+                          teacher_name: resourceData.teacher_name,
                         } : null);
                       }
                     }}

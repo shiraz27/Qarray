@@ -50,6 +50,8 @@ interface ResourceRow {
   chapter_id: number | null;
   chapters?: { name: string };
   resource_types?: { type: string };
+  school_name?: string | null;
+  teacher_name?: string | null;
 }
 
 interface QuestionRow {
@@ -385,7 +387,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('resources')
-        .select('id, title, description, data, ocr_status, ocr_text, chapter_id, chapters(name), resource_types(type)')
+        .select('id, title, description, data, ocr_status, ocr_text, chapter_id, chapters(name), resource_types(type), school_name, teacher_name')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -595,7 +597,6 @@ export default function Statistics() {
       const result = await extractAndUpdateResourceMetadata(
         resourceId,
         resource.ocr_text,
-        resource.description,
         (message) => {
           toast.loading(message, { id: `extracting-${resourceId}` });
         }
@@ -605,7 +606,7 @@ export default function Statistics() {
       
       if (result.success) {
         toast.success(result.message);
-        // Refresh resources to show updated description
+        // Refresh resources to show updated fields
         fetchResources(selectedClass, selectedSubject, selectedChapter);
       } else {
         toast.error(result.message);
@@ -644,8 +645,7 @@ export default function Statistics() {
         try {
           const result = await extractAndUpdateResourceMetadata(
             resource.id,
-            resource.ocr_text!,
-            resource.description
+            resource.ocr_text!
           );
           
           if (result.success && (result.metadata.school_name || result.metadata.teacher_name)) {

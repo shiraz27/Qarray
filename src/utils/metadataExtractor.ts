@@ -93,7 +93,6 @@ export function formatMetadataForDescription(
 export async function extractAndUpdateResourceMetadata(
   resourceId: number,
   ocrText: string,
-  currentDescription: string,
   onProgress?: (message: string) => void
 ): Promise<MetadataExtractionResult> {
   onProgress?.('Extracting metadata with AI...');
@@ -110,19 +109,20 @@ export async function extractAndUpdateResourceMetadata(
   if (school_name || teacher_name) {
     onProgress?.('Updating resource with extracted metadata...');
     
-    const newDescription = formatMetadataForDescription(result.metadata, currentDescription);
-    
     const { error } = await supabase
       .from('resources')
-      .update({ description: newDescription })
+      .update({ 
+        school_name: school_name || null,
+        teacher_name: teacher_name || null
+      })
       .eq('id', resourceId);
     
     if (error) {
-      console.error('Error updating resource description:', error);
+      console.error('Error updating resource metadata:', error);
       return {
         ...result,
         success: false,
-        message: 'Failed to update resource description'
+        message: 'Failed to update resource metadata'
       };
     }
     
