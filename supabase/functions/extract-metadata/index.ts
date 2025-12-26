@@ -15,6 +15,8 @@ interface ExtractedMetadata {
   school_name: string | null;
   teacher_name: string | null;
   suggested_title: string | null;
+  suggested_type_id: number | null;
+  suggested_devoir_type_id: number | null;
 }
 
 serve(async (req) => {
@@ -67,11 +69,23 @@ Your task is to analyze OCR-extracted text from educational documents (exams, ho
    - Generate a concise, descriptive title in the document's primary language
    - Include the subject matter and type (e.g., "اختبار الفصل الأول في الرياضيات" or "Devoir de Mathématiques - 1er Trimestre")
 
+4. Resource Type - Detect the type of document:
+   - ID 1 (Devoirs): الفرض، فرض، اختبار، امتحان، devoir, contrôle, examen, composition
+   - ID 2 (Cours): درس، دروس، cours, leçon
+   - ID 3 (Exercices / Séries): تمارين، سلسلة، تمرين، exercices, série, TD
+   - ID 4 (Résumé): ملخص، تلخيص، résumé, synthèse, fiche
+
+5. Devoir Type (if document is a devoir/exam) - Detect the specific exam type:
+   - ID 1 (contrôle 1): الفرض الأول، فرض1، الاختبار الأول، contrôle 1, DS1, 1er contrôle, first exam
+   - ID 2 (contrôle 2): الفرض الثاني، فرض2، الاختبار الثاني، contrôle 2, DS2, 2ème contrôle, second exam
+   - ID 3 (synthèse): امتحان الفصل، اختبار الفصل، التركيبي، composition, examen, synthèse, bac, final
+
 Important notes:
 - Extract ONLY if you find clear indicators, don't guess
 - Names should be returned in their original language (Arabic or French)
 - If multiple schools/teachers are mentioned, return the primary one (usually the first one)
 - For title: generate a clear, concise title based on document content if no explicit title exists
+- For type_id and devoir_type_id: return the numeric ID, not the name
 - Return null if not found or uncertain`;
 
     // Truncate OCR text if too long (keep first 4000 chars which usually contain headers)
@@ -96,7 +110,7 @@ Important notes:
             type: "function",
             function: {
               name: "extract_document_metadata",
-              description: "Extract school/institute name, teacher name, and suggest a title from educational document",
+              description: "Extract school/institute name, teacher name, suggest a title, and detect document/devoir types from educational document",
               parameters: {
                 type: "object",
                 properties: {
@@ -114,9 +128,19 @@ Important notes:
                     type: "string",
                     description: "Suggested title for the document based on its content. Should be concise and descriptive in the document's primary language.",
                     nullable: true
+                  },
+                  suggested_type_id: {
+                    type: "number",
+                    description: "Detected resource type ID: 1=Devoirs, 2=Cours, 3=Exercices/Séries, 4=Résumé. Null if uncertain.",
+                    nullable: true
+                  },
+                  suggested_devoir_type_id: {
+                    type: "number",
+                    description: "Detected devoir type ID (only if document is a devoir/exam): 1=contrôle 1, 2=contrôle 2, 3=synthèse. Null if not a devoir or uncertain.",
+                    nullable: true
                   }
                 },
-                required: ["school_name", "teacher_name", "suggested_title"],
+                required: ["school_name", "teacher_name", "suggested_title", "suggested_type_id", "suggested_devoir_type_id"],
                 additionalProperties: false
               }
             }
@@ -150,7 +174,7 @@ Important notes:
     console.log("AI response:", JSON.stringify(data, null, 2));
 
     // Extract the tool call response
-    let metadata: ExtractedMetadata = { school_name: null, teacher_name: null, suggested_title: null };
+    let metadata: ExtractedMetadata = { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null };
     
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (toolCall?.function?.arguments) {
@@ -159,7 +183,9 @@ Important notes:
         metadata = {
           school_name: args.school_name || null,
           teacher_name: args.teacher_name || null,
-          suggested_title: args.suggested_title || null
+          suggested_title: args.suggested_title || null,
+          suggested_type_id: args.suggested_type_id || null,
+          suggested_devoir_type_id: args.suggested_devoir_type_id || null
         };
       } catch (parseError) {
         console.error("Error parsing tool call arguments:", parseError);
@@ -183,7 +209,7 @@ Important notes:
       JSON.stringify({ 
         success: false, 
         error: error instanceof Error ? error.message : "Unknown error",
-        metadata: { school_name: null, teacher_name: null, suggested_title: null }
+        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null }
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
