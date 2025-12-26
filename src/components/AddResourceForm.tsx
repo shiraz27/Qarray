@@ -230,7 +230,9 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
         </div>
 
         <div>
-          <FormLabel>Resource Files/URLs</FormLabel>
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            Resource Files/URLs
+          </label>
           <MediaUploader 
             onMediaUploaded={handleMediaUploaded}
             uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
