@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { BarChart3, BookOpen, MessageCircle, Brain, FileText, CheckCircle2, Clock, Play, Loader2, Search, HelpCircle, Sparkles, Building2, User } from 'lucide-react';
+import { BarChart3, BookOpen, MessageCircle, Brain, FileText, CheckCircle2, Clock, Play, Loader2, Search, HelpCircle, Sparkles, Building2, User, FileEdit, Check } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { processResourceOCR } from '@/utils/clientOcrProcessor';
 import { processQuestionOCR } from '@/utils/clientQuestionOcrProcessor';
-import { extractAndUpdateResourceMetadata, type ExtractedMetadata } from '@/utils/metadataExtractor';
+import { extractAndUpdateResourceMetadata, applySuggestedTitle, type ExtractedMetadata } from '@/utils/metadataExtractor';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
 interface Stats {
@@ -52,6 +52,13 @@ interface ResourceRow {
   resource_types?: { type: string };
   school_name?: string | null;
   teacher_name?: string | null;
+  suggested_title?: string | null;
+}
+
+// Track suggested titles from AI extraction
+interface SuggestedTitleEntry {
+  resourceId: number;
+  suggestedTitle: string;
 }
 
 interface QuestionRow {
@@ -98,6 +105,8 @@ export default function Statistics() {
   const [chapters, setChapters] = useState<any[]>([]);
   const [extractingMetadataId, setExtractingMetadataId] = useState<number | null>(null);
   const [isExtractingBatch, setIsExtractingBatch] = useState(false);
+  const [suggestedTitles, setSuggestedTitles] = useState<SuggestedTitleEntry[]>([]);
+  const [applyingTitleId, setApplyingTitleId] = useState<number | null>(null);
   const itemsPerPage = 20;
 
   useEffect(() => {
@@ -606,6 +615,15 @@ export default function Statistics() {
       
       if (result.success) {
         toast.success(result.message);
+        
+        // Store suggested title if found
+        if (result.metadata.suggested_title) {
+          setSuggestedTitles(prev => {
+            const filtered = prev.filter(st => st.resourceId !== resourceId);
+            return [...filtered, { resourceId, suggestedTitle: result.metadata.suggested_title! }];
+          });
+        }
+        
         // Refresh resources to show updated fields
         fetchResources(selectedClass, selectedSubject, selectedChapter);
       } else {
@@ -616,6 +634,34 @@ export default function Statistics() {
       toast.error('Failed to extract metadata');
     } finally {
       setExtractingMetadataId(null);
+    }
+  };
+
+  const handleApplySuggestedTitle = async (resourceId: number) => {
+    const suggestedEntry = suggestedTitles.find(st => st.resourceId === resourceId);
+    if (!suggestedEntry) {
+      toast.error('No suggested title found');
+      return;
+    }
+
+    setApplyingTitleId(resourceId);
+    try {
+      const result = await applySuggestedTitle(resourceId, suggestedEntry.suggestedTitle);
+      
+      if (result.success) {
+        toast.success('Title updated successfully');
+        // Remove from suggested titles
+        setSuggestedTitles(prev => prev.filter(st => st.resourceId !== resourceId));
+        // Refresh resources
+        fetchResources(selectedClass, selectedSubject, selectedChapter);
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error('Error applying title:', error);
+      toast.error('Failed to apply title');
+    } finally {
+      setApplyingTitleId(null);
     }
   };
 
@@ -633,6 +679,7 @@ export default function Statistics() {
     let successCount = 0;
     let failCount = 0;
     let skippedCount = 0;
+    const newSuggestedTitles: SuggestedTitleEntry[] = [];
     
     try {
       for (let i = 0; i < eligibleResources.length; i++) {
@@ -648,8 +695,16 @@ export default function Statistics() {
             resource.ocr_text!
           );
           
-          if (result.success && (result.metadata.school_name || result.metadata.teacher_name)) {
+          if (result.success && (result.metadata.school_name || result.metadata.teacher_name || result.metadata.suggested_title)) {
             successCount++;
+            
+            // Store suggested title
+            if (result.metadata.suggested_title) {
+              newSuggestedTitles.push({
+                resourceId: resource.id,
+                suggestedTitle: result.metadata.suggested_title
+              });
+            }
           } else if (result.success) {
             skippedCount++;
           } else {
@@ -665,6 +720,13 @@ export default function Statistics() {
       
       toast.dismiss('batch-metadata-progress');
       toast.success(`Completed: ${successCount} extracted, ${skippedCount} no data found, ${failCount} failed`);
+      
+      // Update suggested titles
+      setSuggestedTitles(prev => {
+        const existingIds = new Set(newSuggestedTitles.map(st => st.resourceId));
+        const filtered = prev.filter(st => !existingIds.has(st.resourceId));
+        return [...filtered, ...newSuggestedTitles];
+      });
       
       // Refresh resources
       fetchResources(selectedClass, selectedSubject, selectedChapter);
@@ -1097,12 +1159,53 @@ export default function Statistics() {
                                         url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)/)
                                       );
                                       const canProcess = (resource.ocr_status === 'pending' || resource.ocr_status === 'failed') && isPdfOrImage;
+                                      const suggestedTitle = suggestedTitles.find(st => st.resourceId === resource.id);
                                       
                                       return (
                                         <TableRow key={resource.id}>
                                           <TableCell className="font-medium">{resource.id}</TableCell>
                                           <TableCell>
-                                            <div className="max-w-[300px] truncate">{resource.title}</div>
+                                            <div className="space-y-1">
+                                              <div className="max-w-[300px] truncate">{resource.title}</div>
+                                              {suggestedTitle && (
+                                                <div className="flex items-center gap-2">
+                                                  <Badge variant="outline" className="text-xs gap-1 text-primary border-primary/30">
+                                                    <FileEdit className="w-3 h-3" />
+                                                    AI: {suggestedTitle.suggestedTitle.substring(0, 40)}{suggestedTitle.suggestedTitle.length > 40 ? '...' : ''}
+                                                  </Badge>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-6 px-2"
+                                                    onClick={() => handleApplySuggestedTitle(resource.id)}
+                                                    disabled={applyingTitleId === resource.id}
+                                                    title="Apply suggested title"
+                                                  >
+                                                    {applyingTitleId === resource.id ? (
+                                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                                    ) : (
+                                                      <Check className="h-3 w-3 text-green-600" />
+                                                    )}
+                                                  </Button>
+                                                </div>
+                                              )}
+                                              {(resource.school_name || resource.teacher_name) && (
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                  {resource.school_name && (
+                                                    <span className="flex items-center gap-1">
+                                                      <Building2 className="w-3 h-3" />
+                                                      {resource.school_name.substring(0, 20)}{resource.school_name.length > 20 ? '...' : ''}
+                                                    </span>
+                                                  )}
+                                                  {resource.teacher_name && (
+                                                    <span className="flex items-center gap-1">
+                                                      <User className="w-3 h-3" />
+                                                      {resource.teacher_name.substring(0, 20)}{resource.teacher_name.length > 20 ? '...' : ''}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
                                           </TableCell>
                                           <TableCell>
                                             <Badge variant="outline">{resource.resource_types?.type || 'Unknown'}</Badge>
