@@ -45,7 +45,7 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const navigate = useNavigate();
-  const { isModerator, isAdmin } = useUserRole();
+  const { isModerator, isAdmin, loading: roleLoading } = useUserRole();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -272,24 +272,43 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
     if (!deletingId) return;
 
     try {
-      const { error } = await supabase
+      console.log('Attempting to delete memorization:', deletingId);
+      
+      const { error, data } = await supabase
         .from('memorizations')
         .update({ deleted: true })
-        .eq('id', deletingId);
+        .eq('id', deletingId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error:', error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        console.error('No rows updated - permission denied');
+        toast.error('Permission denied - you may not have access to delete this memorization');
+        setDeletingId(null);
+        return;
+      }
 
       setMemorizations(prev => prev.filter(m => m.id !== deletingId));
       toast.success('Memorization deleted');
       setDeletingId(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting:', error);
-      toast.error('Failed to delete memorization');
+      toast.error(`Failed to delete: ${error.message || 'Unknown error'}`);
+      setDeletingId(null);
     }
   };
 
   const canEdit = (mem: Memorization) => {
-    return user && (mem.creator_id === user.id || isModerator || isAdmin);
+    // Always allow if user is creator
+    if (user && mem.creator_id === user.id) return true;
+    // If still loading roles, don't show edit buttons for others' content yet
+    if (roleLoading) return false;
+    // Check moderator/admin status
+    return user && (isModerator || isAdmin);
   };
 
   if (!subjectId) return null;
