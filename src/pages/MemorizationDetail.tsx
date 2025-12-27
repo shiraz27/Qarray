@@ -42,7 +42,7 @@ interface Memorization {
 export default function MemorizationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isModerator, isAdmin } = useUserRole();
+  const { isModerator, isAdmin, loading: roleLoading } = useUserRole();
   const [memorization, setMemorization] = useState<Memorization | null>(null);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,22 +175,38 @@ export default function MemorizationDetail() {
 
   const handleDelete = async () => {
     try {
-      const { error } = await supabase
+      console.log('Attempting to delete memorization:', id);
+      
+      const { error, data } = await supabase
         .from('memorizations')
         .update({ deleted: true })
-        .eq('id', parseInt(id!));
+        .eq('id', parseInt(id!))
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error:', error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        console.error('No rows updated - permission denied');
+        toast.error('Permission denied - you may not have access to delete this memorization');
+        return;
+      }
 
       toast.success('Memorization deleted');
       navigate('/dashboard');
     } catch (error: any) {
       console.error('Error deleting:', error);
-      toast.error('Failed to delete memorization');
+      toast.error(`Failed to delete: ${error.message || 'Unknown error'}`);
     }
   };
 
-  const canEdit = memorization && user && (memorization.creator_id === user.id || isModerator || isAdmin);
+  // Always allow if user is creator, check roles after loading
+  const canEdit = memorization && user && (
+    memorization.creator_id === user.id || 
+    (!roleLoading && (isModerator || isAdmin))
+  );
 
   if (loading || !memorization) {
     return (
