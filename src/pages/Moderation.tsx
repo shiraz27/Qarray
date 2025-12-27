@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useFeatureFlags } from '@/hooks/useFeatureFlag';
 import { Header } from '@/components/Header';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { CheckCircle2, XCircle, BookOpen, MessageCircle, Brain, FileText, ExternalLink, GraduationCap } from 'lucide-react';
+import { CheckCircle2, XCircle, BookOpen, MessageCircle, Brain, FileText, ExternalLink, GraduationCap, Settings } from 'lucide-react';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Navigate, Link } from 'react-router-dom';
 
-type ContentType = 'questions' | 'answers' | 'resources' | 'memorizations' | 'teachers' | 'users';
+type ContentType = 'questions' | 'answers' | 'resources' | 'memorizations' | 'teachers' | 'users' | 'settings';
 
 interface UnverifiedItem {
   id: number | string;
@@ -35,6 +37,7 @@ interface UnverifiedItem {
 
 export default function Moderation() {
   const { isModerator, isAdmin, loading: roleLoading } = useUserRole();
+  const { flags, loading: flagsLoading, updateFlag } = useFeatureFlags();
   const [items, setItems] = useState<UnverifiedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ContentType>('questions');
@@ -465,7 +468,7 @@ export default function Moderation() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ContentType)}>
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="questions" className="gap-2">
               <MessageCircle className="w-4 h-4" />
               Questions
@@ -490,10 +493,73 @@ export default function Moderation() {
               <BookOpen className="w-4 h-4" />
               Users
             </TabsTrigger>
+            <TabsTrigger value="settings" className="gap-2">
+              <Settings className="w-4 h-4" />
+              Settings
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="mt-6">
-            {loading ? (
+            {activeTab === 'settings' ? (
+              <div className="space-y-6">
+                <Card className="p-6">
+                  <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <Settings className="w-5 h-5" />
+                    Feature Flags
+                  </h2>
+                  <p className="text-muted-foreground mb-6">
+                    Control which features are available to users.
+                  </p>
+
+                  {flagsLoading ? (
+                    <div className="text-center py-4">Loading...</div>
+                  ) : flags.length === 0 ? (
+                    <div className="text-center py-4 text-muted-foreground">
+                      No feature flags configured
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {flags.map((flag) => (
+                        <div
+                          key={flag.id}
+                          className="flex items-center justify-between p-4 border rounded-lg"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-medium capitalize">{flag.id.replace(/_/g, ' ')}</h3>
+                              <Badge variant={flag.enabled ? 'default' : 'secondary'}>
+                                {flag.enabled ? 'Enabled' : 'Disabled'}
+                              </Badge>
+                            </div>
+                            {flag.description && (
+                              <p className="text-sm text-muted-foreground">
+                                {flag.description}
+                              </p>
+                            )}
+                            {flag.updated_at && (
+                              <p className="text-xs text-muted-foreground">
+                                Last updated: {new Date(flag.updated_at).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                          <Switch
+                            checked={flag.enabled}
+                            onCheckedChange={async (checked) => {
+                              const success = await updateFlag(flag.id, checked);
+                              if (success) {
+                                toast.success(`Feature "${flag.id}" ${checked ? 'enabled' : 'disabled'}`);
+                              } else {
+                                toast.error('Failed to update feature flag');
+                              }
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            ) : loading ? (
               <div className="text-center py-12">Loading...</div>
             ) : items.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
