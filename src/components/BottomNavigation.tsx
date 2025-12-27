@@ -16,12 +16,13 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ onTabChange,
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { count } = await supabase
-        .from('bookmarks')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+      // Use the database function to get valid bookmark count (excludes deleted content)
+      const { data, error } = await supabase
+        .rpc('get_valid_bookmark_count', { p_user_id: user.id });
 
-      setBookmarkCount(count || 0);
+      if (!error) {
+        setBookmarkCount(data || 0);
+      }
     };
 
     fetchBookmarkCount();
