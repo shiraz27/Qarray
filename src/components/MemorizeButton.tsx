@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Brain } from 'lucide-react';
 import { MemorizationsModal } from './MemorizationsModal';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 
 interface MemorizeButtonProps {
   subjectId?: number;
@@ -10,6 +11,12 @@ interface MemorizeButtonProps {
 
 export const MemorizeButton = ({ subjectId, chapterId }: MemorizeButtonProps) => {
   const [modalOpen, setModalOpen] = useState(false);
+  const { enabled, loading } = useFeatureFlag('memorizations');
+
+  // Don't render if feature is disabled or still loading
+  if (loading || enabled === false) {
+    return null;
+  }
 
   return (
     <>
