@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/utils';
 import { ArrowLeft, Play, Edit, Trash2, BookmarkPlus, Bookmark as BookmarkIcon } from 'lucide-react';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { StudySessionDialog } from '@/components/StudySessionDialog';
@@ -196,9 +197,9 @@ export default function MemorizationDetail() {
 
       toast.success('Memorization deleted');
       navigate('/dashboard');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting:', error);
-      toast.error(`Failed to delete: ${error.message || 'Unknown error'}`);
+      toast.error(`Failed to delete: ${getErrorMessage(error)}`);
     }
   };
 
