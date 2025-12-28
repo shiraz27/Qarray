@@ -5,6 +5,7 @@ import { Brain, Lock, Globe, ThumbsUp, ThumbsDown, Bookmark, Edit, Trash2, Chevr
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/utils';
 import { EditMemorizationDialog } from './EditMemorizationDialog';
 import { useUserRole } from '@/hooks/useUserRole';
 import {
@@ -295,9 +296,9 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
       setMemorizations(prev => prev.filter(m => m.id !== deletingId));
       toast.success('Memorization deleted');
       setDeletingId(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting:', error);
-      toast.error(`Failed to delete: ${error.message || 'Unknown error'}`);
+      toast.error(`Failed to delete: ${getErrorMessage(error)}`);
       setDeletingId(null);
     }
   };
