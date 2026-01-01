@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.extract-metadata]
 verify_jwt = false
+
+[functions.admin-delete]
+verify_jwt = false
