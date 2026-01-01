@@ -10,11 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { CheckCircle2, XCircle, BookOpen, MessageCircle, Brain, FileText, ExternalLink, GraduationCap, Settings } from 'lucide-react';
+import { CheckCircle2, XCircle, BookOpen, MessageCircle, Brain, FileText, ExternalLink, GraduationCap, Settings, Trash2 } from 'lucide-react';
+import { AdminDeleteTab } from '@/components/AdminDeleteTab';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Navigate, Link } from 'react-router-dom';
 
-type ContentType = 'questions' | 'answers' | 'resources' | 'memorizations' | 'teachers' | 'users' | 'settings';
+type ContentType = 'questions' | 'answers' | 'resources' | 'memorizations' | 'teachers' | 'users' | 'settings' | 'delete';
 
 interface UnverifiedItem {
   id: number | string;
@@ -468,7 +469,7 @@ export default function Moderation() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ContentType)}>
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="questions" className="gap-2">
               <MessageCircle className="w-4 h-4" />
               Questions
@@ -497,10 +498,16 @@ export default function Moderation() {
               <Settings className="w-4 h-4" />
               Settings
             </TabsTrigger>
+            <TabsTrigger value="delete" className="gap-2 text-destructive">
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="mt-6">
-            {activeTab === 'settings' ? (
+            {activeTab === 'delete' ? (
+              <AdminDeleteTab />
+            ) : activeTab === 'settings' ? (
               <div className="space-y-6">
                 <Card className="p-6">
                   <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
