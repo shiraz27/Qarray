@@ -261,7 +261,7 @@ export default function Bookmarks() {
     if (!user) return;
 
     try {
-      const bookmarkId = itemId.split('-')[1];
+      const bookmarkId = itemId.substring(itemId.indexOf('-') + 1);
       await supabase.from("bookmarks").delete().eq("id", bookmarkId).eq("user_id", user.id);
 
       setBookmarkedItems((prev) => prev.filter((item) => item.id !== itemId));
