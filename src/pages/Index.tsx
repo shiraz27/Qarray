@@ -5,11 +5,10 @@ import { ActionButtons } from '@/components/ActionButtons';
 import { SubjectTabs } from '@/components/SubjectTabs';
 import { MainContent } from '@/components/MainContent';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
-import { LogOut, Trash2, Search, Trophy, Star, Sparkles, Award, Zap, Target } from 'lucide-react';
+import { Search, Trophy, Star, Sparkles, Award, Zap, Target } from 'lucide-react';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
@@ -17,94 +16,24 @@ import qarayLogo from '@/assets/qarray-logo-new.png';
 import educationPattern from '@/assets/education-pattern.png';
 import { TutorialDialog } from '@/components/TutorialDialog';
 import { SEO, createWebPageSchema } from '@/components/SEO';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 
 const Index: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useTranslation();
   const [session, setSession] = useState<Session | null>(null);
-  const [activeTab, setActiveTab] = useState('subjects');
-  const [isDeleting, setIsDeleting] = useState(false);
   const [userProfile, setUserProfile] = useState<{ full_name: string; class_id: number } | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
 
-   const handleTabChange = (tab: string) => {
+  const handleTabChange = (tab: string) => {
     if (tab === 'bookmarks') {
       navigate('/bookmarks');
     } else if (tab === 'classmates') {
       navigate('/classmates');
-    } else {
-      setActiveTab(tab);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast({
-        title: t('logout'),
-        description: "You've been successfully logged out.",
-      });
-      navigate('/login');
-    } catch (error: any) {
-      toast({
-        title: t('error'),
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    setIsDeleting(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to delete account');
-      }
-
-      toast({
-        title: t('accountDeleted'),
-        description: "You can now register again with the same email.",
-      });
-      
-      navigate('/login');
-    } catch (error: any) {
-      toast({
-        title: t('error'),
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeleting(false);
+    } else if (tab === 'profile') {
+      navigate('/profile');
     }
   };
 
@@ -209,133 +138,65 @@ const Index: React.FC = () => {
 
       <div className="w-full mx-auto flex flex-col min-h-screen relative z-10">
         <div className="flex-1 w-full overflow-auto pb-24">
-          {activeTab === 'subjects' && (
-            <>
-              <section className="items-stretch flex w-full flex-col bg-background/90 backdrop-blur-sm relative z-10">
-                <Header userName={userProfile?.full_name || 'User'} />
-                
-                <div className="flex flex-col items-center mt-6 mb-4 gap-4 relative">
-                  {/* Floating Gamification Icons - Around Welcome Badge */}
-                  <div className="absolute -top-4 left-0 right-0 h-32 pointer-events-none overflow-visible">
-                    <Trophy className="absolute top-0 left-[10%] w-6 h-6 text-primary/30 animate-float" />
-                    <Star className="absolute top-2 right-[10%] w-5 h-5 text-[hsl(14,92%,76%)]/40 animate-float-delayed" />
-                    <Sparkles className="absolute top-8 left-[5%] w-4 h-4 text-primary/25 animate-sparkle" />
-                    <Award className="absolute top-4 right-[5%] w-5 h-5 text-primary/30 animate-float-slow" />
-                    <Zap className="absolute top-10 left-[15%] w-4 h-4 text-[hsl(14,92%,76%)]/35 animate-float-delayed" />
-                    <Target className="absolute top-6 right-[15%] w-4 h-4 text-primary/20 animate-sparkle" />
-                  </div>
-                  
-                  {/* Welcome Badge with Username */}
-                  <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 animate-bounce-slow">
-                    <Sparkles className="w-4 h-4 text-primary animate-sparkle" />
-                    <span className="text-sm font-medium text-primary">
-                      Welcome back, {userProfile?.full_name || 'User'}!
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    {/* Logo with glow effect */}
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-glow-pulse" />
-                      <img
-                        src={qarayLogo}
-                        className="relative h-16 w-16 object-contain hover-scale"
-                        alt="Qarray Logo"
-                      />
-                    </div>
-                    <h1 className="text-4xl font-bold text-foreground">
-                      Qarray
-                    </h1>
-                  </div>
-                  
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => setSearchOpen(true)}
-                    className="w-[90%] max-w-md justify-start gap-2 hover:bg-background hover:border-border transition-all"
-                  >
-                    <Search className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Search anything...</span>
-                  </Button>
-                </div>
-                
-                <ActionButtons />
-              </section>
-              
-              <SubjectTabs 
-                classId={userProfile?.class_id} 
-                onSubjectChange={setSelectedSubject}
-              />
-              <MainContent subjectId={selectedSubject} />
-            </>
-          )}
-
-          {activeTab === 'profile' && (
-            <div className="flex flex-col items-center justify-start h-full p-8">
-              <div className="w-full max-w-md space-y-6">
-                <h2 className="text-2xl font-bold mb-6">{t('profile')}</h2>
-                
-                <div className="bg-white rounded-lg border p-6 space-y-4">
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center text-2xl">
-                      👤
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">{userProfile?.full_name || 'User'}</h3>
-                      <p className="text-sm text-gray-600">{session?.user?.email}</p>
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-4">
-                    <p className="text-sm font-medium mb-3 text-gray-700">{t('language')}</p>
-                    <LanguageSwitcher />
-                  </div>
-
-                  <Button
-                    onClick={handleLogout}
-                    variant="outline"
-                    className="w-full gap-2"
-                  >
-                    <LogOut size={18} />
-                    {t('logout')}
-                  </Button>
-
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="destructive"
-                        className="w-full gap-2"
-                      >
-                        <Trash2 size={18} />
-                        {t('deleteAccount')}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>{t('deleteAccount')}</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {t('deleteAccountConfirm')}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleDeleteAccount}
-                          disabled={isDeleting}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          {isDeleting ? 'Deleting...' : t('delete')}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
+          <section className="items-stretch flex w-full flex-col bg-background/90 backdrop-blur-sm relative z-10">
+            <Header userName={userProfile?.full_name || 'User'} />
+            
+            <div className="flex flex-col items-center mt-6 mb-4 gap-4 relative">
+              {/* Floating Gamification Icons - Around Welcome Badge */}
+              <div className="absolute -top-4 left-0 right-0 h-32 pointer-events-none overflow-visible">
+                <Trophy className="absolute top-0 left-[10%] w-6 h-6 text-primary/30 animate-float" />
+                <Star className="absolute top-2 right-[10%] w-5 h-5 text-[hsl(14,92%,76%)]/40 animate-float-delayed" />
+                <Sparkles className="absolute top-8 left-[5%] w-4 h-4 text-primary/25 animate-sparkle" />
+                <Award className="absolute top-4 right-[5%] w-5 h-5 text-primary/30 animate-float-slow" />
+                <Zap className="absolute top-10 left-[15%] w-4 h-4 text-[hsl(14,92%,76%)]/35 animate-float-delayed" />
+                <Target className="absolute top-6 right-[15%] w-4 h-4 text-primary/20 animate-sparkle" />
               </div>
+              
+              {/* Welcome Badge with Username */}
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 animate-bounce-slow">
+                <Sparkles className="w-4 h-4 text-primary animate-sparkle" />
+                <span className="text-sm font-medium text-primary">
+                  Welcome back, {userProfile?.full_name || 'User'}!
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Logo with glow effect */}
+                <div className="relative">
+                  <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-glow-pulse" />
+                  <img
+                    src={qarayLogo}
+                    className="relative h-16 w-16 object-contain hover-scale"
+                    alt="Qarray Logo"
+                  />
+                </div>
+                <h1 className="text-4xl font-bold text-foreground">
+                  Qarray
+                </h1>
+              </div>
+              
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setSearchOpen(true)}
+                className="w-[90%] max-w-md justify-start gap-2 hover:bg-background hover:border-border transition-all"
+              >
+                <Search className="w-4 h-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Search anything...</span>
+              </Button>
             </div>
-          )}
+            
+            <ActionButtons />
+          </section>
+          
+          <SubjectTabs 
+            classId={userProfile?.class_id} 
+            onSubjectChange={setSelectedSubject}
+          />
+          <MainContent subjectId={selectedSubject} />
         </div>
         
-        <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
+        <BottomNavigation onTabChange={handleTabChange} activeTab="subjects" />
       </div>
       
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
