@@ -87,32 +87,35 @@ export const UploadStatusIndicator: React.FC = () => {
   // Check if we should show the return button prominently
   const showReturnButton = activeSourceRoutes.length > 0 && !activeSourceRoutes.includes(location.pathname);
 
+  const handleNavigateToForm = () => {
+    if (showReturnButton) {
+      navigate(activeSourceRoutes[0]);
+    }
+  };
+
   return (
     <div className="fixed bottom-20 right-4 z-50 md:bottom-4 animate-fade-in">
       <Card className={cn(
         "shadow-lg border-primary/20 transition-all duration-200 bg-background/95 backdrop-blur-sm",
         isExpanded ? "w-80" : "w-auto",
-        hasActiveUploads && "ring-2 ring-primary/30"
+        hasActiveUploads && "ring-2 ring-primary/30",
+        showReturnButton && "cursor-pointer ring-2 ring-primary"
       )}>
-        {/* Return to form button - ALWAYS visible at top when applicable */}
-        {showReturnButton && (
-          <div className="p-2 bg-primary text-primary-foreground rounded-t-lg">
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full justify-center font-medium"
-              onClick={() => navigate(activeSourceRoutes[0])}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Return to form
-            </Button>
-          </div>
-        )}
-
-        {/* Header - always visible */}
+        {/* Header - clickable to navigate back OR expand */}
         <div 
-          className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors"
-          onClick={() => setIsExpanded(!isExpanded)}
+          className={cn(
+            "flex items-center gap-3 p-3 transition-colors",
+            showReturnButton 
+              ? "bg-primary/10 hover:bg-primary/20" 
+              : "hover:bg-muted/50 cursor-pointer"
+          )}
+          onClick={() => {
+            if (showReturnButton && !isExpanded) {
+              handleNavigateToForm();
+            } else {
+              setIsExpanded(!isExpanded);
+            }
+          }}
         >
           <div className="relative flex-shrink-0">
             {hasActiveUploads ? (
@@ -120,6 +123,8 @@ export const UploadStatusIndicator: React.FC = () => {
                 <CloudUpload className="h-5 w-5 text-primary animate-pulse" />
                 <span className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-primary rounded-full animate-ping" />
               </div>
+            ) : showReturnButton ? (
+              <ArrowLeft className="h-5 w-5 text-primary" />
             ) : failedCount > 0 ? (
               <X className="h-5 w-5 text-destructive" />
             ) : (
@@ -129,11 +134,13 @@ export const UploadStatusIndicator: React.FC = () => {
           
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">
-              {hasActiveUploads 
-                ? `Uploading ${pendingCount} file${pendingCount !== 1 ? 's' : ''}`
-                : failedCount > 0
-                  ? `${failedCount} upload${failedCount !== 1 ? 's' : ''} failed`
-                  : `${completedCount} upload${completedCount !== 1 ? 's' : ''} complete`
+              {showReturnButton && !hasActiveUploads
+                ? "Tap to return to form"
+                : hasActiveUploads 
+                  ? `Uploading ${pendingCount} file${pendingCount !== 1 ? 's' : ''}`
+                  : failedCount > 0
+                    ? `${failedCount} upload${failedCount !== 1 ? 's' : ''} failed`
+                    : `${completedCount} upload${completedCount !== 1 ? 's' : ''} complete`
               }
             </p>
             {hasActiveUploads && (
@@ -144,9 +151,22 @@ export const UploadStatusIndicator: React.FC = () => {
                 </span>
               </div>
             )}
+            {showReturnButton && !hasActiveUploads && (
+              <p className="text-xs text-muted-foreground">
+                {completedCount} file{completedCount !== 1 ? 's' : ''} ready
+              </p>
+            )}
           </div>
 
-          <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6 flex-shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+          >
             {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
           </Button>
         </div>
