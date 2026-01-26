@@ -84,7 +84,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
     restoredData,
     saveFormData,
     clearFormSession,
-    addUploadedUrl,
+    removeUploadedUrl,
   } = useFormPersistence('addResourceGlobal', '/dashboard');
 
   const form = useForm<ResourceFormData>({
@@ -227,12 +227,17 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
 
   const handleMediaUploaded = (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => {
     setMediaUrls(prev => [...prev, url]);
-    addUploadedUrl(url); // Persist to session
+    // URL persistence is handled by the saveFormData useEffect
     toast.success('Media added successfully');
   };
 
   const removeMedia = (index: number) => {
+    const urlToRemove = mediaUrls[index];
     setMediaUrls(prev => prev.filter((_, i) => i !== index));
+    // Keep session in sync when files are removed
+    if (urlToRemove) {
+      removeUploadedUrl(urlToRemove);
+    }
   };
 
   const handleContinueToChoose = () => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -76,6 +76,7 @@ interface ContextData {
 export default function Chapter() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
   const [chapter, setChapter] = useState<ChapterData | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -92,6 +93,16 @@ export default function Chapter() {
   const [isResourceDialogOpen, setIsResourceDialogOpen] = useState(false);
   const [subjectId, setSubjectId] = useState<number | null>(null);
   const [contextData, setContextData] = useState<ContextData | null>(null);
+
+  // Auto-open resource dialog when restoreForm=true is in URL
+  useEffect(() => {
+    if (searchParams.get('restoreForm') === 'true') {
+      setIsResourceDialogOpen(true);
+      // Clear the query param
+      searchParams.delete('restoreForm');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleTabChange = (tab: string) => {
     if (tab === 'subjects') {
