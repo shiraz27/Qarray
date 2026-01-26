@@ -99,31 +99,25 @@ export const useFormPersistence = (
     setRestoredData(null);
   }, []);
 
-  // Add uploaded URLs to session
+  // Add uploaded URLs to session (DEPRECATED - use saveFormData instead)
+  // Keeping for backwards compatibility but saveFormData is the single source of truth
   const addUploadedUrl = useCallback((url: string) => {
+    // No-op: saveFormData handles all URL persistence now
+    // This prevents duplicate URL issues from race conditions
+    console.log('[FormPersistence] addUploadedUrl called (no-op):', url);
+  }, []);
+
+  // Remove uploaded URL from session (for when files are manually deleted from form)
+  const removeUploadedUrl = useCallback((url: string) => {
     const sessions = getSessions();
     const session = sessions[sessionIdRef.current];
     
     if (session) {
-      if (!session.uploadedUrls.includes(url)) {
-        session.uploadedUrls.push(url);
-        session.updatedAt = Date.now();
-        saveSessions(sessions);
-      }
-    } else {
-      // Create session with just the URL
-      sessions[sessionIdRef.current] = {
-        id: sessionIdRef.current,
-        formType,
-        data: {},
-        uploadedUrls: [url],
-        sourceRoute,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
+      session.uploadedUrls = session.uploadedUrls.filter(u => u !== url);
+      session.updatedAt = Date.now();
       saveSessions(sessions);
     }
-  }, [formType, sourceRoute]);
+  }, []);
 
   // Get pending sessions for a route (for the indicator to check)
   const getPendingSession = useCallback((): FormSession | null => {
@@ -140,6 +134,7 @@ export const useFormPersistence = (
     saveFormData,
     clearFormSession,
     addUploadedUrl,
+    removeUploadedUrl,
     getPendingSession,
   };
 };
