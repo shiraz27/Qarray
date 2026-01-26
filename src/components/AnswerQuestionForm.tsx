@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useUploadManager } from '@/contexts/UploadManagerContext';
 
 const answerSchema = z.object({
   answer: z.string().min(10, 'Answer must be at least 10 characters').max(1000, 'Answer must be less than 1000 characters'),
@@ -31,9 +32,16 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
   onCancel 
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const { isModerator, isAdmin } = useUserRole();
+  const { getUploadsByCallback } = useUploadManager();
+  
+  // Generate stable callback ID for tracking uploads
+  const callbackId = useMemo(() => `answer-${Date.now()}`, []);
+  
+  // Check for pending uploads
+  const myUploads = getUploadsByCallback(callbackId);
+  const hasPendingUploads = myUploads.some(u => u.status === 'queued' || u.status === 'uploading');
   
   const form = useForm<AnswerFormData>({
     resolver: zodResolver(answerSchema),
@@ -52,6 +60,11 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
   };
 
   const onSubmit = async (data: AnswerFormData) => {
+    if (hasPendingUploads) {
+      toast.warning('Please wait for uploads to complete');
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -119,7 +132,6 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
             chapterId={chapterId}
             contentType="answer"
             contentId={questionId.toString()}
-            onUploadStateChange={setIsUploading}
           />
         </div>
 
@@ -127,9 +139,9 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting || isUploading}>
-            {(isSubmitting || isUploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isUploading ? 'Uploading...' : 'Submit Answer'}
+          <Button type="submit" disabled={isSubmitting || hasPendingUploads}>
+            {(isSubmitting || hasPendingUploads) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {hasPendingUploads ? 'Uploading...' : 'Submit Answer'}
           </Button>
         </div>
       </form>

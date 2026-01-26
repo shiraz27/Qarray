@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
+import { useUploadManager } from '@/contexts/UploadManagerContext';
 
 const answerSchema = z.object({
   answer: z.string().min(10, 'Answer must be at least 10 characters').max(1000, 'Answer must be less than 1000 characters'),
@@ -34,7 +35,14 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
   onCancel 
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  const { getUploadsByCallback } = useUploadManager();
+  
+  // Generate stable callback ID for tracking uploads
+  const callbackId = useMemo(() => `edit-answer-${Date.now()}`, []);
+  
+  // Check for pending uploads
+  const myUploads = getUploadsByCallback(callbackId);
+  const hasPendingUploads = myUploads.some(u => u.status === 'queued' || u.status === 'uploading');
   
   // Parse initial data to separate text from URLs
   const parseAnswerData = (data: string) => {
@@ -127,7 +135,6 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
             chapterId={chapterId}
             contentType="answer"
             contentId={questionId.toString()}
-            onUploadStateChange={setIsUploading}
           />
         </div>
 
@@ -135,9 +142,9 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting || isUploading}>
-            {(isSubmitting || isUploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isUploading ? 'Uploading...' : 'Update Answer'}
+          <Button type="submit" disabled={isSubmitting || hasPendingUploads}>
+            {(isSubmitting || hasPendingUploads) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {hasPendingUploads ? 'Uploading...' : 'Update Answer'}
           </Button>
         </div>
       </form>
