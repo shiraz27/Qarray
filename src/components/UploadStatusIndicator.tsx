@@ -84,8 +84,11 @@ export const UploadStatusIndicator: React.FC = () => {
     ? Math.round(((completedItems + (currentProgress / 100)) / totalItems) * 100)
     : 0;
 
-  // Check if we should show the return button prominently
+  // Check if we should show the return button (user is away from form)
   const showReturnButton = activeSourceRoutes.length > 0 && !activeSourceRoutes.includes(location.pathname);
+  
+  // Check if user is ON the form page (uploads belong here)
+  const isOnFormPage = activeSourceRoutes.length > 0 && activeSourceRoutes.includes(location.pathname);
 
   const handleNavigateToForm = () => {
     if (showReturnButton) {
@@ -154,6 +157,11 @@ export const UploadStatusIndicator: React.FC = () => {
             {showReturnButton && !hasActiveUploads && (
               <p className="text-xs text-muted-foreground">
                 {completedCount} file{completedCount !== 1 ? 's' : ''} ready
+              </p>
+            )}
+            {isOnFormPage && !hasActiveUploads && completedCount > 0 && (
+              <p className="text-xs text-green-600 font-medium">
+                ✓ Files added to form above
               </p>
             )}
           </div>
