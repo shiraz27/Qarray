@@ -64,8 +64,8 @@ const App = () => (
               <Sonner />
               <BrowserRouter>
                 <AppContent />
+                <UploadStatusIndicator />
               </BrowserRouter>
-              <UploadStatusIndicator />
             </TooltipProvider>
           </UploadManagerProvider>
         </QueryClientProvider>
