@@ -91,8 +91,9 @@ export const UploadStatusIndicator: React.FC = () => {
   const isOnFormPage = activeSourceRoutes.length > 0 && activeSourceRoutes.includes(location.pathname);
 
   const handleNavigateToForm = () => {
-    if (showReturnButton) {
-      navigate(activeSourceRoutes[0]);
+    if (showReturnButton && activeSourceRoutes[0]) {
+      // Navigate to form with restore flag
+      navigate(`${activeSourceRoutes[0]}?restoreForm=true`);
     }
   };
 

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getSessionByRoute, type FormSession } from '@/hooks/useFormPersistence';
 
 export interface UploadItem {
   id: string;
@@ -16,7 +17,7 @@ export interface UploadItem {
   contentType?: string;
   contentId?: string;
   callbackId?: string;
-  sourceRoute?: string; // Route where upload was initiated
+  sourceRoute?: string;
 }
 
 interface UploadOptions {
@@ -41,6 +42,7 @@ interface UploadManagerContextType {
   completedCount: number;
   failedCount: number;
   activeSourceRoutes: string[];
+  getFormSessionForRoute: (route: string) => FormSession | null;
 }
 
 const UploadManagerContext = createContext<UploadManagerContextType | null>(null);
@@ -319,6 +321,10 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => clearInterval(interval);
   }, []);
 
+  const getFormSessionForRoute = useCallback((route: string): FormSession | null => {
+    return getSessionByRoute(route);
+  }, []);
+
   return (
     <UploadManagerContext.Provider value={{
       addToQueue,
@@ -333,6 +339,7 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
       completedCount,
       failedCount,
       activeSourceRoutes,
+      getFormSessionForRoute,
     }}>
       {children}
     </UploadManagerContext.Provider>
