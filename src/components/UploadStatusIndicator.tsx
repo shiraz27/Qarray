@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card } from '@/components/ui/card';
@@ -14,13 +15,27 @@ import {
   FileImage,
   FileAudio,
   FileText,
-  CloudUpload
+  CloudUpload,
+  ArrowLeft,
+  Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const UploadStatusIndicator: React.FC = () => {
-  const { items, hasActiveUploads, pendingCount, completedCount, failedCount, retryUpload, removeFromQueue } = useUploadManager();
+  const { 
+    items, 
+    hasActiveUploads, 
+    pendingCount, 
+    completedCount, 
+    failedCount, 
+    retryUpload, 
+    removeFromQueue,
+    clearCompleted,
+    activeSourceRoutes
+  } = useUploadManager();
   const [isExpanded, setIsExpanded] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Auto-expand when there are active uploads
   useEffect(() => {
@@ -120,68 +135,101 @@ export const UploadStatusIndicator: React.FC = () => {
 
         {/* Expanded content */}
         {isExpanded && (
-          <div className="border-t max-h-64 overflow-y-auto">
-            {items.map((item) => (
-              <div 
-                key={item.id}
-                className="flex items-center gap-2 p-2 border-b last:border-b-0 hover:bg-muted/30"
-              >
-                <div className="flex-shrink-0 text-muted-foreground">
-                  {getFileIcon(item.fileType)}
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium truncate">{item.fileName}</p>
-                  {item.status === 'uploading' && (
-                    <div className="flex items-center gap-2 mt-1">
-                      <Progress value={item.progress} className="h-1 flex-1" />
-                      <span className="text-[10px] text-muted-foreground">{item.progress}%</span>
-                    </div>
-                  )}
-                  {item.status === 'queued' && (
-                    <p className="text-[10px] text-muted-foreground">Waiting...</p>
-                  )}
-                  {item.status === 'failed' && item.error && (
-                    <p className="text-[10px] text-destructive truncate">{item.error}</p>
-                  )}
-                  {item.status === 'completed' && (
-                    <p className="text-[10px] text-green-600">Completed</p>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {getStatusIcon(item.status)}
-                  
-                  {item.status === 'failed' && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        retryUpload(item.id);
-                      }}
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                    </Button>
-                  )}
-                  
-                  {item.status === 'queued' && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeFromQueue(item.id);
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
+          <div className="border-t">
+            {/* Return to form button - show if there are source routes and we're not on one */}
+            {activeSourceRoutes.length > 0 && !activeSourceRoutes.includes(location.pathname) && (
+              <div className="p-2 border-b bg-primary/5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-primary hover:text-primary"
+                  onClick={() => navigate(activeSourceRoutes[0])}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Return to form
+                </Button>
               </div>
-            ))}
+            )}
+
+            {/* File list */}
+            <div className="max-h-48 overflow-y-auto">
+              {items.map((item) => (
+                <div 
+                  key={item.id}
+                  className="flex items-center gap-2 p-2 border-b last:border-b-0 hover:bg-muted/30"
+                >
+                  <div className="flex-shrink-0 text-muted-foreground">
+                    {getFileIcon(item.fileType)}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{item.fileName}</p>
+                    {item.status === 'uploading' && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <Progress value={item.progress} className="h-1 flex-1" />
+                        <span className="text-[10px] text-muted-foreground">{item.progress}%</span>
+                      </div>
+                    )}
+                    {item.status === 'queued' && (
+                      <p className="text-[10px] text-muted-foreground">Waiting...</p>
+                    )}
+                    {item.status === 'failed' && item.error && (
+                      <p className="text-[10px] text-destructive truncate">{item.error}</p>
+                    )}
+                    {item.status === 'completed' && (
+                      <p className="text-[10px] text-green-600">Completed</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {getStatusIcon(item.status)}
+                    
+                    {item.status === 'failed' && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          retryUpload(item.id);
+                        }}
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                      </Button>
+                    )}
+                    
+                    {item.status === 'queued' && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeFromQueue(item.id);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Clear completed button */}
+            {(completedCount > 0 || failedCount > 0) && !hasActiveUploads && (
+              <div className="p-2 border-t">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-center text-muted-foreground hover:text-foreground"
+                  onClick={clearCompleted}
+                >
+                  <Trash2 className="h-3 w-3 mr-2" />
+                  Clear list
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </Card>

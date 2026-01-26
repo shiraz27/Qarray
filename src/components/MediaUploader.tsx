@@ -1,17 +1,18 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Camera, Upload, Mic, Youtube, FileText, Loader2, X, Image, FileAudio, Video, Clock } from 'lucide-react';
+import { Camera, Upload, Mic, Youtube, FileText, Loader2, X, Image, FileAudio, Video, Clock, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { enhanceDocument, isMobileDevice } from '@/utils/documentScanner';
 import { MediaPreviewDialog } from './MediaPreviewDialog';
 import { Card } from '@/components/ui/card';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
 import { Badge } from '@/components/ui/badge';
-
+import { Alert, AlertDescription } from '@/components/ui/alert';
 interface MediaUploaderProps {
   onMediaUploaded: (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => void;
   acceptedTypes?: ('image' | 'video' | 'audio' | 'pdf')[];
@@ -51,6 +52,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
 
   // Use global upload manager
   const { addToQueue, onUploadComplete, getUploadsByCallback, pendingCount } = useUploadManager();
+  const location = useLocation();
   
   // Generate stable callback ID for this uploader instance
   const callbackId = useMemo(() => `uploader-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, []);
@@ -80,6 +82,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       contentType,
       contentId,
       callbackId,
+      sourceRoute: location.pathname,
     });
   };
 
@@ -281,20 +284,21 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Pending Uploads Indicator */}
+      {/* Background Upload Hint - always show when there are pending uploads */}
       {myPendingUploads.length > 0 && (
-        <Card className="p-3 border-primary/50 bg-primary/5">
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            <span className="text-sm font-medium">
-              {myPendingUploads.length} file{myPendingUploads.length !== 1 ? 's' : ''} uploading in background...
+        <Alert className="border-primary/50 bg-primary/5">
+          <Info className="h-4 w-4 text-primary" />
+          <AlertDescription className="flex items-center justify-between">
+            <span className="text-sm">
+              <span className="font-medium">{myPendingUploads.length} file{myPendingUploads.length !== 1 ? 's' : ''}</span> uploading in background. 
+              You can close this form and continue browsing – check the upload status in the floating indicator.
             </span>
-            <Badge variant="secondary" className="ml-auto">
+            <Badge variant="secondary" className="ml-2 flex-shrink-0">
               <Clock className="h-3 w-3 mr-1" />
               Background
             </Badge>
-          </div>
-        </Card>
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Uploaded Media List */}

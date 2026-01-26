@@ -16,6 +16,7 @@ export interface UploadItem {
   contentType?: string;
   contentId?: string;
   callbackId?: string;
+  sourceRoute?: string; // Route where upload was initiated
 }
 
 interface UploadOptions {
@@ -24,12 +25,14 @@ interface UploadOptions {
   contentType?: string;
   contentId?: string;
   callbackId?: string;
+  sourceRoute?: string;
 }
 
 interface UploadManagerContextType {
   addToQueue: (file: File, options: UploadOptions) => string;
   removeFromQueue: (id: string) => void;
   retryUpload: (id: string) => void;
+  clearCompleted: () => void;
   getUploadsByCallback: (callbackId: string) => UploadItem[];
   onUploadComplete: (callbackId: string, callback: (url: string, fileType: string) => void) => () => void;
   items: UploadItem[];
@@ -37,6 +40,7 @@ interface UploadManagerContextType {
   pendingCount: number;
   completedCount: number;
   failedCount: number;
+  activeSourceRoutes: string[];
 }
 
 const UploadManagerContext = createContext<UploadManagerContextType | null>(null);
@@ -65,6 +69,14 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
   const pendingCount = items.filter(item => item.status === 'queued' || item.status === 'uploading').length;
   const completedCount = items.filter(item => item.status === 'completed').length;
   const failedCount = items.filter(item => item.status === 'failed').length;
+  
+  // Get unique source routes from active/pending uploads
+  const activeSourceRoutes = [...new Set(
+    items
+      .filter(item => item.status === 'queued' || item.status === 'uploading' || item.status === 'completed')
+      .map(item => item.sourceRoute)
+      .filter((route): route is string => !!route)
+  )];
 
   // Browser close warning
   useEffect(() => {
@@ -220,6 +232,7 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
       retryCount: 0,
       chapterId: options.chapterId,
       contentType: options.contentType,
+      sourceRoute: options.sourceRoute,
       contentId: options.contentId,
       callbackId: options.callbackId,
     };
@@ -260,6 +273,11 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
   const getUploadsByCallback = useCallback((callbackId: string): UploadItem[] => {
     return items.filter(item => item.callbackId === callbackId);
   }, [items]);
+
+  const clearCompleted = useCallback(() => {
+    setItems(prev => prev.filter(item => item.status !== 'completed' && item.status !== 'failed'));
+    queueRef.current = queueRef.current.filter(item => item.status !== 'completed' && item.status !== 'failed');
+  }, []);
 
   const onUploadComplete = useCallback((
     callbackId: string, 
@@ -306,6 +324,7 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
       addToQueue,
       removeFromQueue,
       retryUpload,
+      clearCompleted,
       getUploadsByCallback,
       onUploadComplete,
       items,
@@ -313,6 +332,7 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
       pendingCount,
       completedCount,
       failedCount,
+      activeSourceRoutes,
     }}>
       {children}
     </UploadManagerContext.Provider>
