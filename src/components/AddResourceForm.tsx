@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,6 +19,7 @@ import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
 import { processOcrAndExtractMetadata, OcrAndExtractResult } from '@/utils/ocrAndExtract';
 import { SchoolAutocomplete } from './SchoolAutocomplete';
+import { useFormPersistence } from '@/hooks/useFormPersistence';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
@@ -50,6 +52,9 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
   onSuccess, 
   onCancel 
 }) => {
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  
   const [step, setStep] = useState<Step>('upload');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -59,6 +64,15 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
   const [extractedData, setExtractedData] = useState<OcrAndExtractResult | null>(null);
   const [selectedInstituteId, setSelectedInstituteId] = useState<string | undefined>();
   const { isModerator, isAdmin } = useUserRole();
+  
+  // Form persistence
+  const { 
+    isRestored, 
+    restoredData, 
+    saveFormData, 
+    clearFormSession, 
+    addUploadedUrl 
+  } = useFormPersistence('addResource', location.pathname);
   
   const form = useForm<ResourceFormData>({
     resolver: zodResolver(resourceSchema),
@@ -73,8 +87,47 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
     },
   });
 
+  // Restore form state from session on mount
+  useEffect(() => {
+    if (isRestored && restoredData) {
+      // Restore uploaded URLs
+      if (restoredData.uploadedUrls.length > 0) {
+        setMediaUrls(restoredData.uploadedUrls);
+        // If we have URLs, go to choose step
+        if (restoredData.data?.step) {
+          setStep(restoredData.data.step as Step);
+        } else if (restoredData.uploadedUrls.length > 0) {
+          setStep('choose');
+        }
+        toast.success(`Restored ${restoredData.uploadedUrls.length} uploaded file(s)`);
+      }
+      // Restore form data
+      if (restoredData.data?.formValues) {
+        Object.entries(restoredData.data.formValues).forEach(([key, value]) => {
+          form.setValue(key as keyof ResourceFormData, value as any);
+        });
+      }
+      // Clear the restore flag from URL
+      if (searchParams.has('restoreForm')) {
+        searchParams.delete('restoreForm');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [isRestored, restoredData, form, searchParams, setSearchParams]);
+
+  // Save form state whenever it changes
+  useEffect(() => {
+    if (mediaUrls.length > 0 || Object.values(form.getValues()).some(v => v)) {
+      saveFormData(
+        { step, formValues: form.getValues() },
+        mediaUrls
+      );
+    }
+  }, [mediaUrls, step, saveFormData]);
+
   const handleMediaUploaded = (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => {
     setMediaUrls(prev => [...prev, url]);
+    addUploadedUrl(url); // Persist to session storage
     toast.success('Media added successfully');
   };
 
@@ -218,6 +271,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
       if (error) throw error;
 
       toast.success(step === 'review' ? 'Resource added with AI-extracted metadata!' : 'Resource added successfully');
+      clearFormSession(); // Clear persisted form data on success
       form.reset();
       setMediaUrls([]);
       onSuccess();
