@@ -84,6 +84,9 @@ export const UploadStatusIndicator: React.FC = () => {
     ? Math.round(((completedItems + (currentProgress / 100)) / totalItems) * 100)
     : 0;
 
+  // Check if we should show the return button prominently
+  const showReturnButton = activeSourceRoutes.length > 0 && !activeSourceRoutes.includes(location.pathname);
+
   return (
     <div className="fixed bottom-20 right-4 z-50 md:bottom-4 animate-fade-in">
       <Card className={cn(
@@ -91,6 +94,21 @@ export const UploadStatusIndicator: React.FC = () => {
         isExpanded ? "w-80" : "w-auto",
         hasActiveUploads && "ring-2 ring-primary/30"
       )}>
+        {/* Return to form button - ALWAYS visible at top when applicable */}
+        {showReturnButton && (
+          <div className="p-2 bg-primary text-primary-foreground rounded-t-lg">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-full justify-center font-medium"
+              onClick={() => navigate(activeSourceRoutes[0])}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Return to form
+            </Button>
+          </div>
+        )}
+
         {/* Header - always visible */}
         <div 
           className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors"
@@ -136,20 +154,6 @@ export const UploadStatusIndicator: React.FC = () => {
         {/* Expanded content */}
         {isExpanded && (
           <div className="border-t">
-            {/* Return to form button - show if there are source routes and we're not on one */}
-            {activeSourceRoutes.length > 0 && !activeSourceRoutes.includes(location.pathname) && (
-              <div className="p-2 border-b bg-primary/5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start text-primary hover:text-primary"
-                  onClick={() => navigate(activeSourceRoutes[0])}
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Return to form
-                </Button>
-              </div>
-            )}
 
             {/* File list */}
             <div className="max-h-48 overflow-y-auto">
