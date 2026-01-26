@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MessageCircle, Plus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AskQuestionGlobalForm } from './AskQuestionGlobalForm';
@@ -7,10 +8,30 @@ import { supabase } from '@/integrations/supabase/client';
 import { MemorizeButton } from './MemorizeButton';
 
 export const ActionButtons: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isAskDialogOpen, setIsAskDialogOpen] = useState(false);
   const [isAddResourceDialogOpen, setIsAddResourceDialogOpen] = useState(false);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
   const [devoirTypes, setDevoirTypes] = useState<Array<{ id: number; devoir_type: string }>>([]);
+  const [shouldRestoreForm, setShouldRestoreForm] = useState(false);
+
+  // Auto-open dialog when restoreForm=true is in URL
+  useEffect(() => {
+    if (searchParams.get('restoreForm') === 'true') {
+      setShouldRestoreForm(true);
+      setIsAddResourceDialogOpen(true);
+      // Clear the query param
+      searchParams.delete('restoreForm');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  // Reset restore flag when dialog closes
+  useEffect(() => {
+    if (!isAddResourceDialogOpen) {
+      setShouldRestoreForm(false);
+    }
+  }, [isAddResourceDialogOpen]);
 
   useEffect(() => {
     fetchTypes();
@@ -84,6 +105,7 @@ export const ActionButtons: React.FC = () => {
             devoirTypes={devoirTypes}
             onSuccess={() => setIsAddResourceDialogOpen(false)}
             onCancel={() => setIsAddResourceDialogOpen(false)}
+            restoreSession={shouldRestoreForm}
           />
         </DialogContent>
       </Dialog>
