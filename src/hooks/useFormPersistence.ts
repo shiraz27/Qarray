@@ -48,7 +48,8 @@ export const useFormPersistence = (
   formType: string,
   sourceRoute: string
 ) => {
-  const sessionIdRef = useRef<string>(`${formType}-${sourceRoute}-${Date.now()}`);
+  // Use a stable session ID based on formType and sourceRoute (not timestamp)
+  const sessionIdRef = useRef<string>(`${formType}-${sourceRoute}`);
   const [isRestored, setIsRestored] = useState(false);
   const [restoredData, setRestoredData] = useState<FormSession | null>(null);
 
@@ -64,6 +65,9 @@ export const useFormPersistence = (
     if (existingSession) {
       sessionIdRef.current = existingSession.id;
       setRestoredData(existingSession);
+      console.log('[FormPersistence] Found existing session:', existingSession);
+    } else {
+      console.log('[FormPersistence] No existing session for', formType, sourceRoute);
     }
     
     setIsRestored(true);

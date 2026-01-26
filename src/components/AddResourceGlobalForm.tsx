@@ -104,11 +104,18 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
 
   // Restore session data when dialog opens with restoreSession flag
   useEffect(() => {
+    // Reset the ref when restoreSession changes to allow re-restoration
+    if (!restoreSession) {
+      hasRestoredRef.current = false;
+      return;
+    }
+    
     if (restoreSession && isRestored && restoredData && !hasRestoredRef.current) {
       hasRestoredRef.current = true;
+      console.log('[AddResourceGlobalForm] Restoring session:', restoredData);
       
       // Restore uploaded URLs
-      if (restoredData.uploadedUrls.length > 0) {
+      if (restoredData.uploadedUrls && restoredData.uploadedUrls.length > 0) {
         setMediaUrls(restoredData.uploadedUrls);
         toast.success(`Restored ${restoredData.uploadedUrls.length} uploaded file(s)`);
       }
