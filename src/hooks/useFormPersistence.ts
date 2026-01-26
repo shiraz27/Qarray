@@ -151,3 +151,17 @@ export const getSessionByRoute = (route: string): FormSession | null => {
   const sessions = getSessions();
   return Object.values(sessions).find(s => s.sourceRoute === route) || null;
 };
+
+// Utility to get session by form type
+export const getSessionByFormType = (formType: string): FormSession | null => {
+  const sessions = getSessions();
+  return Object.values(sessions).find(s => s.formType === formType && s.uploadedUrls.length > 0) || null;
+};
+
+// Check if there's a pending global form session (for dialog-based forms)
+export const hasPendingGlobalFormSession = (): boolean => {
+  const sessions = getSessions();
+  return Object.values(sessions).some(
+    s => s.formType.includes('Global') && s.uploadedUrls.length > 0
+  );
+};

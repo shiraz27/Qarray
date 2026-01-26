@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,6 +18,7 @@ import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
 import { processOcrAndExtractMetadata, OcrAndExtractResult } from '@/utils/ocrAndExtract';
 import { SchoolAutocomplete } from './SchoolAutocomplete';
+import { useFormPersistence } from '@/hooks/useFormPersistence';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
@@ -52,13 +53,15 @@ interface AddResourceGlobalFormProps {
   devoirTypes: Array<{ id: number; devoir_type: string }>;
   onSuccess: () => void;
   onCancel: () => void;
+  restoreSession?: boolean;
 }
 
 export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({ 
   resourceTypes,
   devoirTypes,
   onSuccess, 
-  onCancel 
+  onCancel,
+  restoreSession = false
 }) => {
   const [step, setStep] = useState<Step>('upload');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,7 +76,17 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
   const [extractedData, setExtractedData] = useState<OcrAndExtractResult | null>(null);
   const [selectedInstituteId, setSelectedInstituteId] = useState<string | undefined>();
   const { isModerator, isAdmin } = useUserRole();
+  const hasRestoredRef = useRef(false);
   
+  // Form persistence
+  const {
+    isRestored,
+    restoredData,
+    saveFormData,
+    clearFormSession,
+    addUploadedUrl,
+  } = useFormPersistence('addResourceGlobal', '/dashboard');
+
   const form = useForm<ResourceFormData>({
     resolver: zodResolver(resourceSchema),
     defaultValues: {
@@ -88,6 +101,54 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
       teacher_name: '',
     },
   });
+
+  // Restore session data when dialog opens with restoreSession flag
+  useEffect(() => {
+    if (restoreSession && isRestored && restoredData && !hasRestoredRef.current) {
+      hasRestoredRef.current = true;
+      
+      // Restore uploaded URLs
+      if (restoredData.uploadedUrls.length > 0) {
+        setMediaUrls(restoredData.uploadedUrls);
+        toast.success(`Restored ${restoredData.uploadedUrls.length} uploaded file(s)`);
+      }
+      
+      // Restore form values
+      if (restoredData.data) {
+        const { step: savedStep, formValues, selectedSubject: savedSubject } = restoredData.data;
+        
+        if (savedStep) {
+          setStep(savedStep as Step);
+        }
+        
+        if (savedSubject) {
+          setSelectedSubject(savedSubject);
+        }
+        
+        if (formValues) {
+          Object.entries(formValues).forEach(([key, value]) => {
+            if (value !== undefined && value !== '') {
+              form.setValue(key as keyof ResourceFormData, value as any);
+            }
+          });
+        }
+      }
+    }
+  }, [restoreSession, isRestored, restoredData, form]);
+
+  // Save form state whenever it changes
+  useEffect(() => {
+    if (mediaUrls.length > 0 || step !== 'upload') {
+      saveFormData(
+        { 
+          step, 
+          formValues: form.getValues(),
+          selectedSubject 
+        },
+        mediaUrls
+      );
+    }
+  }, [mediaUrls, step, selectedSubject, saveFormData]);
 
   useEffect(() => {
     fetchUserClass();
@@ -159,6 +220,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
 
   const handleMediaUploaded = (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => {
     setMediaUrls(prev => [...prev, url]);
+    addUploadedUrl(url); // Persist to session
     toast.success('Media added successfully');
   };
 
@@ -330,6 +392,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
       if (error) throw error;
 
       toast.success(step === 'review' ? 'Resource added with AI-extracted metadata!' : 'Resource added successfully');
+      clearFormSession(); // Clear persisted session on success
       form.reset();
       setMediaUrls([]);
       setSelectedSubject('');
