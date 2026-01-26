@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
+import { useUploadManager } from '@/contexts/UploadManagerContext';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
@@ -52,12 +53,18 @@ export const AddResourceFormWithSelection: React.FC<AddResourceFormWithSelection
   onCancel 
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [filteredChapters, setFilteredChapters] = useState<Chapter[]>([]);
+  const { getUploadsByCallback } = useUploadManager();
   
+  // Generate stable callback ID for tracking uploads
+  const callbackId = useMemo(() => `add-resource-sel-${Date.now()}`, []);
+  
+  // Check for pending uploads
+  const myUploads = getUploadsByCallback(callbackId);
+  const hasPendingUploads = myUploads.some(u => u.status === 'queued' || u.status === 'uploading');
   const form = useForm<ResourceFormData>({
     resolver: zodResolver(resourceSchema),
     defaultValues: {
@@ -289,7 +296,6 @@ export const AddResourceFormWithSelection: React.FC<AddResourceFormWithSelection
             onRemoveMedia={removeMedia}
             chapterId={parseInt(form.watch('chapter_id')) || undefined}
             contentType="resource"
-            onUploadStateChange={setIsUploading}
           />
         </div>
 
@@ -397,9 +403,9 @@ export const AddResourceFormWithSelection: React.FC<AddResourceFormWithSelection
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting || isUploading}>
-            {(isSubmitting || isUploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isUploading ? 'Uploading...' : 'Add Resource'}
+          <Button type="submit" disabled={isSubmitting || hasPendingUploads}>
+            {(isSubmitting || hasPendingUploads) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {hasPendingUploads ? 'Uploading...' : 'Add Resource'}
           </Button>
         </div>
       </form>

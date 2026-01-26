@@ -6,6 +6,67 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 2000; // 2 seconds
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function uploadWithRetry(
+  uploadUrl: string,
+  headers: Record<string, string>,
+  body: ArrayBuffer,
+  retries = MAX_RETRIES
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      if (attempt > 0) {
+        // Exponential backoff
+        const backoffDelay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1);
+        console.log(`Retry attempt ${attempt}, waiting ${backoffDelay}ms`);
+        await delay(backoffDelay);
+      }
+
+      const response = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers,
+        body: new Blob([body]),
+      });
+
+      // Check for rate limiting (503 SlowDown)
+      if (response.status === 503) {
+        const errorText = await response.text();
+        console.warn(`Archive.org returned 503 (attempt ${attempt + 1}):`, errorText);
+        
+        if (attempt < retries) {
+          continue; // Retry
+        }
+        
+        throw new Error(`Rate limited after ${retries + 1} attempts: ${errorText}`);
+      }
+
+      // Check for other retryable errors
+      if (response.status >= 500 && attempt < retries) {
+        console.warn(`Server error ${response.status} (attempt ${attempt + 1}), retrying...`);
+        continue;
+      }
+
+      return response;
+      
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error(`Upload attempt ${attempt + 1} failed:`, lastError.message);
+      
+      if (attempt >= retries) {
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError || new Error('Upload failed after retries');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -19,7 +80,7 @@ serve(async (req) => {
     const fileName = formData.get('fileName') as string;
     const fileType = formData.get('fileType') as string;
     const chapterId = formData.get('chapterId') as string | null;
-    const contentType = formData.get('contentType') as string; // 'question' or 'resource'
+    const contentType = formData.get('contentType') as string;
     const contentId = formData.get('contentId') as string;
     
     if (!file || !fileName) {
@@ -120,29 +181,40 @@ serve(async (req) => {
 
     // Read file as array buffer
     const fileBuffer = await file.arrayBuffer();
-    const fileBytes = new Uint8Array(fileBuffer);
 
-    // Upload to Archive.org using S3-compatible API
+    // Upload to Archive.org using S3-compatible API with retry logic
+
+    // Upload to Archive.org using S3-compatible API with retry logic
     const uploadUrl = `https://s3.us.archive.org/${itemIdentifier}/${folderPath}`;
     
-    const uploadResponse = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `LOW ${accessKey}:${secretKey}`,
-        'x-amz-auto-make-bucket': '1',
-        'x-archive-meta-mediatype': fileType === 'audio' ? 'audio' : fileType === 'image' ? 'image' : 'texts',
-        'x-archive-meta-collection': 'opensource',
-        'x-archive-meta-title': metadataTitle,
-        ...additionalMetadata,
-        'Content-Type': file.type || 'application/octet-stream',
-      },
-      body: fileBytes,
-    });
+    const uploadHeaders = {
+      'Authorization': `LOW ${accessKey}:${secretKey}`,
+      'x-amz-auto-make-bucket': '1',
+      'x-archive-meta-mediatype': fileType === 'audio' ? 'audio' : fileType === 'image' ? 'image' : 'texts',
+      'x-archive-meta-collection': 'opensource',
+      'x-archive-meta-title': metadataTitle,
+      ...additionalMetadata,
+      'Content-Type': file.type || 'application/octet-stream',
+    };
+
+    const uploadResponse = await uploadWithRetry(uploadUrl, uploadHeaders, fileBuffer);
 
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
       console.error('Archive.org upload failed:', errorText);
-      throw new Error(`Upload failed: ${uploadResponse.status} - ${errorText}`);
+      
+      // Return appropriate status code for frontend retry handling
+      const status = uploadResponse.status === 503 ? 429 : 500;
+      return new Response(
+        JSON.stringify({ 
+          error: `Upload failed: ${uploadResponse.status} - ${errorText}`,
+          retryable: uploadResponse.status >= 500,
+        }),
+        {
+          status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     const archiveUrl = `https://archive.org/download/${itemIdentifier}/${folderPath}`;
@@ -161,10 +233,15 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error uploading to Archive.org:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const isRetryable = errorMessage.includes('503') || errorMessage.includes('Rate limited');
+    
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ 
+        error: errorMessage,
+        retryable: isRetryable,
+      }),
       {
-        status: 500,
+        status: isRetryable ? 429 : 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

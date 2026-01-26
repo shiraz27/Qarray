@@ -1,15 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Camera, Upload, Mic, Youtube, FileText, Loader2, X, Image, FileAudio, Video } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Camera, Upload, Mic, Youtube, FileText, Loader2, X, Image, FileAudio, Video, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { enhanceDocument, isMobileDevice } from '@/utils/documentScanner';
 import { MediaPreviewDialog } from './MediaPreviewDialog';
 import { Card } from '@/components/ui/card';
+import { useUploadManager } from '@/contexts/UploadManagerContext';
+import { Badge } from '@/components/ui/badge';
 
 interface MediaUploaderProps {
   onMediaUploaded: (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => void;
@@ -32,7 +33,6 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   contentId,
   onUploadStateChange
 }) => {
-  const [isUploading, setIsUploading] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -49,37 +49,38 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const uploadToArchive = async (file: File, fileType: 'image' | 'audio' | 'pdf') => {
-    setIsUploading(true);
-    onUploadStateChange?.(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('fileName', file.name);
-      formData.append('fileType', fileType);
-      
-      // Add organization metadata if available
-      if (chapterId) {
-        formData.append('chapterId', chapterId.toString());
-        if (contentType) formData.append('contentType', contentType);
-        if (contentId) formData.append('contentId', contentId.toString());
-      }
+  // Use global upload manager
+  const { addToQueue, onUploadComplete, getUploadsByCallback, pendingCount } = useUploadManager();
+  
+  // Generate stable callback ID for this uploader instance
+  const callbackId = useMemo(() => `uploader-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, []);
 
-      const { data, error } = await supabase.functions.invoke('upload-to-archive', {
-        body: formData,
-      });
+  // Register callback for completed uploads
+  useEffect(() => {
+    const unsubscribe = onUploadComplete(callbackId, (url: string, fileType: string) => {
+      onMediaUploaded(url, fileType as 'image' | 'video' | 'audio' | 'pdf');
+    });
+    return unsubscribe;
+  }, [callbackId, onUploadComplete, onMediaUploaded]);
 
-      if (error) throw error;
+  // Get uploads for this specific uploader
+  const myUploads = getUploadsByCallback(callbackId);
+  const myPendingUploads = myUploads.filter(u => u.status === 'queued' || u.status === 'uploading');
+  const isUploading = myPendingUploads.length > 0;
 
-      toast.success('File uploaded successfully');
-      onMediaUploaded(data.url, fileType);
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Failed to upload file');
-    } finally {
-      setIsUploading(false);
-      onUploadStateChange?.(false);
-    }
+  // Notify parent about upload state changes
+  useEffect(() => {
+    onUploadStateChange?.(isUploading);
+  }, [isUploading, onUploadStateChange]);
+
+  const queueFileUpload = (file: File, fileType: 'image' | 'audio' | 'pdf') => {
+    addToQueue(file, {
+      fileType,
+      chapterId,
+      contentType,
+      contentId,
+      callbackId,
+    });
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,20 +99,11 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       };
       reader.readAsDataURL(file);
     } else {
-      // Multiple files - upload all directly
-      setIsUploading(true);
-      onUploadStateChange?.(true);
-      try {
-        for (let i = 0; i < files.length; i++) {
-          await uploadToArchive(files[i], 'image');
-        }
-      } catch (error) {
-        console.error('Error uploading images:', error);
-        toast.error('Failed to upload some images');
-      } finally {
-        setIsUploading(false);
-        onUploadStateChange?.(false);
+      // Multiple files - queue all directly
+      for (let i = 0; i < files.length; i++) {
+        queueFileUpload(files[i], 'image');
       }
+      toast.success(`${files.length} files added to upload queue`);
     }
     
     // Reset input
@@ -137,24 +129,14 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    setIsUploading(true);
-    onUploadStateChange?.(true);
-    
-    try {
-      // Process all PDF files directly without preview (since iframe doesn't support data URLs)
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        await uploadToArchive(file, 'pdf');
-      }
-    } catch (error) {
-      console.error('Error uploading PDFs:', error);
-      toast.error('Failed to upload some PDF files');
-    } finally {
-      setIsUploading(false);
-      onUploadStateChange?.(false);
-      // Reset input
-      e.target.value = '';
+    // Queue all PDF files
+    for (let i = 0; i < files.length; i++) {
+      queueFileUpload(files[i], 'pdf');
     }
+    toast.success(`${files.length} PDF file${files.length > 1 ? 's' : ''} added to upload queue`);
+    
+    // Reset input
+    e.target.value = '';
   };
 
   const handleKeepFile = async () => {
@@ -171,17 +153,18 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
         fileToUpload = new File([enhancedBlob], previewFile.name, { type: 'image/jpeg' });
       }
       
-      await uploadToArchive(fileToUpload, previewType === 'pdf' ? 'pdf' : previewType);
+      queueFileUpload(fileToUpload, previewType === 'pdf' ? 'pdf' : previewType as 'image' | 'audio');
+      toast.success('File added to upload queue');
     } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Failed to upload file');
+      console.error('Processing error:', error);
+      toast.error('Failed to process file');
     } finally {
       setIsProcessingPreview(false);
       setPreviewUrl('');
       setPreviewFile(null);
       setPreviewType(null);
       setFromCamera(false);
-      setAudioBlob(null); // Clear audio blob after upload
+      setAudioBlob(null);
     }
   };
 
@@ -298,6 +281,22 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* Pending Uploads Indicator */}
+      {myPendingUploads.length > 0 && (
+        <Card className="p-3 border-primary/50 bg-primary/5">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span className="text-sm font-medium">
+              {myPendingUploads.length} file{myPendingUploads.length !== 1 ? 's' : ''} uploading in background...
+            </span>
+            <Badge variant="secondary" className="ml-auto">
+              <Clock className="h-3 w-3 mr-1" />
+              Background
+            </Badge>
+          </div>
+        </Card>
+      )}
+
       {/* Uploaded Media List */}
       {uploadedMedia.length > 0 && (
         <Card className="p-3">
@@ -361,21 +360,15 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
                   type="button"
                   variant="outline"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
                   className="flex-1"
                 >
-                  {isUploading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="mr-2 h-4 w-4" />
-                  )}
+                  <Upload className="mr-2 h-4 w-4" />
                   Choose File
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => cameraInputRef.current?.click()}
-                  disabled={isUploading}
                   className="flex-1"
                 >
                   <Camera className="mr-2 h-4 w-4" />
@@ -482,14 +475,9 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
                 type="button"
                 variant="outline"
                 onClick={() => pdfInputRef.current?.click()}
-                disabled={isUploading}
                 className="w-full mt-2"
               >
-                {isUploading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <FileText className="mr-2 h-4 w-4" />
-                )}
+                <FileText className="mr-2 h-4 w-4" />
                 Choose PDF File
               </Button>
               <input
