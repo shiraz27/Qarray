@@ -1,64 +1,92 @@
 
-# Fix: Add "Go to Form" Button When Uploads Complete
+# Fix: Persist Uploaded Files When Form is Closed
 
 ## Problem
-When uploads complete and the user is already on `/dashboard`, the upload indicator shows "✓ Files added to form above" but the Add Resource dialog isn't open. There's no button to open it - tapping the indicator just expands/collapses the file list.
+When you upload 4 files and close the form dialog, only 1 file is restored. This happens because:
+
+1. Files upload in the background via `UploadManagerContext`
+2. When a file completes, it tries to notify the `MediaUploader` component
+3. BUT if the dialog was closed, `MediaUploader` unmounted and removed its callback
+4. The completed URL exists in the upload queue but never gets saved to localStorage
+5. Only files that completed BEFORE the dialog closed get persisted
 
 ## Root Cause
-The logic in `UploadStatusIndicator.tsx`:
-- `showReturnButton` is `false` when user is on the same page as `sourceRoute`
-- When on the same page, it shows "Files added to form above" message
-- But dialog-based forms can be closed while on the same page
-- No mechanism exists to re-open the dialog from the indicator
+The current flow relies on callbacks:
+```
+Upload completes → UploadManager notifies callback → MediaUploader calls setMediaUrls → useEffect saves to localStorage
+```
+
+When the form closes, the callback chain breaks at step 2.
 
 ## Solution
-Add an explicit "Open Form" button in the indicator that appears when:
-1. Uploads are completed (not actively uploading)
-2. User is on the source page (`isOnFormPage = true`)
-3. There are completed uploads ready
+Make `UploadManagerContext` directly persist completed URLs to the form session in localStorage, bypassing the callback chain entirely.
 
-This button will navigate to the same page with `?restoreForm=true` which triggers the dialog to open via the existing `ActionButtons` logic.
+### New Flow:
+```
+Upload completes → UploadManager saves URL directly to localStorage session → Form restores all URLs when reopened
+```
 
-## Changes
+## Files to Change
 
-### `src/components/UploadStatusIndicator.tsx`
-1. Add a new "Open Form" button in the expanded section when `isOnFormPage` and uploads are complete
-2. This button will call `handleNavigateToForm()` with the `?restoreForm=true` flag
-3. Update the header click behavior - when on the form page and not expanded, clicking should also trigger the form open
+### `src/contexts/UploadManagerContext.tsx`
+1. Import `getSessions` and `saveSessions` helpers (or export them from useFormPersistence)
+2. When an upload completes, ALSO save the URL directly to the form session using `sourceRoute`
+3. This ensures URLs persist even when form is closed
 
 ```text
-Key changes:
-- Add handleOpenFormOnSamePage() function that navigates with ?restoreForm=true
-- Add "Open Form" button in expanded section when isOnFormPage && completedCount > 0 && !hasActiveUploads
-- Update header click to open form when on same page with completed uploads
-- Change the "Files added to form above" message to include action text
+Changes:
+- Add helper to persist URL to form session by route
+- In processQueue, after upload success, call persistUrlToSession(url, sourceRoute)
+- The session will have all URLs when form reopens
+```
+
+### `src/hooks/useFormPersistence.ts`
+1. Export the `getSessions` and `saveSessions` helpers so UploadManager can use them
+2. Add a utility function `persistUrlToSessionByRoute(route, url)` that:
+   - Finds the session matching the route
+   - Adds the URL to `uploadedUrls` if not already present
+   - Saves back to localStorage
+
+```text
+Changes:
+- Export getSessions and saveSessions
+- Add persistUrlToSessionByRoute(route: string, url: string) function
+```
+
+### `src/components/AddResourceGlobalForm.tsx`
+1. When restoring, merge URLs from:
+   - The form session's `uploadedUrls`
+   - Completed uploads in the UploadManager that match the form's route
+2. Deduplicate to avoid showing the same file twice
+
+```text
+Changes:
+- On restoration, also check UploadManager for completed items matching sourceRoute
+- Merge and deduplicate URLs before setting mediaUrls
 ```
 
 ## Technical Details
 
-### New Button Location
-In the expanded section, before the "Clear list" button:
-```
-[File list]
----
-[Open Form button] ← NEW when isOnFormPage && completedCount > 0
-[Clear list button]
-```
+### Why Direct Persistence Works
+- `sourceRoute` is already stored on each `UploadItem`
+- When upload completes, we know exactly which form session to update
+- This decouples URL persistence from component lifecycle
 
-### Click Behavior Update
-When collapsed and tapped:
-- If on different page → navigate to source with `?restoreForm=true`
-- If on same page with completed uploads → navigate to same URL with `?restoreForm=true` (forces dialog open)
-- Otherwise → expand the indicator
+### Deduplication Strategy
+When restoring:
+1. Get URLs from localStorage session
+2. Get URLs from completed uploads in UploadManager matching the route
+3. Combine with `[...new Set([...sessionUrls, ...managerUrls])]`
 
-### Visual Changes
-- Header shows "Tap to open form" instead of static "Files added" message
-- Arrow icon when there are completed files to indicate actionable state
-- Primary colored header background when there are ready files
+### Backward Compatibility
+- Existing callback mechanism still works for live updates when form is open
+- Direct persistence is a fallback for when form is closed
+- Both mechanisms can coexist safely
 
 ## User Flow After Fix
-1. User opens Add Resource dialog on dashboard
-2. Uploads files, dialog closes or user navigates away and back
-3. Uploads complete, indicator shows "2 uploads complete"
-4. User taps indicator header → dialog opens with files restored
-5. OR user expands indicator → sees "Open Form" button → taps → dialog opens
+1. Open "Add Resource" dialog
+2. Upload 4 files, close dialog while uploads are in progress
+3. All 4 uploads complete in background
+4. Each completed URL is saved directly to localStorage by UploadManager
+5. User taps "Return to form"
+6. Form restores all 4 files from localStorage
