@@ -1,111 +1,64 @@
 
-# Fix: Form Restoration, Cleanup, and Duplicate File Issues
+# Fix: Add "Go to Form" Button When Uploads Complete
 
-## Problems Identified
+## Problem
+When uploads complete and the user is already on `/dashboard`, the upload indicator shows "✓ Files added to form above" but the Add Resource dialog isn't open. There's no button to open it - tapping the indicator just expands/collapses the file list.
 
-### 1. Missing File / Duplicate URLs Issue
-When uploading files, both `addUploadedUrl()` and `saveFormData()` update the session. This causes:
-- `addUploadedUrl()` adds one URL to the session
-- `saveFormData()` saves the entire `mediaUrls` array (which may include the same URL again)
-- Result: duplicate URLs in session, making it look like files are missing when restored
-
-### 2. Uploaded Files Don't Clean Up
-- Sessions persist in localStorage even after successful form submission if the component unmounts before cleanup
-- No automatic cleanup when user abandons a form
-- The upload indicator's "Clear list" only clears the visual queue, not the localStorage session
-
-### 3. Chapter Page Dialog Doesn't Auto-Open
-- `Chapter.tsx` has a resource dialog but doesn't detect `?restoreForm=true` query parameter
-- When "Tap to return" navigates to `/chapter/52?restoreForm=true`, the page loads but the dialog stays closed
-- User has to manually click "Add Resource" to see their restored files
+## Root Cause
+The logic in `UploadStatusIndicator.tsx`:
+- `showReturnButton` is `false` when user is on the same page as `sourceRoute`
+- When on the same page, it shows "Files added to form above" message
+- But dialog-based forms can be closed while on the same page
+- No mechanism exists to re-open the dialog from the indicator
 
 ## Solution
+Add an explicit "Open Form" button in the indicator that appears when:
+1. Uploads are completed (not actively uploading)
+2. User is on the source page (`isOnFormPage = true`)
+3. There are completed uploads ready
 
-### Fix 1: Eliminate Duplicate URL Storage
-**In `AddResourceForm.tsx` and `AddResourceGlobalForm.tsx`:**
-- Remove the separate `addUploadedUrl()` call from `handleMediaUploaded`
-- The `saveFormData()` in the useEffect already saves `mediaUrls` - this is sufficient
-- OR: Only use `addUploadedUrl()` and remove `mediaUrls` from `saveFormData()`
+This button will navigate to the same page with `?restoreForm=true` which triggers the dialog to open via the existing `ActionButtons` logic.
 
-The cleaner approach is to let `saveFormData()` handle all persistence since it saves the complete state.
+## Changes
 
-### Fix 2: Clear Sessions on Form Close (Not Just Success)
-**In `AddResourceForm.tsx`, `AddResourceGlobalForm.tsx`:**
-- Add cleanup when form is cancelled or dialog closes
-- Clear session only when form submits successfully OR when user explicitly cancels
-- Add an option to clear session on cancel (with user choice to keep for later)
+### `src/components/UploadStatusIndicator.tsx`
+1. Add a new "Open Form" button in the expanded section when `isOnFormPage` and uploads are complete
+2. This button will call `handleNavigateToForm()` with the `?restoreForm=true` flag
+3. Update the header click behavior - when on the form page and not expanded, clicking should also trigger the form open
 
-**In `useFormPersistence.ts`:**
-- Add `removeUploadedUrl()` function to keep session in sync when files are removed from the form
-
-### Fix 3: Auto-Open Dialog on Chapter Page
-**In `src/pages/Chapter.tsx`:**
-- Import `useSearchParams` from `react-router-dom`
-- Add `useEffect` to detect `?restoreForm=true` query parameter
-- When detected, set `isResourceDialogOpen(true)` and clear the query param
-
-## Files to Change
-
-### `src/pages/Chapter.tsx`
 ```text
-- Import useSearchParams
-- Add useEffect to check for restoreForm query param
-- Auto-open resource dialog when restoreForm=true
-- Clear query param after opening
-```
-
-### `src/components/AddResourceForm.tsx`
-```text
-- Remove addUploadedUrl() call from handleMediaUploaded
-- Let saveFormData() handle all URL persistence
-- Update removeMedia to also update session
-```
-
-### `src/components/AddResourceGlobalForm.tsx`
-```text
-- Remove addUploadedUrl() call from handleMediaUploaded  
-- Let saveFormData() handle all URL persistence
-- Update removeMedia to also update session
-```
-
-### `src/hooks/useFormPersistence.ts`
-```text
-- Add removeUploadedUrl() function
-- Export it for use in forms when files are manually removed
+Key changes:
+- Add handleOpenFormOnSamePage() function that navigates with ?restoreForm=true
+- Add "Open Form" button in expanded section when isOnFormPage && completedCount > 0 && !hasActiveUploads
+- Update header click to open form when on same page with completed uploads
+- Change the "Files added to form above" message to include action text
 ```
 
 ## Technical Details
 
-### Why Duplicates Occur
-Current flow when file uploads:
-1. `handleMediaUploaded` → `setMediaUrls([...prev, url])` → triggers useEffect
-2. `handleMediaUploaded` → `addUploadedUrl(url)` → saves to session.uploadedUrls
-3. useEffect (mediaUrls changes) → `saveFormData({...}, mediaUrls)` → overwrites session.uploadedUrls
+### New Button Location
+In the expanded section, before the "Clear list" button:
+```
+[File list]
+---
+[Open Form button] ← NEW when isOnFormPage && completedCount > 0
+[Clear list button]
+```
 
-If timing is off, or if mediaUrls doesn't yet include the new URL, the session gets out of sync.
+### Click Behavior Update
+When collapsed and tapped:
+- If on different page → navigate to source with `?restoreForm=true`
+- If on same page with completed uploads → navigate to same URL with `?restoreForm=true` (forces dialog open)
+- Otherwise → expand the indicator
 
-### Fixed Flow
-1. `handleMediaUploaded` → `setMediaUrls([...prev, url])`
-2. useEffect (mediaUrls changes) → `saveFormData({...}, mediaUrls)` → single source of truth
-
-### Session Lifecycle
-- **Create**: When first file is uploaded or form field is filled
-- **Update**: On every mediaUrls or form field change
-- **Clear**: On successful submission OR explicit cancel
-- **Expire**: After 24 hours of inactivity
+### Visual Changes
+- Header shows "Tap to open form" instead of static "Files added" message
+- Arrow icon when there are completed files to indicate actionable state
+- Primary colored header background when there are ready files
 
 ## User Flow After Fix
-
-### Scenario 1: Upload from Chapter Page
-1. Go to `/chapter/52`, click "Add Resource"
-2. Upload files, navigate away while uploading
-3. See upload indicator, tap "Return to form"
-4. Navigate to `/chapter/52?restoreForm=true`
-5. Dialog auto-opens with correct file count (no duplicates)
-6. Submit form → session clears → indicator clears
-
-### Scenario 2: Clean Start
-1. Go to any form with no pending session
-2. Form starts fresh with no leftover files
-3. Upload new files, submit
-4. No stale data remains
+1. User opens Add Resource dialog on dashboard
+2. Uploads files, dialog closes or user navigates away and back
+3. Uploads complete, indicator shows "2 uploads complete"
+4. User taps indicator header → dialog opens with files restored
+5. OR user expands indicator → sees "Open Form" button → taps → dialog opens
