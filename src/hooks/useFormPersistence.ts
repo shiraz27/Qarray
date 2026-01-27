@@ -14,7 +14,7 @@ const STORAGE_KEY = 'qarray_form_sessions';
 const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // Get all sessions from localStorage
-const getSessions = (): Record<string, FormSession> => {
+export const getSessions = (): Record<string, FormSession> => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return {};
@@ -36,11 +36,35 @@ const getSessions = (): Record<string, FormSession> => {
 };
 
 // Save sessions to localStorage
-const saveSessions = (sessions: Record<string, FormSession>) => {
+export const saveSessions = (sessions: Record<string, FormSession>) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
   } catch (e) {
     console.error('Failed to save form sessions:', e);
+  }
+};
+
+// Persist a URL to a form session by route (used by UploadManager for background uploads)
+export const persistUrlToSessionByRoute = (route: string, url: string): boolean => {
+  try {
+    const sessions = getSessions();
+    const session = Object.values(sessions).find(s => s.sourceRoute === route);
+    
+    if (session) {
+      // Only add if not already present
+      if (!session.uploadedUrls.includes(url)) {
+        session.uploadedUrls.push(url);
+        session.updatedAt = Date.now();
+        sessions[session.id] = session;
+        saveSessions(sessions);
+        console.log('[FormPersistence] Persisted URL to session:', url, 'for route:', route);
+        return true;
+      }
+    }
+    return false;
+  } catch (e) {
+    console.error('[FormPersistence] Failed to persist URL:', e);
+    return false;
   }
 };
 
