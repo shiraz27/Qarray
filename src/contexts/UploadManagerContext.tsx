@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { getSessionByRoute, type FormSession } from '@/hooks/useFormPersistence';
+import { getSessionByRoute, persistUrlToSessionByRoute, type FormSession } from '@/hooks/useFormPersistence';
 
 export interface UploadItem {
   id: string;
@@ -125,7 +125,13 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
         item.id === nextItem.id ? { ...item, status: 'completed' as const, url: result.url } : item
       );
 
-      // Notify callbacks
+      // CRITICAL: Persist URL directly to localStorage session
+      // This ensures the URL is saved even if the form dialog is closed
+      if (nextItem.sourceRoute) {
+        persistUrlToSessionByRoute(nextItem.sourceRoute, result.url);
+      }
+
+      // Notify callbacks (for when form is still open)
       if (nextItem.callbackId) {
         const callbacks = callbacksRef.current.get(nextItem.callbackId);
         if (callbacks) {

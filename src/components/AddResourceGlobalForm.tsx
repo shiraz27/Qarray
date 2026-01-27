@@ -19,6 +19,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { processOcrAndExtractMetadata, OcrAndExtractResult } from '@/utils/ocrAndExtract';
 import { SchoolAutocomplete } from './SchoolAutocomplete';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
+import { useUploadManager } from '@/contexts/UploadManagerContext';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
@@ -77,6 +78,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
   const [selectedInstituteId, setSelectedInstituteId] = useState<string | undefined>();
   const { isModerator, isAdmin } = useUserRole();
   const hasRestoredRef = useRef(false);
+  const { items: uploadManagerItems } = useUploadManager();
   
   // Form persistence
   const {
@@ -114,10 +116,20 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
       hasRestoredRef.current = true;
       console.log('[AddResourceGlobalForm] Restoring session:', restoredData);
       
-      // Restore uploaded URLs
-      if (restoredData.uploadedUrls && restoredData.uploadedUrls.length > 0) {
-        setMediaUrls(restoredData.uploadedUrls);
-        toast.success(`Restored ${restoredData.uploadedUrls.length} uploaded file(s)`);
+      // Get URLs from localStorage session
+      const sessionUrls = restoredData.uploadedUrls || [];
+      
+      // Get completed upload URLs from UploadManager that match our route
+      const managerUrls = uploadManagerItems
+        .filter(item => item.sourceRoute === '/dashboard' && item.status === 'completed' && item.url)
+        .map(item => item.url as string);
+      
+      // Merge and deduplicate
+      const allUrls = [...new Set([...sessionUrls, ...managerUrls])];
+      
+      if (allUrls.length > 0) {
+        setMediaUrls(allUrls);
+        toast.success(`Restored ${allUrls.length} uploaded file(s)`);
       }
       
       // Restore form values
@@ -141,7 +153,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
         }
       }
     }
-  }, [restoreSession, isRestored, restoredData, form]);
+  }, [restoreSession, isRestored, restoredData, form, uploadManagerItems]);
 
   // Save form state whenever it changes
   useEffect(() => {
