@@ -91,11 +91,19 @@ export const UploadStatusIndicator: React.FC = () => {
   const isOnFormPage = activeSourceRoutes.length > 0 && activeSourceRoutes.includes(location.pathname);
 
   const handleNavigateToForm = () => {
-    if (showReturnButton && activeSourceRoutes[0]) {
+    if (activeSourceRoutes[0]) {
       // Navigate to form with restore flag
       navigate(`${activeSourceRoutes[0]}?restoreForm=true`);
     }
   };
+
+  const handleOpenFormOnSamePage = () => {
+    // Re-navigate to current path with restoreForm flag to trigger dialog open
+    navigate(`${location.pathname}?restoreForm=true`);
+  };
+
+  // Show "Open Form" when on form page with completed uploads
+  const showOpenFormButton = isOnFormPage && completedCount > 0 && !hasActiveUploads;
 
   return (
     <div className="fixed bottom-20 right-4 z-50 md:bottom-4 animate-fade-in">
@@ -116,6 +124,8 @@ export const UploadStatusIndicator: React.FC = () => {
           onClick={() => {
             if (showReturnButton && !isExpanded) {
               handleNavigateToForm();
+            } else if (showOpenFormButton && !isExpanded) {
+              handleOpenFormOnSamePage();
             } else {
               setIsExpanded(!isExpanded);
             }
@@ -160,9 +170,9 @@ export const UploadStatusIndicator: React.FC = () => {
                 {completedCount} file{completedCount !== 1 ? 's' : ''} ready
               </p>
             )}
-            {isOnFormPage && !hasActiveUploads && completedCount > 0 && (
-              <p className="text-xs text-green-600 font-medium">
-                ✓ Files added to form above
+            {showOpenFormButton && (
+              <p className="text-xs text-primary font-medium">
+                Tap to open form
               </p>
             )}
           </div>
@@ -249,9 +259,20 @@ export const UploadStatusIndicator: React.FC = () => {
               ))}
             </div>
 
-            {/* Clear completed button */}
-            {(completedCount > 0 || failedCount > 0) && !hasActiveUploads && (
-              <div className="p-2 border-t">
+            {/* Action buttons */}
+            {!hasActiveUploads && (completedCount > 0 || failedCount > 0) && (
+              <div className="p-2 border-t space-y-2">
+                {showOpenFormButton && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="w-full justify-center"
+                    onClick={handleOpenFormOnSamePage}
+                  >
+                    <ArrowLeft className="h-3 w-3 mr-2" />
+                    Open Form
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
