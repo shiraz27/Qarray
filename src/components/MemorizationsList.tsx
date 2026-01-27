@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/utils';
 import { EditMemorizationDialog } from './EditMemorizationDialog';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +48,7 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const navigate = useNavigate();
   const { isModerator, isAdmin, loading: roleLoading } = useUserRole();
+  const { enabled: featureEnabled, loading: featureLoading } = useFeatureFlag('memorizations');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -311,6 +313,11 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
     // Check moderator/admin status
     return user && (isModerator || isAdmin);
   };
+
+  // Hide completely when feature is disabled or loading
+  if (featureLoading || featureEnabled === false) {
+    return null;
+  }
 
   if (!subjectId) return null;
 
