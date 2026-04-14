@@ -1,52 +1,50 @@
 
-# Fix: Hide Memorizations Section When Feature is Disabled
+
+# Fix: PDF File Not Rendering on Resource Detail Page
 
 ## Problem
-When the "memorizations" feature flag is disabled, the `MemorizationsList` component still renders and shows an empty state message: "No memorization sets yet for this subject". This is confusing because it implies content should exist but doesn't, when in reality the entire feature is turned off.
+On `/resource/24`, the resource has 1 PDF file (`4sc_t1-pages-2-combined (2).pdf`) and shows "1 file(s)" count, but the actual clickable PDF card is not visible.
 
 ## Root Cause
-- `MainContent.tsx` renders `MemorizationsList` unconditionally when chapters exist
-- `MemorizationsList.tsx` does NOT check the `memorizations` feature flag
-- Only `MemorizeButton.tsx` checks the flag, but it only controls the "Create" button, not the list
+The URL contains a **space** in the filename: `...4sc_t1-pages-2-combined (2).pdf`. 
+
+In `ResourceDetail.tsx` line 620, the `resource.data` array (which already contains clean URLs) is joined into a text string with `\n`, then passed to `MediaList` which runs `extractMediaFromText()` to parse URLs back out using regex. This round-trip through text parsing is fragile — the space in the URL can cause the regex to split or mangle it, resulting in no valid media being detected.
+
+Meanwhile, questions and answers store their data as a single text string with embedded URLs, so they genuinely need `extractMediaFromText`. But resources already have a clean `string[]` array — the text-parsing step is unnecessary and harmful.
 
 ## Solution
-Add the `useFeatureFlag` check to `MemorizationsList.tsx` and return `null` when the feature is disabled.
+In `ResourceDetail.tsx`, replace the `MediaList` usage for `resource.data` with direct `MediaPreview` rendering from the array. This bypasses the text-parsing regex entirely.
 
-## File to Change
+## File Change
 
-### `src/components/MemorizationsList.tsx`
-1. Import `useFeatureFlag` hook
-2. Call `useFeatureFlag('memorizations')` at the component level
-3. Return `null` when `enabled === false` (feature disabled)
-4. Optionally show a loading state while the flag is being fetched
-
-```text
-Changes:
-- Add import: import { useFeatureFlag } from '@/hooks/useFeatureFlag';
-- Add hook call: const { enabled: featureEnabled, loading: featureLoading } = useFeatureFlag('memorizations');
-- Add early return: if (featureLoading || featureEnabled === false) return null;
-```
-
-## Technical Details
-
-### Why Check Both Loading and Enabled
-- While loading, we don't know if the feature is enabled, so we hide the section to prevent flash of content
-- When `enabled === false`, the feature is explicitly disabled
-- When `enabled === true`, we show the memorizations section normally
-
-### Consistency with MemorizeButton
-The `MemorizeButton` component already uses this pattern:
+### `src/pages/ResourceDetail.tsx` (line ~620)
+Replace:
 ```tsx
-if (loading || !enabled) return null;
+<MediaList data={resource.data.join('\n')} showText={true} />
 ```
+With direct rendering of each URL:
+```tsx
+{resource.data.length > 0 && (
+  <div className="space-y-3">
+    <h3 className="text-sm font-semibold text-muted-foreground">
+      Attachments ({resource.data.length})
+    </h3>
+    <div className="grid grid-cols-1 gap-4">
+      {resource.data.map((url, index) => (
+        <div key={index} className="w-full">
+          <MediaPreview url={url} className="w-full" />
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+```
+Also add `MediaPreview` to the imports (it's already available since `MediaList` uses it).
 
-We'll apply the same pattern to `MemorizationsList`.
+This removes the "1 file(s)" duplicate count shown below the banner (line 633) since the attachment count is now shown inline. The existing `resource.data.length` display on line 633 can remain as-is for the summary area.
 
-## User Experience After Fix
+## Why This Works
+- `resource.data` is already `["https://.../(2).pdf"]` — a clean URL array
+- `MediaPreview` already handles spaces in URLs via `url.replace(/ /g, '%20')` on line 27
+- No regex parsing needed, no chance of URL splitting
 
-| Feature State | What User Sees |
-|---------------|----------------|
-| Enabled, has memorizations | Full memorization list with cards |
-| Enabled, no memorizations | Empty state: "No memorization sets yet" |
-| Disabled | Nothing - section completely hidden |
-| Loading | Nothing - section hidden until flag loads |
