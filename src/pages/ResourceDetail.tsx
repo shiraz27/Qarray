@@ -12,7 +12,7 @@ import chapterPattern from '@/assets/chapter-pattern.png';
 import qarayLogo from '@/assets/qarray-logo-new.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { MediaList } from '@/components/MediaList';
+import { MediaPreview } from '@/components/MediaPreview';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
@@ -617,7 +617,20 @@ export default function ResourceDetail() {
                 </div>
               )}
               
-              <MediaList data={resource.data.join('\n')} showText={true} />
+              {resource.data.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground">
+                    Attachments ({resource.data.length})
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    {resource.data.map((url, index) => (
+                      <div key={index} className="w-full">
+                        <MediaPreview url={url} className="w-full" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             {!resource.verified && (
               <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs flex-shrink-0">

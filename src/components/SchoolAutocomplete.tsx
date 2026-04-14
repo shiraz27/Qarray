@@ -35,7 +35,7 @@ export const SchoolAutocomplete: React.FC<SchoolAutocompleteProps> = ({
   const [loading, setLoading] = useState(false);
   const [selectedInstituteId, setSelectedInstituteId] = useState<string | undefined>();
   const [isAddingNew, setIsAddingNew] = useState(false);
-  const debounceRef = useRef<NodeJS.Timeout>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Search institutes when search value changes
   useEffect(() => {
