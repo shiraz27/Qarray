@@ -102,8 +102,19 @@ async function extractPdfText(blob: Blob): Promise<string> {
 /**
  * Extract text from image using Tesseract.js OCR
  */
-async function extractImageText(blob: Blob): Promise<string> {
-  const worker = await createWorker('eng+ara'); // English + Arabic
+async function extractImageText(
+  blob: Blob,
+  onSubProgress?: (ratio: number) => void,
+  registerWorker?: (terminate: () => Promise<void>) => void
+): Promise<string> {
+  const worker = await createWorker('eng+ara', 1, {
+    logger: (m: any) => {
+      if (m.status === 'recognizing text' && typeof m.progress === 'number') {
+        onSubProgress?.(m.progress);
+      }
+    },
+  } as any);
+  registerWorker?.(() => worker.terminate());
 
   try {
     const {
@@ -118,15 +129,33 @@ async function extractImageText(blob: Blob): Promise<string> {
 /**
  * Convert PDF pages to images and OCR them
  */
-async function ocrPdfPages(blob: Blob): Promise<string> {
+async function ocrPdfPages(
+  blob: Blob,
+  onSubProgress?: (ratio: number) => void,
+  registerWorker?: (terminate: () => Promise<void>) => void,
+  signal?: AbortSignal
+): Promise<string> {
   const arrayBuffer = await blob.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-  const worker = await createWorker('eng+ara');
+  const totalPages = pdf.numPages;
+  const worker = await createWorker('eng+ara', 1, {
+    logger: (m: any) => {
+      if (m.status === 'recognizing text' && typeof m.progress === 'number') {
+        // currentPageIndex is captured in closure below
+        const overall = (currentPageIndex + m.progress) / totalPages;
+        onSubProgress?.(overall);
+      }
+    },
+  } as any);
+  registerWorker?.(() => worker.terminate());
   let fullText = '';
+  let currentPageIndex = 0;
 
   try {
-    for (let i = 1; i <= pdf.numPages; i++) {
+    for (let i = 1; i <= totalPages; i++) {
+      if (signal?.aborted) throw new Error('Aborted');
+      currentPageIndex = i - 1;
       const page = await pdf.getPage(i);
       const viewport = page.getViewport({ scale: 2.0 });
 
@@ -164,7 +193,12 @@ async function ocrPdfPages(blob: Blob): Promise<string> {
 /**
  * Two-stage PDF processing: Extract text first, then OCR if needed
  */
-async function processPdfWithFallback(blob: Blob): Promise<string> {
+async function processPdfWithFallback(
+  blob: Blob,
+  onSubProgress?: (ratio: number) => void,
+  registerWorker?: (terminate: () => Promise<void>) => void,
+  signal?: AbortSignal
+): Promise<string> {
   console.log('Stage 1: Attempting text extraction from PDF...');
 
   // Stage 1: Try to extract text
@@ -177,6 +211,7 @@ async function processPdfWithFallback(blob: Blob): Promise<string> {
 
   if (hasRealText) {
     console.log('Stage 1: Success! Text extracted from PDF');
+    onSubProgress?.(1);
     return extractedText;
   }
 
@@ -185,7 +220,7 @@ async function processPdfWithFallback(blob: Blob): Promise<string> {
   );
 
   // Stage 2: Fallback to OCR for scanned PDFs
-  return await ocrPdfPages(blob);
+  return await ocrPdfPages(blob, onSubProgress, registerWorker, signal);
 }
 
 /**
@@ -200,8 +235,9 @@ async function processPdfWithFallback(blob: Blob): Promise<string> {
  */
 export async function processOcrAndExtractMetadata(
   mediaUrls: string[],
-  onProgress?: (message: string) => void,
-  localFiles?: Map<string, File>
+  onProgress?: (update: { message: string; progress: number }) => void,
+  localFiles?: Map<string, File>,
+  signal?: AbortSignal
 ): Promise<OcrAndExtractResult> {
   try {
     if (mediaUrls.length === 0) {
@@ -218,11 +254,35 @@ export async function processOcrAndExtractMetadata(
     let processedFileCount = 0;
     let failedFileCount = 0;
 
+    // First pass: count OCR-able files for slice allocation
+    const ocrableIndices: number[] = [];
     for (let i = 0; i < mediaUrls.length; i++) {
+      const t = detectFileType(mediaUrls[i]);
+      if (t === 'pdf' || t === 'image') ocrableIndices.push(i);
+    }
+    const totalOcrable = ocrableIndices.length;
+    // Reserve 0-90% for OCR, 90-100% for AI metadata extraction
+    const sliceSize = totalOcrable > 0 ? 90 / totalOcrable : 0;
+    let completedSlices = 0;
+    const activeWorkers: Array<() => Promise<void>> = [];
+    const registerWorker = (terminate: () => Promise<void>) => {
+      activeWorkers.push(terminate);
+    };
+    const abortHandler = () => {
+      activeWorkers.forEach((t) => t().catch(() => {}));
+    };
+    signal?.addEventListener('abort', abortHandler);
+
+    for (let i = 0; i < mediaUrls.length; i++) {
+      if (signal?.aborted) throw new Error('Aborted');
       const url = mediaUrls[i];
       const fileType = detectFileType(url);
 
-      onProgress?.(`Processing file ${i + 1}/${mediaUrls.length}: ${fileType}...`);
+      const baseProgress = completedSlices * sliceSize;
+      onProgress?.({
+        message: `Processing file ${i + 1}/${mediaUrls.length}: ${fileType}...`,
+        progress: baseProgress,
+      });
 
       if (fileType === 'video' || fileType === 'audio' || fileType === 'unknown') {
         continue; // Skip non-OCR-able files
@@ -238,26 +298,35 @@ export async function processOcrAndExtractMetadata(
         const blob: Blob = localFile ?? (await fetchFileViaProxy(url));
 
         let text = '';
+        const sliceStart = completedSlices * sliceSize;
+        const onSub = (ratio: number) => {
+          onProgress?.({
+            message: `Reading file ${i + 1}/${mediaUrls.length} (${Math.round(ratio * 100)}%)...`,
+            progress: Math.min(sliceStart + ratio * sliceSize, 90),
+          });
+        };
 
         if (fileType === 'pdf') {
-          // Two-stage processing for PDFs
-          text = await processPdfWithFallback(blob);
+          text = await processPdfWithFallback(blob, onSub, registerWorker, signal);
           processedFileCount++;
         } else if (fileType === 'image') {
-          // Direct OCR for images
-          text = await extractImageText(blob);
+          text = await extractImageText(blob, onSub, registerWorker);
           processedFileCount++;
         }
 
         if (text) {
           extractedTexts.push(text);
         }
+        completedSlices++;
       } catch (error: any) {
         console.error(`Error processing ${url}:`, error);
         failedFileCount++;
+        completedSlices++;
         // Continue processing other files
       }
     }
+
+    signal?.removeEventListener('abort', abortHandler);
 
     // If no OCR-able files exist at all (only video/audio)
     if (ocrableFileCount === 0) {
@@ -281,10 +350,12 @@ export async function processOcrAndExtractMetadata(
 
     const combinedText = extractedTexts.join('\n\n---\n\n');
     
-    onProgress?.('Extracting metadata with AI...');
+    onProgress?.({ message: 'Extracting metadata with AI...', progress: 92 });
 
     // Now extract metadata using AI
     const metadataResult = await extractMetadataFromOCR(combinedText);
+
+    onProgress?.({ message: 'Done', progress: 100 });
 
     return {
       success: metadataResult.success,
