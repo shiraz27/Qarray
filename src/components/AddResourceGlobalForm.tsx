@@ -78,6 +78,10 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
   const [extractedData, setExtractedData] = useState<OcrAndExtractResult | null>(null);
   const [selectedInstituteId, setSelectedInstituteId] = useState<string | undefined>();
   const { isModerator, isAdmin } = useUserRole();
+
+  // Map of remote URL -> original File blob for files uploaded in this session.
+  // Used to OCR locally instead of re-fetching from Archive.org.
+  const localFilesRef = useRef<Map<string, File>>(new Map());
   const hasRestoredRef = useRef(false);
   const { items: uploadManagerItems } = useUploadManager();
   

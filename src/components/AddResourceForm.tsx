@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -65,6 +65,11 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
   const [extractedData, setExtractedData] = useState<OcrAndExtractResult | null>(null);
   const [selectedInstituteId, setSelectedInstituteId] = useState<string | undefined>();
   const { isModerator, isAdmin } = useUserRole();
+
+  // Map of remote URL -> original File blob for files uploaded in this session.
+  // Used to OCR locally instead of re-fetching from Archive.org (avoids
+  // propagation-delay 404s and is faster).
+  const localFilesRef = useRef<Map<string, File>>(new Map());
   
   // Form persistence
   const { 
@@ -126,8 +131,11 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
     }
   }, [mediaUrls, step, saveFormData]);
 
-  const handleMediaUploaded = (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => {
+  const handleMediaUploaded = (url: string, type: 'image' | 'video' | 'audio' | 'pdf', file?: File) => {
     setMediaUrls(prev => [...prev, url]);
+    if (file) {
+      localFilesRef.current.set(url, file);
+    }
     // URL persistence is handled by the saveFormData useEffect
     toast.success('Media added successfully');
   };
@@ -135,6 +143,9 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
   const removeMedia = (index: number) => {
     const urlToRemove = mediaUrls[index];
     setMediaUrls(prev => prev.filter((_, i) => i !== index));
+    if (urlToRemove) {
+      localFilesRef.current.delete(urlToRemove);
+    }
     // Keep session in sync when files are removed
     if (urlToRemove) {
       removeUploadedUrl(urlToRemove);
@@ -160,7 +171,8 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
         (message) => {
           setProcessingMessage(message);
           setProcessingProgress(prev => Math.min(prev + 15, 90));
-        }
+        },
+        localFilesRef.current
       );
 
       setExtractedData(result);
