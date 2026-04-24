@@ -788,10 +788,10 @@ export default function Chapter() {
 
       {/* Content Tabs */}
       <div className="flex-1 px-4">
-        <Tabs defaultValue="questions" className="w-full">
+        <Tabs defaultValue="resources" className="w-full">
           <TabsList className="w-full grid grid-cols-2 mb-4">
-            <TabsTrigger value="questions">{t('questions') || 'Questions'}</TabsTrigger>
             <TabsTrigger value="resources">{t('resources') || 'Resources'}</TabsTrigger>
+            <TabsTrigger value="questions">{t('questions') || 'Questions'}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="questions" className="space-y-3">
