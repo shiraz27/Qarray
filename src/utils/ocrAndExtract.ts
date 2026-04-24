@@ -190,10 +190,18 @@ async function processPdfWithFallback(blob: Blob): Promise<string> {
 
 /**
  * Process OCR for uploaded media URLs and extract AI metadata
+ *
+ * @param mediaUrls    Remote URLs for the uploaded files (e.g. Archive.org)
+ * @param onProgress   Optional progress callback
+ * @param localFiles   Optional Map of url -> original File blob. When a URL has
+ *                     a matching local File, we OCR it directly instead of
+ *                     re-fetching from the remote host. This avoids
+ *                     propagation-delay 404s and is much faster.
  */
 export async function processOcrAndExtractMetadata(
   mediaUrls: string[],
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
+  localFiles?: Map<string, File>
 ): Promise<OcrAndExtractResult> {
   try {
     if (mediaUrls.length === 0) {
@@ -223,8 +231,11 @@ export async function processOcrAndExtractMetadata(
       ocrableFileCount++; // Count files that should be OCR-able
 
       try {
-        // Fetch file via proxy
-        const blob = await fetchFileViaProxy(url);
+        // Prefer the original local File blob when available — this skips a
+        // round-trip through the proxy/Archive.org and avoids propagation
+        // delays right after upload.
+        const localFile = localFiles?.get(url);
+        const blob: Blob = localFile ?? (await fetchFileViaProxy(url));
 
         let text = '';
 

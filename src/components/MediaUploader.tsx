@@ -14,7 +14,7 @@ import { useUploadManager } from '@/contexts/UploadManagerContext';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 interface MediaUploaderProps {
-  onMediaUploaded: (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => void;
+  onMediaUploaded: (url: string, type: 'image' | 'video' | 'audio' | 'pdf', file?: File) => void;
   acceptedTypes?: ('image' | 'video' | 'audio' | 'pdf')[];
   uploadedMedia?: Array<{ url: string; type: string; name: string }>;
   onRemoveMedia?: (index: number) => void;
@@ -57,10 +57,11 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   // Generate stable callback ID for this uploader instance
   const callbackId = useMemo(() => `uploader-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, []);
 
-  // Register callback for completed uploads
+  // Register callback for completed uploads. We forward the original File blob
+  // (when available) so consumers can run OCR locally without re-fetching.
   useEffect(() => {
-    const unsubscribe = onUploadComplete(callbackId, (url: string, fileType: string) => {
-      onMediaUploaded(url, fileType as 'image' | 'video' | 'audio' | 'pdf');
+    const unsubscribe = onUploadComplete(callbackId, (url: string, fileType: string, file?: File) => {
+      onMediaUploaded(url, fileType as 'image' | 'video' | 'audio' | 'pdf', file);
     });
     return unsubscribe;
   }, [callbackId, onUploadComplete, onMediaUploaded]);

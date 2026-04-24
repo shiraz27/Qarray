@@ -35,7 +35,7 @@ interface UploadManagerContextType {
   retryUpload: (id: string) => void;
   clearCompleted: () => void;
   getUploadsByCallback: (callbackId: string) => UploadItem[];
-  onUploadComplete: (callbackId: string, callback: (url: string, fileType: string) => void) => () => void;
+  onUploadComplete: (callbackId: string, callback: (url: string, fileType: string, file?: File) => void) => () => void;
   items: UploadItem[];
   hasActiveUploads: boolean;
   pendingCount: number;
@@ -62,7 +62,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<UploadItem[]>([]);
-  const callbacksRef = useRef<Map<string, Set<(url: string, fileType: string) => void>>>(new Map());
+  const callbacksRef = useRef<Map<string, Set<(url: string, fileType: string, file?: File) => void>>>(new Map());
   const isProcessingRef = useRef(false);
   const queueRef = useRef<UploadItem[]>([]);
 
@@ -132,10 +132,12 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       // Notify callbacks (for when form is still open)
+      // Pass the original File blob so consumers can skip re-fetching from the
+      // remote host (useful for OCR right after upload).
       if (nextItem.callbackId) {
         const callbacks = callbacksRef.current.get(nextItem.callbackId);
         if (callbacks) {
-          callbacks.forEach(cb => cb(result.url, nextItem.fileType));
+          callbacks.forEach(cb => cb(result.url, nextItem.fileType, nextItem.file));
         }
       }
 
@@ -289,7 +291,7 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const onUploadComplete = useCallback((
     callbackId: string, 
-    callback: (url: string, fileType: string) => void
+    callback: (url: string, fileType: string, file?: File) => void
   ): (() => void) => {
     if (!callbacksRef.current.has(callbackId)) {
       callbacksRef.current.set(callbackId, new Set());
