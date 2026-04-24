@@ -711,7 +711,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
           </div>
           <h3 className="text-lg font-semibold">AI is processing your files</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            This may take 15-30 seconds
+            This may take 15-30 seconds · {processingElapsed}s elapsed
           </p>
         </div>
 
@@ -720,6 +720,17 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
           <p className="text-sm text-center text-muted-foreground">
             {processingMessage}
           </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
+          <Button variant="outline" size="sm" onClick={() => handleCancelProcessing('choose')}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => handleCancelProcessing('manual')}>
+            <Edit3 className="h-4 w-4 mr-1" />
+            Cancel and fill manually
+          </Button>
         </div>
       </div>
     );
