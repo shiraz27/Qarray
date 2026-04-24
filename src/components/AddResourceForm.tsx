@@ -14,7 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Bot, Edit3, Clock, Zap, AlertTriangle, Sparkles, ArrowLeft, Check, ArrowRight } from 'lucide-react';
+import { Loader2, Bot, Edit3, Clock, Zap, AlertTriangle, Sparkles, ArrowLeft, Check, ArrowRight, X } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
 import { processOcrAndExtractMetadata, OcrAndExtractResult } from '@/utils/ocrAndExtract';
@@ -62,6 +62,8 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [processingMessage, setProcessingMessage] = useState('');
+  const [processingElapsed, setProcessingElapsed] = useState(0);
+  const processingAbortRef = useRef<AbortController | null>(null);
   const [extractedData, setExtractedData] = useState<OcrAndExtractResult | null>(null);
   const [selectedInstituteId, setSelectedInstituteId] = useState<string | undefined>();
   const { isModerator, isAdmin } = useUserRole();
@@ -162,18 +164,35 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
 
   const handleChooseAI = async () => {
     setStep('processing');
-    setProcessingProgress(10);
+    setProcessingProgress(2);
     setProcessingMessage('Starting OCR processing...');
+    setProcessingElapsed(0);
+
+    const abort = new AbortController();
+    processingAbortRef.current = abort;
+    const startedAt = Date.now();
+    const tick = window.setInterval(() => {
+      setProcessingElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    // Hard watchdog: bail to manual entry after 3 minutes
+    const watchdog = window.setTimeout(() => {
+      abort.abort();
+      toast.error('Processing is taking too long. Switching to manual entry.');
+      setStep('manual');
+    }, 180000);
 
     try {
       const result = await processOcrAndExtractMetadata(
         mediaUrls,
-        (message) => {
+        ({ message, progress }) => {
           setProcessingMessage(message);
-          setProcessingProgress(prev => Math.min(prev + 15, 90));
+          setProcessingProgress(prev => Math.max(prev, Math.min(progress, 99)));
         },
-        localFilesRef.current
+        localFilesRef.current,
+        abort.signal
       );
+
+      if (abort.signal.aborted) return;
 
       setExtractedData(result);
       setProcessingProgress(100);
@@ -212,10 +231,22 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
       }, 500);
 
     } catch (error: any) {
+      if (abort.signal.aborted) return;
       console.error('Processing error:', error);
       toast.error('Failed to process files: ' + error.message);
       setStep('choose');
+    } finally {
+      window.clearInterval(tick);
+      window.clearTimeout(watchdog);
+      processingAbortRef.current = null;
     }
+  };
+
+  const handleCancelProcessing = (target: 'choose' | 'manual') => {
+    processingAbortRef.current?.abort();
+    setProcessingProgress(0);
+    setProcessingMessage('');
+    setStep(target);
   };
 
   const handleChooseManual = () => {
@@ -476,7 +507,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           </div>
           <h3 className="text-lg font-semibold">AI is processing your files</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            This may take 15-30 seconds
+            This may take 15-30 seconds · {processingElapsed}s elapsed
           </p>
         </div>
 
@@ -485,6 +516,17 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           <p className="text-sm text-center text-muted-foreground">
             {processingMessage}
           </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
+          <Button variant="outline" size="sm" onClick={() => handleCancelProcessing('choose')}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => handleCancelProcessing('manual')}>
+            <Edit3 className="h-4 w-4 mr-1" />
+            Cancel and fill manually
+          </Button>
         </div>
       </div>
     );
