@@ -114,7 +114,7 @@ async function extractImageText(
       }
     },
   } as any);
-  registerWorker?.(() => worker.terminate());
+  registerWorker?.(async () => { await worker.terminate(); });
 
   try {
     const {
@@ -148,7 +148,7 @@ async function ocrPdfPages(
       }
     },
   } as any);
-  registerWorker?.(() => worker.terminate());
+  registerWorker?.(async () => { await worker.terminate(); });
   let fullText = '';
   let currentPageIndex = 0;
 
