@@ -38,6 +38,17 @@ async function fetchFileViaProxy(url: string): Promise<Blob> {
     throw new Error(`Failed to fetch file: ${errorText}`);
   }
 
+  // The proxy returns 200 with a JSON `{ unavailable: true }` payload when the
+  // upstream (Archive.org) is still 404-ing after retries. Detect that here so
+  // callers can treat it as a normal handled error instead of a binary blob.
+  const contentType = response.headers.get('Content-Type') || '';
+  if (contentType.includes('application/json')) {
+    const payload = await response.json().catch(() => null) as { unavailable?: boolean; error?: string } | null;
+    if (payload?.unavailable) {
+      throw new Error(payload.error || 'File not available yet');
+    }
+  }
+
   return await response.blob();
 }
 

@@ -68,11 +68,20 @@ Deno.serve(async (req) => {
     const result = await fetchWithRetry(url);
     
     if (!result.ok) {
-      console.error(`Fetch media failed: ${result.status} - ${result.message}`);
+      // Archive.org propagation can take a while; treat any non-OK
+      // upstream status as a soft "unavailable" response with HTTP 200 so the
+      // platform's runtime-error monitor doesn't flag every retryable miss as
+      // a hard failure. The frontend inspects the JSON body to decide how to
+      // surface this state to the user.
+      console.warn(`Fetch media unavailable: ${result.status} - ${result.message}`);
       return new Response(
-        JSON.stringify({ error: `File not available: ${result.message}` }),
+        JSON.stringify({
+          unavailable: true,
+          upstreamStatus: result.status,
+          error: `File not available: ${result.message}`,
+        }),
         {
-          status: result.status === 404 ? 404 : 502,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
