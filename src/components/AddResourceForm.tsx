@@ -19,6 +19,7 @@ import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
 import { processOcrAndExtractMetadata, OcrAndExtractResult } from '@/utils/ocrAndExtract';
 import { SchoolAutocomplete } from './SchoolAutocomplete';
+import { AIBadge } from './AIBadge';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
 
 const resourceSchema = z.object({
@@ -524,10 +525,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
               <FormLabel className="flex items-center gap-2">
                 Title
                 {isReviewMode && extractedData?.metadata.suggested_title && (
-                  <Badge variant="secondary" className="text-xs">
-                    <Bot className="h-3 w-3 mr-1" />
-                    AI
-                  </Badge>
+                  <AIBadge />
                 )}
               </FormLabel>
               <FormControl>
@@ -546,10 +544,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
               <FormLabel className="flex items-center gap-2">
                 Description
                 {isReviewMode && extractedData?.metadata.suggested_description && (
-                  <Badge variant="secondary" className="text-xs">
-                    <Bot className="h-3 w-3 mr-1" />
-                    AI
-                  </Badge>
+                  <AIBadge />
                 )}
               </FormLabel>
               <FormControl>
@@ -573,10 +568,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
                 <FormLabel className="flex items-center gap-2">
                   Resource Type
                   {isReviewMode && extractedData?.metadata.suggested_type_id && (
-                    <Badge variant="secondary" className="text-xs">
-                      <Bot className="h-3 w-3 mr-1" />
-                      AI
-                    </Badge>
+                    <AIBadge />
                   )}
                 </FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
@@ -606,10 +598,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
                 <FormLabel className="flex items-center gap-2">
                   Devoir Type
                   {isReviewMode && extractedData?.metadata.suggested_devoir_type_id && (
-                    <Badge variant="secondary" className="text-xs">
-                      <Bot className="h-3 w-3 mr-1" />
-                      AI
-                    </Badge>
+                    <AIBadge />
                   )}
                 </FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
@@ -641,10 +630,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
                 <FormLabel className="flex items-center gap-2">
                   School Name
                   {isReviewMode && extractedData?.metadata.school_name && (
-                    <Badge variant="secondary" className="text-xs">
-                      <Bot className="h-3 w-3 mr-1" />
-                      AI
-                    </Badge>
+                    <AIBadge />
                   )}
                 </FormLabel>
                 <FormControl>
@@ -668,10 +654,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
                 <FormLabel className="flex items-center gap-2">
                   Teacher Name
                   {isReviewMode && extractedData?.metadata.teacher_name && (
-                    <Badge variant="secondary" className="text-xs">
-                      <Bot className="h-3 w-3 mr-1" />
-                      AI
-                    </Badge>
+                    <AIBadge />
                   )}
                 </FormLabel>
                 <FormControl>

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
-import { Check, ChevronsUpDown, Plus, Building2, Bot, Loader2 } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus, Building2, Bot, Loader2, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Institute {
@@ -37,13 +37,21 @@ export const SchoolAutocomplete: React.FC<SchoolAutocompleteProps> = ({
   const [isAddingNew, setIsAddingNew] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
+  // When opening, pre-fill the search input with the current value so the user
+  // can immediately edit it instead of having to retype from scratch.
+  useEffect(() => {
+    if (open) {
+      setSearchValue(value || '');
+    }
+  }, [open]);
+
   // Search institutes when search value changes
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
 
-    if (!searchValue || searchValue.length < 2) {
+    if (!searchValue || searchValue.length < 1) {
       setInstitutes([]);
       return;
     }
@@ -109,6 +117,18 @@ export const SchoolAutocomplete: React.FC<SchoolAutocompleteProps> = ({
     setSearchValue('');
   };
 
+  // Use the typed text as a free-form school name without creating a new
+  // institute record. This lets the user override AI suggestions with any
+  // string they want.
+  const handleUseExact = () => {
+    const nameToUse = searchValue.trim();
+    if (!nameToUse) return;
+    setSelectedInstituteId(undefined);
+    onChange(nameToUse, undefined);
+    setOpen(false);
+    setSearchValue('');
+  };
+
   const handleAddNew = async () => {
     const nameToAdd = searchValue || value;
     if (!nameToAdd) return;
@@ -152,9 +172,15 @@ export const SchoolAutocomplete: React.FC<SchoolAutocompleteProps> = ({
   const handleClearSelection = () => {
     setSelectedInstituteId(undefined);
     onChange('', undefined);
+    setSearchValue('');
   };
 
   const showAiBadge = aiSuggested && value === aiSuggested;
+  const trimmedSearch = searchValue.trim();
+  const exactMatchInList = institutes.some(
+    (i) => i.name.toLowerCase() === trimmedSearch.toLowerCase()
+  );
+  const differsFromCurrent = trimmedSearch && trimmedSearch !== value;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -185,7 +211,8 @@ export const SchoolAutocomplete: React.FC<SchoolAutocompleteProps> = ({
                 <Check className="h-3 w-3" />
               </Badge>
             )}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <Pencil className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           </div>
         </Button>
       </PopoverTrigger>
@@ -195,15 +222,27 @@ export const SchoolAutocomplete: React.FC<SchoolAutocompleteProps> = ({
             placeholder="Search schools..." 
             value={searchValue}
             onValueChange={setSearchValue}
+            autoFocus
           />
           <CommandList>
+            {value && (
+              <CommandGroup>
+                <CommandItem
+                  onSelect={handleClearSelection}
+                  className="cursor-pointer text-muted-foreground text-xs"
+                >
+                  Clear current value
+                </CommandItem>
+              </CommandGroup>
+            )}
+
             {loading && (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="h-4 w-4 animate-spin" />
               </div>
             )}
             
-            {!loading && searchValue.length >= 2 && institutes.length === 0 && (
+            {!loading && searchValue.length >= 1 && institutes.length === 0 && (
               <CommandEmpty>
                 <div className="py-2 text-sm text-muted-foreground">
                   No schools found
@@ -237,10 +276,20 @@ export const SchoolAutocomplete: React.FC<SchoolAutocompleteProps> = ({
               </CommandGroup>
             )}
 
-            {searchValue.length >= 2 && (
+            {trimmedSearch.length >= 1 && (
               <>
                 <CommandSeparator />
                 <CommandGroup>
+                  {differsFromCurrent && (
+                    <CommandItem
+                      onSelect={handleUseExact}
+                      className="cursor-pointer"
+                    >
+                      <Check className="mr-2 h-4 w-4" />
+                      <span>Use exact name: "{trimmedSearch}"</span>
+                    </CommandItem>
+                  )}
+                  {!exactMatchInList && (
                   <CommandItem
                     onSelect={handleAddNew}
                     className="cursor-pointer"
@@ -251,25 +300,13 @@ export const SchoolAutocomplete: React.FC<SchoolAutocompleteProps> = ({
                     ) : (
                       <Plus className="mr-2 h-4 w-4" />
                     )}
-                    <span>Add "{searchValue}" as new school</span>
+                    <span>Add "{trimmedSearch}" as new school</span>
                   </CommandItem>
+                  )}
                 </CommandGroup>
               </>
             )}
 
-            {value && selectedInstituteId && (
-              <>
-                <CommandSeparator />
-                <CommandGroup>
-                  <CommandItem
-                    onSelect={handleClearSelection}
-                    className="cursor-pointer text-muted-foreground"
-                  >
-                    Clear selection
-                  </CommandItem>
-                </CommandGroup>
-              </>
-            )}
           </CommandList>
         </Command>
       </PopoverContent>
