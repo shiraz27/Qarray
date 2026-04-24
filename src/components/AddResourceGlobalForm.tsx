@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Bot, Edit3, Clock, Zap, AlertTriangle, Sparkles, ArrowLeft, Check, ArrowRight } from 'lucide-react';
+import { Loader2, Bot, Edit3, Clock, Zap, AlertTriangle, Sparkles, ArrowLeft, Check, ArrowRight, X } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
 import { processOcrAndExtractMetadata, OcrAndExtractResult } from '@/utils/ocrAndExtract';
@@ -75,6 +75,8 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
   const [userClassId, setUserClassId] = useState<number | null>(null);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [processingMessage, setProcessingMessage] = useState('');
+  const [processingElapsed, setProcessingElapsed] = useState(0);
+  const processingAbortRef = useRef<AbortController | null>(null);
   const [extractedData, setExtractedData] = useState<OcrAndExtractResult | null>(null);
   const [selectedInstituteId, setSelectedInstituteId] = useState<string | undefined>();
   const { isModerator, isAdmin } = useUserRole();
@@ -282,18 +284,34 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
     }
 
     setStep('processing');
-    setProcessingProgress(10);
+    setProcessingProgress(2);
     setProcessingMessage('Starting OCR processing...');
+    setProcessingElapsed(0);
+
+    const abort = new AbortController();
+    processingAbortRef.current = abort;
+    const startedAt = Date.now();
+    const tick = window.setInterval(() => {
+      setProcessingElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    const watchdog = window.setTimeout(() => {
+      abort.abort();
+      toast.error('Processing is taking too long. Switching to manual entry.');
+      setStep('manual');
+    }, 180000);
 
     try {
       const result = await processOcrAndExtractMetadata(
         mediaUrls,
-        (message) => {
+        ({ message, progress }) => {
           setProcessingMessage(message);
-          setProcessingProgress(prev => Math.min(prev + 15, 90));
+          setProcessingProgress(prev => Math.max(prev, Math.min(progress, 99)));
         },
-        localFilesRef.current
+        localFilesRef.current,
+        abort.signal
       );
+
+      if (abort.signal.aborted) return;
 
       // Check if processing was successful
       if (!result.success) {
@@ -339,6 +357,24 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
       setTimeout(() => {
         setStep('review');
       }, 500);
+    } catch (error: any) {
+      if (abort.signal.aborted) return;
+      console.error('Processing error:', error);
+      toast.error('Failed to process files: ' + (error?.message || 'Unknown error'));
+      setStep('choose');
+    } finally {
+      window.clearInterval(tick);
+      window.clearTimeout(watchdog);
+      processingAbortRef.current = null;
+    }
+  };
+
+  const handleCancelProcessing = (target: 'choose' | 'manual') => {
+    processingAbortRef.current?.abort();
+    setProcessingProgress(0);
+    setProcessingMessage('');
+    setStep(target);
+  };
 
     } catch (error: any) {
       console.error('Processing error:', error);
