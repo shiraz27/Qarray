@@ -1,19 +1,21 @@
 import React from 'react';
 import { MediaPreview } from './MediaPreview';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
+import { capitalizeEveryWord } from '@/utils/textHelpers';
 
 interface MediaListProps {
   data: string;
   showText?: boolean;
+  capitalizeText?: boolean;
 }
 
-export function MediaList({ data, showText = true }: MediaListProps) {
+export function MediaList({ data, showText = true, capitalizeText = false }: MediaListProps) {
   const { text, media } = extractMediaFromText(data);
 
   return (
     <div className="space-y-4">
       {showText && text && (
-        <p className="text-base leading-relaxed">{text}</p>
+        <p className="text-base leading-relaxed">{capitalizeText ? capitalizeEveryWord(text) : text}</p>
       )}
       
       {media.length > 0 && (

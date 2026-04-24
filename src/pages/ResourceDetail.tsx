@@ -19,6 +19,7 @@ import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
 import { EmptyState } from '@/components/EmptyState';
 import { SEO, createLearningResourceSchema } from '@/components/SEO';
+import { capitalizeEveryWord } from '@/utils/textHelpers';
 
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -597,7 +598,7 @@ export default function ResourceDetail() {
           
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-foreground mb-2">{resource.title}</h2>
+              <h2 className="text-xl font-bold text-foreground mb-2">{capitalizeEveryWord(resource.title)}</h2>
               <p className="text-sm text-muted-foreground mb-3">{resource.description}</p>
               
               {/* School and Teacher Info */}

@@ -18,6 +18,7 @@ import { AddResourceForm } from '@/components/AddResourceForm';
 import { UserAvatar } from '@/components/UserAvatar';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { SEO, createCourseSchema } from '@/components/SEO';
+import { capitalizeEveryWord } from '@/utils/textHelpers';
 
 interface ChapterData {
   id: number;
@@ -897,7 +898,7 @@ export default function Chapter() {
                     />
                   )}
                   <div className="flex items-start justify-between mb-2">
-                    <p className="text-foreground flex-1">{text}</p>
+                    <p className="text-foreground flex-1">{capitalizeEveryWord(text)}</p>
                     {!question.verified && (
                       <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full whitespace-nowrap">
                         Unverified
@@ -1173,7 +1174,7 @@ export default function Chapter() {
                     />
                   )}
                   <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold text-foreground flex-1">{resource.title}</h3>
+                    <h3 className="font-semibold text-foreground flex-1">{capitalizeEveryWord(resource.title)}</h3>
                     <div className="flex gap-1 ml-2 flex-shrink-0">
                       {!resource.verified && (
                         <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full whitespace-nowrap">
