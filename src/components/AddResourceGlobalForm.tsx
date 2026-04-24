@@ -376,15 +376,6 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
     setStep(target);
   };
 
-    } catch (error: any) {
-      console.error('Processing error:', error);
-      toast.error('Failed to process files: ' + error.message);
-      setProcessingProgress(0);
-      setProcessingMessage('');
-      setStep('choose');
-    }
-  };
-
   const handleChooseManual = () => {
     // Validate subject and chapter are selected
     const subjectId = form.getValues('subject_id');
