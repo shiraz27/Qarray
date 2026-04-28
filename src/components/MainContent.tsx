@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { MessageSquare, FileText, Bookmark, Plus, Edit } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -22,6 +29,14 @@ interface Chapter {
   isBookmarked: boolean;
 }
 
+interface CommonChapter {
+  id: number;
+  name: string;
+  className: string;
+}
+
+const BAC_CLASS_IDS = new Set([15, 16, 17, 18, 19, 20, 21]);
+
 interface MainContentProps {
   subjectId: number | null;
 }
@@ -30,6 +45,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [commonChapters, setCommonChapters] = useState<CommonChapter[]>([]);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
@@ -123,6 +139,63 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
         );
 
         setChapters(chaptersWithCounts);
+
+        // Fetch common chapters from other Bac classes
+        const currentClassId = subjectData?.class_id;
+        const nativeIds = (chaptersData || []).map((c) => c.id);
+        if (
+          currentClassId &&
+          BAC_CLASS_IDS.has(currentClassId) &&
+          nativeIds.length > 0
+        ) {
+          const { data: mappings } = await supabase
+            .from('chapter_common_mappings')
+            .select(
+              'common_chapter_id, chapters!chapter_common_mappings_common_chapter_id_fkey(id, name, class_id, deleted, classes(name))'
+            )
+            .in('chapter_id', nativeIds);
+
+          // Fallback: the FK alias may not exist; do a manual join.
+          let commons: CommonChapter[] = [];
+          if (mappings && mappings.length > 0 && (mappings[0] as any).chapters) {
+            const seen = new Set<number>();
+            for (const m of mappings as any[]) {
+              const ch = m.chapters;
+              if (!ch || ch.deleted) continue;
+              if (seen.has(ch.id)) continue;
+              seen.add(ch.id);
+              commons.push({
+                id: ch.id,
+                name: ch.name,
+                className: ch.classes?.name ?? '',
+              });
+            }
+          } else {
+            // Manual join fallback
+            const { data: rawMappings } = await supabase
+              .from('chapter_common_mappings')
+              .select('common_chapter_id')
+              .in('chapter_id', nativeIds);
+            const targetIds = Array.from(
+              new Set((rawMappings || []).map((r: any) => r.common_chapter_id))
+            );
+            if (targetIds.length > 0) {
+              const { data: chRows } = await supabase
+                .from('chapters')
+                .select('id, name, class_id, deleted, classes(name)')
+                .in('id', targetIds)
+                .eq('deleted', false);
+              commons = (chRows || []).map((ch: any) => ({
+                id: ch.id,
+                name: ch.name,
+                className: ch.classes?.name ?? '',
+              }));
+            }
+          }
+          setCommonChapters(commons);
+        } else {
+          setCommonChapters([]);
+        }
       } catch (error) {
         console.error('Error fetching chapters:', error);
       } finally {
