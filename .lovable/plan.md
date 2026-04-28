@@ -1,50 +1,81 @@
+# Common Chapters Across Bac Classes
 
+Match chapters with similar topics across different Bac classes (e.g., "LE DIPOLE RC" in Bac Informatique ↔ "Dipole RC" in Bac Mathématiques) using AI, then surface them as a collapsible "Common Chapters" section under the native chapters of each Bac subject.
 
-# Fix: PDF File Not Rendering on Resource Detail Page
+## Scope
 
-## Problem
-On `/resource/24`, the resource has 1 PDF file (`4sc_t1-pages-2-combined (2).pdf`) and shows "1 file(s)" count, but the actual clickable PDF card is not visible.
+- Applies only to classes whose name starts with "Bac" (ids 15–21).
+- Subjects are matched across Bac classes by **name similarity** (AI-judged: e.g., Maths ↔ Mathématiques ↔ Mathématique, Physique ↔ Physiques).
+- Within matched subjects, **chapters** are matched by topic equivalence (AI-judged).
 
-## Root Cause
-The URL contains a **space** in the filename: `...4sc_t1-pages-2-combined (2).pdf`. 
+## How it works (user view)
 
-In `ResourceDetail.tsx` line 620, the `resource.data` array (which already contains clean URLs) is joined into a text string with `\n`, then passed to `MediaList` which runs `extractMediaFromText()` to parse URLs back out using regex. This round-trip through text parsing is fragile — the space in the URL can cause the regex to split or mangle it, resulting in no valid media being detected.
+1. On a Bac subject's chapters page, native chapters render as today.
+2. Below them, a collapsible accordion **"Common Chapters from other Bac classes"** shows matched chapters, each with a badge like `From Bac Mathématiques`.
+3. Tapping a common chapter opens that chapter's existing page (with its own questions/resources from its native class).
+4. Non-Bac classes are unaffected.
 
-Meanwhile, questions and answers store their data as a single text string with embedded URLs, so they genuinely need `extractMediaFromText`. But resources already have a clean `string[]` array — the text-parsing step is unnecessary and harmful.
+## How matching is produced (admin view)
 
-## Solution
-In `ResourceDetail.tsx`, replace the `MediaList` usage for `resource.data` with direct `MediaPreview` rendering from the array. This bypasses the text-parsing regex entirely.
+- A new card in **Statistics → Admin** called **"Match Common Chapters"** with a button **"Run AI Match"**.
+- Clicking it calls a new edge function `match-common-chapters` that:
+  1. Loads all subjects+chapters for Bac classes (ids 15–21).
+  2. Uses **Gemini 2.5 Flash** (Lovable AI Gateway) in two passes:
+     - **Pass A — subject groups:** cluster Bac subjects by name equivalence.
+     - **Pass B — chapter pairs:** for each subject group, ask the model to return pairs of equivalent chapter ids across classes.
+  3. Wipes prior mappings and inserts fresh rows into a new `chapter_common_mappings` table.
+- Shows progress and a result toast (e.g., "Matched 87 chapter pairs across 6 subject groups").
+- Re-runnable any time content changes.
 
-## File Change
+## Database
 
-### `src/pages/ResourceDetail.tsx` (line ~620)
-Replace:
-```tsx
-<MediaList data={resource.data.join('\n')} showText={true} />
+New table `chapter_common_mappings`:
+
+```text
+id              bigserial pk
+chapter_id      int   -- "host" chapter (the one viewing this page)
+common_chapter_id int -- the matched chapter from another Bac class
+created_at      timestamptz default now()
+unique (chapter_id, common_chapter_id)
 ```
-With direct rendering of each URL:
-```tsx
-{resource.data.length > 0 && (
-  <div className="space-y-3">
-    <h3 className="text-sm font-semibold text-muted-foreground">
-      Attachments ({resource.data.length})
-    </h3>
-    <div className="grid grid-cols-1 gap-4">
-      {resource.data.map((url, index) => (
-        <div key={index} className="w-full">
-          <MediaPreview url={url} className="w-full" />
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-```
-Also add `MediaPreview` to the imports (it's already available since `MediaList` uses it).
 
-This removes the "1 file(s)" duplicate count shown below the banner (line 633) since the attachment count is now shown inline. The existing `resource.data.length` display on line 633 can remain as-is for the summary area.
+- Symmetric inserts: for each AI-returned pair (A,B), insert both (A→B) and (B→A) so lookups are one-way by `chapter_id`.
+- RLS: SELECT for everyone (public discovery, mirrors `chapters` policy). INSERT/DELETE restricted to `is_moderator_or_admin`.
+- Index on `chapter_id`.
 
-## Why This Works
-- `resource.data` is already `["https://.../(2).pdf"]` — a clean URL array
-- `MediaPreview` already handles spaces in URLs via `url.replace(/ /g, '%20')` on line 27
-- No regex parsing needed, no chance of URL splitting
+## UI changes
 
+**`src/components/MainContent.tsx`**
+- After fetching native chapters, if the current class is Bac (id in 15..21), fetch:
+  - `chapter_common_mappings` rows where `chapter_id IN (nativeChapterIds)` joined to `chapters` (id, name, subject_id, class_id) and `classes` (name).
+  - Deduplicate target chapters (a single common chapter may match multiple natives).
+- Render new `<Accordion>` below the native chapters list titled **"Common Chapters from other Bac classes"** with a count badge.
+- Each item: chapter card (same visual style, slightly muted) + a small badge `From {className}`. Click navigates to `/chapter/{commonChapterId}`.
+- Hide accordion entirely if there are no mappings.
+
+**`src/components/AdminDeleteTab.tsx`** (or new `MatchCommonChaptersTab` in Statistics)
+- New section with description, "Run AI Match" button, last-run timestamp (read from max `created_at` in the mappings table), live status, and result count.
+
+## Edge function `match-common-chapters`
+
+- Auth: validate JWT, require admin role via `has_role`.
+- CORS headers, Zod validation of (empty) body.
+- Pulls Bac subjects/chapters via service role client.
+- Calls Lovable AI Gateway (`google/gemini-2.5-flash`) with structured tool-calling:
+  - Tool 1 returns `subject_groups: [[subject_id, ...], ...]`.
+  - Tool 2 (called per group) returns `pairs: [{a: chapter_id, b: chapter_id}, ...]`.
+- Inserts symmetric rows in batches; truncates the table first inside a single transaction.
+- Returns `{ groups, pairs, durationMs }`.
+
+## Files
+
+- New migration: create `chapter_common_mappings` with RLS + index.
+- New: `supabase/functions/match-common-chapters/index.ts`.
+- Edited: `src/components/MainContent.tsx` (fetch + accordion).
+- Edited: `src/pages/Statistics.tsx` and/or `src/components/AdminDeleteTab.tsx` (admin trigger UI).
+
+## Notes / non-goals
+
+- No merging of content; opening a common chapter shows its original page as-is (per your choice).
+- No automatic re-run; admin re-triggers manually after adding chapters.
+- Cost is bounded: matching runs over Bac classes only, in two AI passes, cached in DB.
