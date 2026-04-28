@@ -1514,9 +1514,105 @@ export default function Statistics() {
                 </Tabs>
               </CardContent>
             </Card>
+
+            <CommonChaptersMatchCard />
           </div>
         )}
       </main>
     </div>
+  );
+}
+
+function CommonChaptersMatchCard() {
+  const [running, setRunning] = useState(false);
+  const [lastRun, setLastRun] = useState<string | null>(null);
+  const [count, setCount] = useState<number | null>(null);
+  const [result, setResult] = useState<{ groups: number; pairs: number } | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      const { count: c } = await supabase
+        .from('chapter_common_mappings')
+        .select('*', { count: 'exact', head: true });
+      setCount(c ?? 0);
+      const { data } = await supabase
+        .from('chapter_common_mappings')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      setLastRun(data?.[0]?.created_at ?? null);
+    };
+    load();
+  }, []);
+
+  const runMatch = async () => {
+    setRunning(true);
+    setResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('match-common-chapters', {
+        body: {},
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setResult({ groups: data.groups, pairs: data.pairs });
+      toast.success(
+        `Matched ${data.pairs} chapter pairs across ${data.groups} subject groups`,
+      );
+      // refresh stats
+      const { count: c } = await supabase
+        .from('chapter_common_mappings')
+        .select('*', { count: 'exact', head: true });
+      setCount(c ?? 0);
+      const { data: lr } = await supabase
+        .from('chapter_common_mappings')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      setLastRun(lr?.[0]?.created_at ?? null);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Failed to run AI match');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5" />
+          Match Common Chapters (Bac classes)
+        </CardTitle>
+        <CardDescription>
+          Use AI to detect equivalent chapters across Bac classes (e.g. "LE DIPOLE RC" ≡ "Dipole RC"). Results appear under each Bac subject's chapter list.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+          <div>
+            Stored mappings: <span className="font-semibold text-foreground">{count ?? '—'}</span>
+          </div>
+          <div>
+            Last run:{' '}
+            <span className="font-semibold text-foreground">
+              {lastRun ? new Date(lastRun).toLocaleString() : 'Never'}
+            </span>
+          </div>
+          {result && (
+            <div>
+              Last result:{' '}
+              <span className="font-semibold text-foreground">
+                {result.pairs} pairs / {result.groups} groups
+              </span>
+            </div>
+          )}
+        </div>
+        <Button onClick={runMatch} disabled={running} className="gap-2">
+          {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+          {running ? 'Matching…' : 'Run AI Match'}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
