@@ -82,6 +82,27 @@ export type Database = {
         }
         Relationships: []
       }
+      chapter_common_mappings: {
+        Row: {
+          chapter_id: number
+          common_chapter_id: number
+          created_at: string
+          id: number
+        }
+        Insert: {
+          chapter_id: number
+          common_chapter_id: number
+          created_at?: string
+          id?: number
+        }
+        Update: {
+          chapter_id?: number
+          common_chapter_id?: number
+          created_at?: string
+          id?: number
+        }
+        Relationships: []
+      }
       chapters: {
         Row: {
           class_id: number | null
