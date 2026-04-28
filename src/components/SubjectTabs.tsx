@@ -60,17 +60,33 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
       
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('subjects')
-          .select('id, name, logo')
-          .or(`class_id.eq.${classId},common.cs.{${classId}}`)
-          .eq('deleted', false)
-          .order('name');
+        const [primaryRes, commonRes] = await Promise.all([
+          supabase
+            .from('subjects')
+            .select('id, name, logo')
+            .eq('class_id', classId)
+            .eq('deleted', false)
+            .order('name'),
+          supabase
+            .from('subjects')
+            .select('id, name, logo, class_id')
+            .neq('class_id', classId)
+            .contains('common', [classId])
+            .eq('deleted', false)
+            .order('name'),
+        ]);
 
-        if (error) throw error;
-        
-        setSubjects(data || []);
-        if (data && data.length > 0) {
+        if (primaryRes.error) throw primaryRes.error;
+        if (commonRes.error) throw commonRes.error;
+
+        const primary = primaryRes.data || [];
+        const common = (commonRes.data || []).filter(
+          (c) => !primary.find((p) => p.id === c.id)
+        );
+        const data = [...primary, ...common];
+
+        setSubjects(data);
+        if (data.length > 0) {
           setActiveSubject(data[0].id);
           onSubjectChange?.(data[0].id);
         }
@@ -111,17 +127,33 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
       if (!classId) return;
       
       try {
-        const { data, error } = await supabase
-          .from('subjects')
-          .select('id, name, logo')
-          .or(`class_id.eq.${classId},common.cs.{${classId}}`)
-          .eq('deleted', false)
-          .order('name');
+        const [primaryRes, commonRes] = await Promise.all([
+          supabase
+            .from('subjects')
+            .select('id, name, logo')
+            .eq('class_id', classId)
+            .eq('deleted', false)
+            .order('name'),
+          supabase
+            .from('subjects')
+            .select('id, name, logo, class_id')
+            .neq('class_id', classId)
+            .contains('common', [classId])
+            .eq('deleted', false)
+            .order('name'),
+        ]);
 
-        if (error) throw error;
-        
-        setSubjects(data || []);
-        if (data && data.length > 0 && !data.find(s => s.id === activeSubject)) {
+        if (primaryRes.error) throw primaryRes.error;
+        if (commonRes.error) throw commonRes.error;
+
+        const primary = primaryRes.data || [];
+        const common = (commonRes.data || []).filter(
+          (c) => !primary.find((p) => p.id === c.id)
+        );
+        const data = [...primary, ...common];
+
+        setSubjects(data);
+        if (data.length > 0 && !data.find(s => s.id === activeSubject)) {
           setActiveSubject(data[0].id);
           onSubjectChange?.(data[0].id);
         }
