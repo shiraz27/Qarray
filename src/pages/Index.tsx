@@ -193,7 +193,7 @@ const Index: React.FC = () => {
             classId={userProfile?.class_id} 
             onSubjectChange={setSelectedSubject}
           />
-          <MainContent subjectId={selectedSubject} />
+          <MainContent subjectId={selectedSubject} viewingClassId={userProfile?.class_id ?? null} />
         </div>
         
         <BottomNavigation onTabChange={handleTabChange} activeTab="subjects" />
