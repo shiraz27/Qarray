@@ -148,49 +148,25 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
           BAC_CLASS_IDS.has(currentClassId) &&
           nativeIds.length > 0
         ) {
-          const { data: mappings } = await supabase
+          const { data: rawMappings } = await supabase
             .from('chapter_common_mappings')
-            .select(
-              'common_chapter_id, chapters!chapter_common_mappings_common_chapter_id_fkey(id, name, class_id, deleted, classes(name))'
-            )
+            .select('common_chapter_id')
             .in('chapter_id', nativeIds);
-
-          // Fallback: the FK alias may not exist; do a manual join.
+          const targetIds = Array.from(
+            new Set((rawMappings || []).map((r: any) => r.common_chapter_id))
+          );
           let commons: CommonChapter[] = [];
-          if (mappings && mappings.length > 0 && (mappings[0] as any).chapters) {
-            const seen = new Set<number>();
-            for (const m of mappings as any[]) {
-              const ch = m.chapters;
-              if (!ch || ch.deleted) continue;
-              if (seen.has(ch.id)) continue;
-              seen.add(ch.id);
-              commons.push({
-                id: ch.id,
-                name: ch.name,
-                className: ch.classes?.name ?? '',
-              });
-            }
-          } else {
-            // Manual join fallback
-            const { data: rawMappings } = await supabase
-              .from('chapter_common_mappings')
-              .select('common_chapter_id')
-              .in('chapter_id', nativeIds);
-            const targetIds = Array.from(
-              new Set((rawMappings || []).map((r: any) => r.common_chapter_id))
-            );
-            if (targetIds.length > 0) {
-              const { data: chRows } = await supabase
-                .from('chapters')
-                .select('id, name, class_id, deleted, classes(name)')
-                .in('id', targetIds)
-                .eq('deleted', false);
-              commons = (chRows || []).map((ch: any) => ({
-                id: ch.id,
-                name: ch.name,
-                className: ch.classes?.name ?? '',
-              }));
-            }
+          if (targetIds.length > 0) {
+            const { data: chRows } = await supabase
+              .from('chapters')
+              .select('id, name, class_id, deleted, classes(name)')
+              .in('id', targetIds)
+              .eq('deleted', false);
+            commons = (chRows || []).map((ch: any) => ({
+              id: ch.id,
+              name: ch.name,
+              className: ch.classes?.name ?? '',
+            }));
           }
           setCommonChapters(commons);
         } else {
