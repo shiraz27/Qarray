@@ -39,9 +39,10 @@ const BAC_CLASS_IDS = new Set([15, 16, 17, 18, 19, 20, 21]);
 
 interface MainContentProps {
   subjectId: number | null;
+  viewingClassId?: number | null;
 }
 
-export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
+export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClassId = null }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -72,9 +73,9 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
           .eq('id', subjectId)
           .maybeSingle();
 
-        if (subjectData) {
-          setClassId(subjectData.class_id);
-        }
+        // For common subjects (class_id is null), fall back to the viewing class
+        const effectiveClassId = subjectData?.class_id ?? viewingClassId;
+        setClassId(effectiveClassId);
 
         // Fetch chapters
         const { data: chaptersData, error: chaptersError } = await supabase
