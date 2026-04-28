@@ -70,7 +70,6 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
           supabase
             .from('subjects')
             .select('id, name, logo, class_id')
-            .neq('class_id', classId)
             .contains('common', [classId])
             .eq('deleted', false)
             .order('name'),
@@ -137,7 +136,6 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
           supabase
             .from('subjects')
             .select('id, name, logo, class_id')
-            .neq('class_id', classId)
             .contains('common', [classId])
             .eq('deleted', false)
             .order('name'),
