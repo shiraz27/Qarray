@@ -448,7 +448,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
 
       {commonChapters.length > 0 && (
         <div className="mt-6 px-4">
-          <Accordion type="single" collapsible>
+          <Accordion type="single" collapsible defaultValue="common">
             <AccordionItem value="common" className="border rounded-lg bg-card">
               <AccordionTrigger className="px-4 hover:no-underline">
                 <span className="flex items-center gap-2 text-sm font-semibold">
