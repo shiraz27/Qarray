@@ -43,7 +43,7 @@ export const useDataPreload = () => {
             const { data: subjects } = await supabase
               .from('subjects')
               .select('*')
-              .eq('class_id', profile.class_id)
+              .or(`class_id.eq.${profile.class_id},common.cs.{${profile.class_id}}`)
               .eq('deleted', false)
               .order('name');
             cache.subjects = subjects || [];
