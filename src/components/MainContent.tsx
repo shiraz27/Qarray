@@ -470,6 +470,57 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
         })}
       </div>
 
+      {commonChapters.length > 0 && (
+        <div className="mt-6 px-4">
+          <Accordion type="single" collapsible>
+            <AccordionItem value="common" className="border rounded-lg bg-card">
+              <AccordionTrigger className="px-4 hover:no-underline">
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  Common Chapters from other Bac classes
+                  <Badge variant="secondary">{commonChapters.length}</Badge>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="space-y-3">
+                  {commonChapters.map((ch) => (
+                    <Card
+                      key={ch.id}
+                      className="relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer border-none"
+                      style={{
+                        background:
+                          'linear-gradient(to right, #FFFFFF 0%, #E8F0FE 100%)',
+                      }}
+                      onClick={() => navigate(`/chapter/${ch.id}`)}
+                    >
+                      <div
+                        className="absolute inset-0 opacity-30"
+                        style={{
+                          backgroundImage: `url(${chapterPattern})`,
+                          backgroundSize: 'auto',
+                          backgroundRepeat: 'repeat',
+                          imageRendering: 'crisp-edges',
+                        }}
+                      />
+                      <div className="relative z-10 flex items-center justify-between gap-3">
+                        <h3 className="font-semibold text-sm tracking-wide text-gray-900 flex-1">
+                          {ch.name.toUpperCase()}
+                        </h3>
+                        <Badge
+                          variant="outline"
+                          className="bg-white/70 text-gray-700 border-gray-300 whitespace-nowrap"
+                        >
+                          From {ch.className}
+                        </Badge>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+      )}
+
       {subjectId && classId && (
         <ManageChapterDialog
           open={manageDialogOpen}
