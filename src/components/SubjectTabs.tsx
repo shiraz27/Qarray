@@ -63,7 +63,7 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
         const { data, error } = await supabase
           .from('subjects')
           .select('id, name, logo')
-          .eq('class_id', classId)
+          .or(`class_id.eq.${classId},common.cs.{${classId}}`)
           .eq('deleted', false)
           .order('name');
 
@@ -114,7 +114,7 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
         const { data, error } = await supabase
           .from('subjects')
           .select('id, name, logo')
-          .eq('class_id', classId)
+          .or(`class_id.eq.${classId},common.cs.{${classId}}`)
           .eq('deleted', false)
           .order('name');
 
