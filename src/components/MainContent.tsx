@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { MessageSquare, FileText, Bookmark, Plus, Edit } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -22,6 +29,14 @@ interface Chapter {
   isBookmarked: boolean;
 }
 
+interface CommonChapter {
+  id: number;
+  name: string;
+  className: string;
+}
+
+const BAC_CLASS_IDS = new Set([15, 16, 17, 18, 19, 20, 21]);
+
 interface MainContentProps {
   subjectId: number | null;
 }
@@ -30,6 +45,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [commonChapters, setCommonChapters] = useState<CommonChapter[]>([]);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
@@ -123,6 +139,39 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
         );
 
         setChapters(chaptersWithCounts);
+
+        // Fetch common chapters from other Bac classes
+        const currentClassId = subjectData?.class_id;
+        const nativeIds = (chaptersData || []).map((c) => c.id);
+        if (
+          currentClassId &&
+          BAC_CLASS_IDS.has(currentClassId) &&
+          nativeIds.length > 0
+        ) {
+          const { data: rawMappings } = await supabase
+            .from('chapter_common_mappings')
+            .select('common_chapter_id')
+            .in('chapter_id', nativeIds);
+          const targetIds = Array.from(
+            new Set((rawMappings || []).map((r: any) => r.common_chapter_id))
+          );
+          let commons: CommonChapter[] = [];
+          if (targetIds.length > 0) {
+            const { data: chRows } = await supabase
+              .from('chapters')
+              .select('id, name, class_id, deleted, classes(name)')
+              .in('id', targetIds)
+              .eq('deleted', false);
+            commons = (chRows || []).map((ch: any) => ({
+              id: ch.id,
+              name: ch.name,
+              className: ch.classes?.name ?? '',
+            }));
+          }
+          setCommonChapters(commons);
+        } else {
+          setCommonChapters([]);
+        }
       } catch (error) {
         console.error('Error fetching chapters:', error);
       } finally {
@@ -396,6 +445,57 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId }) => {
           );
         })}
       </div>
+
+      {commonChapters.length > 0 && (
+        <div className="mt-6 px-4">
+          <Accordion type="single" collapsible>
+            <AccordionItem value="common" className="border rounded-lg bg-card">
+              <AccordionTrigger className="px-4 hover:no-underline">
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  Common Chapters from other Bac classes
+                  <Badge variant="secondary">{commonChapters.length}</Badge>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="space-y-3">
+                  {commonChapters.map((ch) => (
+                    <Card
+                      key={ch.id}
+                      className="relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer border-none"
+                      style={{
+                        background:
+                          'linear-gradient(to right, #FFFFFF 0%, #E8F0FE 100%)',
+                      }}
+                      onClick={() => navigate(`/chapter/${ch.id}`)}
+                    >
+                      <div
+                        className="absolute inset-0 opacity-30"
+                        style={{
+                          backgroundImage: `url(${chapterPattern})`,
+                          backgroundSize: 'auto',
+                          backgroundRepeat: 'repeat',
+                          imageRendering: 'crisp-edges',
+                        }}
+                      />
+                      <div className="relative z-10 flex items-center justify-between gap-3">
+                        <h3 className="font-semibold text-sm tracking-wide text-gray-900 flex-1">
+                          {ch.name.toUpperCase()}
+                        </h3>
+                        <Badge
+                          variant="outline"
+                          className="bg-white/70 text-gray-700 border-gray-300 whitespace-nowrap"
+                        >
+                          From {ch.className}
+                        </Badge>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+      )}
 
       {subjectId && classId && (
         <ManageChapterDialog
