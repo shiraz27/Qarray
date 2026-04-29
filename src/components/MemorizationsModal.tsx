@@ -143,8 +143,8 @@ export const MemorizationsModal = ({ open, onClose, subjectId, chapterId }: Memo
     }
   };
 
-  const filteredMemorizations = memorizations.filter(m =>
-    m.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredMemorizations = memorizations.filter((m) =>
+    normalizedIncludes(m.title, searchQuery),
   );
 
   return (

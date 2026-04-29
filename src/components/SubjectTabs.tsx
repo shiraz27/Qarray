@@ -6,6 +6,7 @@ import { MemorizeButton } from '@/components/MemorizeButton';
 import { ManageSubjectDialog } from '@/components/ManageSubjectDialog';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
+import { normalizeText } from '@/utils/textHelpers';
 
 interface Subject {
   id: number;
@@ -30,12 +31,12 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 const getIconForSubject = (logo: string | null, subjectName: string): LucideIcon => {
-  if (logo && iconMap[logo.toLowerCase()]) {
-    return iconMap[logo.toLowerCase()];
+  if (logo && iconMap[normalizeText(logo)]) {
+    return iconMap[normalizeText(logo)];
   }
   
   // Fallback based on subject name
-  const nameLower = subjectName.toLowerCase();
+  const nameLower = normalizeText(subjectName);
   if (nameLower.includes('math')) return Calculator;
   if (nameLower.includes('phys') || nameLower.includes('chim')) return Atom;
   if (nameLower.includes('program') || nameLower.includes('info')) return Code;

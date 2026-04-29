@@ -753,7 +753,7 @@ export default function Statistics() {
 
   const filteredResources = resources.filter(r => {
     const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
-    const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = normalizedIncludes(r.title, searchQuery);
     return matchesFilter && matchesSearch;
   });
 
@@ -765,7 +765,7 @@ export default function Statistics() {
 
   const filteredQuestions = questions.filter(q => {
     const matchesFilter = questionOcrFilter === 'all' || q.ocr_status === questionOcrFilter;
-    const matchesSearch = q.data.toLowerCase().includes(questionSearchQuery.toLowerCase());
+    const matchesSearch = normalizedIncludes(q.data, questionSearchQuery);
     return matchesFilter && matchesSearch;
   });
 
