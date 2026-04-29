@@ -253,6 +253,8 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
           }
         }}>
           <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] p-0 bg-background border-none flex flex-col">
+            <DialogTitle className="sr-only">PDF Preview</DialogTitle>
+            <DialogDescription className="sr-only">Preview the PDF document through the app proxy.</DialogDescription>
             <div className="flex items-center justify-between p-3 border-b">
               <p className="text-sm font-medium truncate">PDF Preview</p>
               <div className="flex items-center gap-2">
@@ -271,13 +273,21 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
                 </Button>
               </div>
             </div>
-            {pdfBlocked && !pdfBlobUrl ? (
+            {!pdfBlobUrl && pdfProxying ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 bg-muted/30">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-sm font-medium">Loading secure preview...</p>
+                <p className="text-xs text-muted-foreground text-center max-w-md">
+                  The document is being loaded through the app so browser extensions cannot block it.
+                </p>
+              </div>
+            ) : pdfBlocked && !pdfBlobUrl ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 bg-muted/30">
                 <ShieldAlert className="h-12 w-12 text-amber-500" />
                 <div className="text-center max-w-md space-y-2">
-                  <p className="font-medium">Preview blocked by your browser</p>
+                  <p className="font-medium">Preview couldn't load</p>
                   <p className="text-sm text-muted-foreground">
-                    An ad blocker or privacy extension (uBlock, Brave Shields, AdBlock, etc.) is blocking <code className="text-xs">archive.org</code>. You can load the document through our proxy instead.
+                    Your browser may be blocking direct Archive.org access, or the file may still be processing. Retry the secure preview below.
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -287,7 +297,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
                     className="gap-2"
                   >
                     {pdfProxying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                    {pdfProxying ? 'Loading...' : 'Load via proxy'}
+                    {pdfProxying ? 'Loading...' : 'Retry secure preview'}
                   </Button>
                   <Button
                     variant="outline"
@@ -302,8 +312,8 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
               </div>
             ) : (
               <iframe
-                key={pdfBlobUrl || encodedUrl}
-                src={pdfBlobUrl || encodedUrl}
+                key={pdfBlobUrl || 'secure-preview'}
+                src={pdfBlobUrl || 'about:blank'}
                 title="PDF preview"
                 className="flex-1 w-full"
                 onLoad={() => setPdfBlocked(false)}
