@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
 import { Check, ChevronsUpDown, Plus, Building2, Bot, Loader2, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { normalizeText } from '@/utils/textHelpers';
 
 interface Institute {
   id: string;
@@ -59,11 +60,10 @@ export const SchoolAutocomplete: React.FC<SchoolAutocompleteProps> = ({
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('institutes')
-          .select('id, name, verified')
-          .ilike('name', `%${searchValue}%`)
-          .limit(10);
+        const { data, error } = await supabase.rpc(
+          'search_institutes_normalized',
+          { search_query: searchValue },
+        );
 
         if (error) {
           console.error('Error searching institutes:', error);
@@ -89,20 +89,40 @@ export const SchoolAutocomplete: React.FC<SchoolAutocompleteProps> = ({
   useEffect(() => {
     if (aiSuggested && !selectedInstituteId) {
       const matchInstitutes = async () => {
-        const { data } = await supabase
-          .from('institutes')
-          .select('id, name, verified')
-          .ilike('name', `%${aiSuggested}%`)
-          .limit(5);
+        const { data } = await supabase.rpc(
+          'search_institutes_normalized',
+          { search_query: aiSuggested },
+        );
 
         if (data && data.length > 0) {
-          // Find exact or close match
+          // Normalized exact match (accents/articles/case insensitive)
+          const target = normalizeText(aiSuggested);
           const exactMatch = data.find(
-            inst => inst.name.toLowerCase() === aiSuggested.toLowerCase()
+            (inst: any) => normalizeText(inst.name) === target,
           );
           if (exactMatch) {
             setSelectedInstituteId(exactMatch.id);
             onChange(exactMatch.name, exactMatch.id);
+            return;
+          }
+
+          // Ask AI to confirm semantic equivalence
+          try {
+            const candidates = data.slice(0, 10).map((d: any) => d.name);
+            const { data: smart } = await supabase.functions.invoke(
+              'smart-match',
+              { body: { query: aiSuggested, candidates, context: 'school' } },
+            );
+            const first = smart?.matches?.[0];
+            if (first) {
+              const matched = data[first.index];
+              if (matched) {
+                setSelectedInstituteId(matched.id);
+                onChange(matched.name, matched.id);
+              }
+            }
+          } catch (err) {
+            console.warn('smart-match unavailable:', err);
           }
         }
       };
