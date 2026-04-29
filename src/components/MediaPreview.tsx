@@ -117,16 +117,11 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
     };
   }, [pdfBlobUrl, imageBlobUrl]);
 
-  // Detect blocked iframe (ad blocker / ERR_BLOCKED_BY_CLIENT) when preview opens
+  // Load PDFs through the app proxy by default; direct Archive.org embeds are often blocked by privacy extensions
   useEffect(() => {
-    if (!pdfPreviewOpen || pdfBlobUrl) return;
-    setPdfBlocked(false);
-    const timer = setTimeout(() => {
-      // If iframe didn't signal load within 4s, likely blocked
-      setPdfBlocked(true);
-    }, 4000);
-    return () => clearTimeout(timer);
-  }, [pdfPreviewOpen, pdfBlobUrl]);
+    if (!pdfPreviewOpen || !isPdf || pdfBlobUrl || pdfProxying) return;
+    loadProxyBlob('pdf');
+  }, [pdfPreviewOpen, isPdf, pdfBlobUrl, pdfProxying]);
 
   const loadProxyBlob = async (target: 'pdf' | 'image') => {
     const setter = target === 'pdf' ? setPdfBlobUrl : setImageBlobUrl;
@@ -134,12 +129,12 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
     proxying(true);
     try {
       const res = await fetch(
-        `https://xwqmdhnuthprzfbyoxlb.supabase.co/functions/v1/fetch-media`,
+        fetchMediaUrl,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3cW1kaG51dGhwcnpmYnlveGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4ODcxNzIsImV4cCI6MjA3NTQ2MzE3Mn0.qVP6vOLYLZcgGGIWNK5ZmydzoI4CbTZa6EPl1Q8ruKY',
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
           body: JSON.stringify({ url: encodedUrl }),
         }
@@ -151,8 +146,14 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
       setter(blobUrl);
+      if (target === 'pdf') setPdfBlocked(false);
+      if (target === 'image') {
+        setImageError(false);
+        setImageLoading(true);
+      }
     } catch (e) {
       console.error('Proxy fetch failed:', e);
+      if (target === 'pdf') setPdfBlocked(true);
     } finally {
       proxying(false);
     }
