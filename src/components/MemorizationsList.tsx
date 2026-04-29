@@ -102,8 +102,8 @@ export const MemorizationsList = ({ subjectId }: MemorizationsListProps) => {
               .eq('memorization_id', mem.id)
               .eq('deleted', false);
 
-            const { data: profile } = await supabase
-              .from('profiles')
+            const { data: profile } = await (supabase as any)
+              .from('public_profiles')
               .select('full_name')
               .eq('user_id', mem.creator_id)
               .maybeSingle();
