@@ -34,6 +34,9 @@ interface CommonChapter {
   name: string;
   className: string;
   matchedNativeId: number | null;
+  questionCount: number;
+  answerCount: number;
+  resourceCount: number;
 }
 
 const BAC_CLASS_IDS = new Set([15, 16, 17, 18, 19, 20, 21]);
@@ -173,12 +176,40 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
             // native id ordering map (curriculum order)
             const nativeOrder = new Map<number, number>();
             (chaptersData || []).forEach((c, idx) => nativeOrder.set(c.id, idx));
-            commons = (chRows || []).map((ch: any) => ({
-              id: ch.id,
-              name: ch.name,
-              className: ch.classes?.name ?? '',
-              matchedNativeId: commonToNative.get(ch.id) ?? null,
-            }));
+            commons = await Promise.all(
+              (chRows || []).map(async (ch: any) => {
+                const { count: questionCount } = await supabase
+                  .from('questions')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('chapter_id', ch.id)
+                  .eq('deleted', false);
+                const qIds = await supabase
+                  .from('questions')
+                  .select('id')
+                  .eq('chapter_id', ch.id)
+                  .eq('deleted', false)
+                  .then((res) => res.data?.map((q) => q.id) || []);
+                const { count: answerCount } = await supabase
+                  .from('answers')
+                  .select('*', { count: 'exact', head: true })
+                  .in('question_id', qIds)
+                  .eq('deleted', false);
+                const { count: resourceCount } = await supabase
+                  .from('resources')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('chapter_id', ch.id)
+                  .eq('deleted', false);
+                return {
+                  id: ch.id,
+                  name: ch.name,
+                  className: ch.classes?.name ?? '',
+                  matchedNativeId: commonToNative.get(ch.id) ?? null,
+                  questionCount: questionCount || 0,
+                  answerCount: answerCount || 0,
+                  resourceCount: resourceCount || 0,
+                };
+              })
+            );
             commons.sort((a, b) => {
               const aOrder = a.matchedNativeId !== null
                 ? nativeOrder.get(a.matchedNativeId) ?? Number.MAX_SAFE_INTEGER
