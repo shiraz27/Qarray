@@ -10,7 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { MessageSquare, FileText, Bookmark, Plus, Edit } from 'lucide-react';
+import { MessageSquare, FileText, Bookmark, Plus, Edit, Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
@@ -57,6 +57,9 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
   const [editingChapterId, setEditingChapterId] = useState<number | null>(null);
   const [classId, setClassId] = useState<number | null>(null);
   const { isModerator, isAdmin } = useUserRole();
+  const [filterResources, setFilterResources] = useState(false);
+  const [filterQuestions, setFilterQuestions] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -510,8 +513,82 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
                 </span>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
+                {/* Filters and Search */}
+                <div className="space-y-3 mb-4">
+                  {/* Search Input */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                      type="text"
+                      placeholder="Search chapters..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-10 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Filter Toggles */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setFilterResources(!filterResources)}
+                      className={`flex-1 px-3 py-2 text-xs font-medium rounded-full border-2 transition-all ${
+                        filterResources
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background text-foreground border-border hover:border-primary'
+                      }`}
+                    >
+                      <FileText size={14} className="inline mr-1" />
+                      Has Resources
+                    </button>
+                    <button
+                      onClick={() => setFilterQuestions(!filterQuestions)}
+                      className={`flex-1 px-3 py-2 text-xs font-medium rounded-full border-2 transition-all ${
+                        filterQuestions
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background text-foreground border-border hover:border-primary'
+                      }`}
+                    >
+                      <MessageSquare size={14} className="inline mr-1" />
+                      Has Questions
+                    </button>
+                  </div>
+                </div>
+
                 <div className="space-y-3">
-                  {commonChapters.map((ch, idx) => {
+                  {commonChapters
+                    .filter((ch) => {
+                      // Apply search filter (fuzzy search by name)
+                      if (searchQuery) {
+                        const query = searchQuery.toLowerCase();
+                        const name = ch.name.toLowerCase();
+                        // Simple fuzzy match: check if all characters in query exist in name in order
+                        let queryIndex = 0;
+                        for (const char of name) {
+                          if (char === query[queryIndex]) {
+                            queryIndex++;
+                            if (queryIndex === query.length) break;
+                          }
+                        }
+                        if (queryIndex < query.length) return false;
+                      }
+
+                      // Apply resource filter
+                      if (filterResources && ch.resourceCount === 0) return false;
+
+                      // Apply questions filter
+                      if (filterQuestions && ch.questionCount === 0) return false;
+
+                      return true;
+                    })
+                    .map((ch, idx) => {
                     const prev = idx > 0 ? commonChapters[idx - 1] : null;
                     const isNewCluster =
                       !prev || prev.matchedNativeId !== ch.matchedNativeId;
