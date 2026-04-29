@@ -710,6 +710,11 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
                               {t('withCorrection')}
                             </Badge>
                           )}
+                          {result.smartMatch && (
+                            <Badge className="text-[10px] sm:text-xs px-1.5 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-200">
+                              ✨ Smart match
+                            </Badge>
+                          )}
                         </div>
                         <p className="font-medium text-sm sm:text-base truncate">
                           {highlightKeyword(result.title, query)}
