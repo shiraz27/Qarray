@@ -90,8 +90,8 @@ export default function MemorizationDetail() {
       setMemorization(data);
 
       // Fetch creator name
-      const { data: profile } = await supabase
-        .from('profiles')
+      const { data: profile } = await (supabase as any)
+        .from('public_profiles')
         .select('full_name')
         .eq('user_id', data.creator_id)
         .maybeSingle();
