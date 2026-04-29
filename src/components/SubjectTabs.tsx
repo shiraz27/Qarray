@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, Atom, Code, BookOpen, Globe, Beaker, TestTube, FlaskConical, Plus, Edit } from 'lucide-react';
+import { Calculator, Atom, Code, BookOpen, Globe, Beaker, TestTube, FlaskConical, Plus, Edit, Database } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { MemorizeButton } from '@/components/MemorizeButton';
@@ -28,6 +28,7 @@ const iconMap: Record<string, LucideIcon> = {
   'beaker': Beaker,
   'test-tube': TestTube,
   'flask-conical': FlaskConical,
+  'database': Database
 };
 
 const getIconForSubject = (logo: string | null, subjectName: string): LucideIcon => {
