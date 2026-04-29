@@ -1,55 +1,43 @@
-## Audit results
+## Problem
 
-I checked every PDF URL stored across all 13 active resources. **All 13 currently return HTTP 200** from Archive.org — including id=35, id=36, and id=24 (which has spaces and parens in its filename). No URL is permanently broken.
+`ERR_BLOCKED_BY_CLIENT` on `ia600505.us.archive.org` is caused by **ad blockers / privacy extensions** (uBlock, Brave Shields, AdBlock, etc.) blocking requests to Archive.org's CDN subdomains. Archive.org files are not actually broken — the URL works in incognito or with extensions disabled.
 
-That confirms the problem is not corrupted data in the DB. It is how the frontend renders PDFs:
+This isn't a server/code bug, but we can make the app gracefully handle it instead of showing Chrome's blank "blocked" page inside the iframe.
 
-1. **Google Docs viewer fails silently during Archive.org's propagation window.** Right after upload, Archive.org lists the file but its CDN nodes return 404 for several minutes. `https://docs.google.com/viewer?url=...` caches that 404 and shows a blank/broken viewer with no retry. This is why id=35 and id=36 looked broken to you — they were both uploaded today.
-2. **Google Docs viewer is also unreliable for filenames with spaces or special characters** (id=24: `4sc_t1-pages-2-combined (2).pdf`). The viewer URL is built without encoding the embedded URL's special characters.
-3. **The sanitizer issue from the previous plan is still real for future uploads** — it produces ugly paths like `bac-math-matiques/maths/d-rivabilit-` and risks collisions across different chapters. Still worth fixing for new uploads.
+## Proposed changes
 
-## Generalized fix
+### 1. `MediaPreview.tsx` — Detect blocked iframe and offer proxy fallback
 
-### A. PDF preview rewrite in `src/components/MediaPreview.tsx`
+- After opening the PDF preview iframe, attach an `onLoad`/timeout check. If the iframe fails to load within ~4 seconds (typical signature of `ERR_BLOCKED_BY_CLIENT`), show an inline notice:
+  > "Your browser or an extension (ad blocker / privacy shield) is blocking archive.org. Try disabling it for this site, or use the proxy preview below."
+- Add a **"Use proxy preview"** button that fetches the PDF through our existing `fetch-media` edge function, converts the response to a blob URL, and renders that in the iframe. Since the blob is served from our own origin, ad blockers won't touch it.
+- Apply the same fallback to the **Open** action: if the user clicks Open and returns reporting it's blocked, the inline notice (already visible) tells them why.
 
-Replace the "click to open Google Docs viewer" card with a self-contained, reliable PDF flow:
+### 2. Add a small banner on the resource detail page
 
-1. **Probe the URL through the existing `fetch-media` edge function** (which already retries with exponential backoff for Archive.org 404s). Show a "Document is being processed…" loading state with a friendly message during retries, mirroring the image branch.
-2. **On success**, render a card with two clear actions:
-   - **Open** — opens the raw Archive.org URL in a new tab (browsers have a built-in PDF viewer; this avoids Google Docs entirely and works for all filename shapes including spaces/parens).
-   - **Preview** — opens an in-app modal containing an `<iframe>` pointing directly at the encoded PDF URL. Native browser PDF rendering, no third-party dependency.
-3. **On permanent failure** (after retries exhausted), show the existing "processing/retry" card so users can manually retry.
-4. **Always `encodeURI()` the stored URL** before using it as an `href` or `src`, so spaces/parens in filenames like id=24 don't break the request.
+When any media on the page is detected as blocked, show a one-time dismissible banner explaining the ad blocker issue with a link to whitelist instructions. This avoids users thinking the app is broken.
 
-This eliminates Google Docs viewer as a single point of failure and removes the entire propagation-window blank-screen class of bugs.
+### 3. Image previews — same fallback
 
-### B. Sanitizer fix in `supabase/functions/upload-to-archive/index.ts`
+Apply the same blob-proxy fallback to images on `onError` (currently they just show "Image processing..." which is misleading when the real cause is an ad blocker).
 
-Same change proposed previously — normalize Unicode before stripping non-ASCII so accented characters become readable ASCII rather than dashes:
+## Technical details
 
-```ts
-const sanitize = (str: string) =>
-  str
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]/gi, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .toLowerCase();
-```
+- Blob URL pattern:
+  ```ts
+  const { data } = await supabase.functions.invoke('fetch-media', { body: { url } });
+  const blobUrl = URL.createObjectURL(data as Blob);
+  // use blobUrl in <iframe src> or <img src>
+  // remember to URL.revokeObjectURL on unmount
+  ```
+- Detection heuristic for blocked iframe: start a 4s timer on mount; if `onLoad` fires, clear it; if it fires, switch to "blocked" UI state.
+- The `fetch-media` function already exists and handles Archive.org retries — no edge function changes needed.
 
-New uploads will land at clean paths (`bac-mathematiques/maths/derivabilite/...`). Existing URLs in the DB are not touched; the files they point to still exist at the old paths and will keep working.
+## Files to modify
 
-### C. No data migration
+- `src/components/MediaPreview.tsx` — add blocked-detection + blob proxy fallback for PDF iframe and images
+- `src/pages/ResourceDetail.tsx` — optional dismissible banner explaining ad blocker behavior
 
-All current URLs are reachable — no need to rewrite stored data.
+## What this does NOT fix
 
-## Files to change
-
-- `src/components/MediaPreview.tsx` — new PDF preview flow with `fetch-media` probe, in-app iframe modal, proper URL encoding
-- `supabase/functions/upload-to-archive/index.ts` — Unicode-aware sanitizer
-
-## Out of scope
-
-- Migrating existing resource URLs to the new clean format (unnecessary; old paths still resolve).
-- Changes to the image or audio branches (already handle propagation correctly).
+If the user clicks **Open** (new tab) → archive.org directly, the ad blocker will still block it. Only the in-app preview (proxied through our domain) is guaranteed to work. We'll make this clear in the UI copy.
