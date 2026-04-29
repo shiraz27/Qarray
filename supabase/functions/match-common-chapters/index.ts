@@ -8,6 +8,18 @@ const corsHeaders = {
 
 const BAC_CLASS_IDS = [15, 16, 17, 18, 19, 20, 21];
 
+const normalize = (s: string): string =>
+  (s ?? "")
+    .toString()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/^(l['’]|d['’]|le |la |les |un |une |des |de |du )/i, "")
+    .replace(/['’`]/g, " ")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 interface SubjectRow {
   id: number;
   name: string;
@@ -36,7 +48,7 @@ async function callAI(messages: any[], tool: any) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages,
         tools: [tool],
         tool_choice: { type: "function", function: { name: tool.function.name } },
@@ -118,14 +130,19 @@ Deno.serve(async (req) => {
         {
           role: "system",
           content:
-            "You group academic subjects across different Tunisian Bac (high-school) classes when they cover the same field. Treat case, accents, plurals and minor naming variants as equivalent (e.g. Maths = Mathématiques = Mathématique; Physique = Physiques; SVT = Science de la vie et de la terre). Group only subjects that genuinely teach the same field.",
+            "You group academic subjects across different Tunisian Bac (high-school) classes when they cover the SAME field. Be generous about surface differences — case, French accents (é è ê à â ô ç…), leading articles (l', le, la, les), plurals, abbreviations and language variants are ALL irrelevant. Examples of equivalents: Maths ≡ Mathématiques ≡ Mathématique ≡ Math; Physique ≡ Physiques ≡ Sciences Physiques ≡ Phys; SVT ≡ Sciences de la Vie et de la Terre ≡ Bio; Info ≡ Informatique ≡ TIC; EPS ≡ Éducation physique. Each candidate is given with both its raw name and a normalized form — use the normalized form to match. Group only subjects that genuinely teach the same field across DIFFERENT classes.",
         },
         {
           role: "user",
           content:
             "Cluster these Bac subjects. Each cluster MUST contain subjects from at least 2 different classes. Skip subjects with no equivalent in another class.\n\n" +
             JSON.stringify(
-              subjects.map((s) => ({ id: s.id, name: s.name, class: s.class_name })),
+              subjects.map((s) => ({
+                id: s.id,
+                name: s.name,
+                normalized: normalize(s.name),
+                class: s.class_name,
+              })),
             ),
         },
       ],
@@ -195,6 +212,7 @@ Deno.serve(async (req) => {
       const payload = groupChapters.map((c) => ({
         id: c.id,
         name: c.name,
+        normalized: normalize(c.name),
         class: c.class_name,
       }));
 
@@ -203,12 +221,12 @@ Deno.serve(async (req) => {
           {
             role: "system",
             content:
-              "You match equivalent chapters across Tunisian Bac classes for the same subject. Two chapters are equivalent when they cover the same core topic, even if names differ in wording, language, capitalization, accents, abbreviations, or include extra context (e.g. 'LE DIPOLE RC' = 'Dipole RC' = 'Le condensateur dipole RC'). Do NOT match chapters from the same class. Only return high-confidence matches.",
+              "You match equivalent chapters across Tunisian Bac classes for the same subject. Two chapters are equivalent when they cover the SAME core topic, even when names differ on the surface. Treat ALL of the following as equivalent and DO match them: case, French accents (é è ê à â ô ç…), leading articles (l', le, la, les, d'), abbreviations, reorderings, language variants, and broader↔narrower titles for the same lesson. Concrete equivalents: 'LE DIPOLE RC' ≡ 'Dipôle RC' ≡ 'Le condensateur dipôle RC'; 'Pile' ≡ 'Pile Daniell' ≡ 'La pile Daniell'; 'Électrolyse' ≡ 'L\\'électrolyse' ≡ 'Electrolyse'; 'Suites numériques' ≡ 'Les suites'. Counter-examples to NOT match: 'Pile Daniell' vs 'Pile à combustible' (different topics); 'Dérivée' vs 'Intégrale' (different lessons). Each candidate carries both raw and normalized names — use the normalized form for matching. Do NOT match chapters from the same class. Return ONLY high-confidence cross-class equivalents.",
           },
           {
             role: "user",
             content:
-              "Return all equivalent chapter pairs across different classes from this list:\n\n" +
+              "Return ALL equivalent chapter pairs across DIFFERENT classes from this list. Be generous about wording differences but strict about topic identity:\n\n" +
               JSON.stringify(payload),
           },
         ],

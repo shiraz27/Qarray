@@ -892,6 +892,37 @@ export type Database = {
         Returns: boolean
       }
       is_moderator_or_admin: { Args: { _user_id: string }; Returns: boolean }
+      search_answers_normalized: {
+        Args: { p_class_id?: number; search_query: string }
+        Returns: {
+          data: string
+          id: number
+          question_id: number
+          subject_name: string
+        }[]
+      }
+      search_chapters_normalized: {
+        Args: {
+          p_class_id?: number
+          p_subject_id?: number
+          search_query: string
+        }
+        Returns: {
+          class_id: number
+          id: number
+          name: string
+          subject_id: number
+          subject_name: string
+        }[]
+      }
+      search_institutes_normalized: {
+        Args: { p_state_id?: number; search_query: string }
+        Returns: {
+          id: string
+          name: string
+          verified: boolean
+        }[]
+      }
       search_pdf_content: {
         Args: { search_query: string; user_class_id: number }
         Returns: {
@@ -916,6 +947,58 @@ export type Database = {
           subject_id: number
         }[]
       }
+      search_questions_normalized: {
+        Args: {
+          p_chapter_id?: number
+          p_class_id?: number
+          p_subject_id?: number
+          search_query: string
+        }
+        Returns: {
+          chapter_id: number
+          data: string
+          id: number
+          subject_id: number
+          subject_name: string
+        }[]
+      }
+      search_resources_normalized: {
+        Args: {
+          p_chapter_id?: number
+          p_class_id?: number
+          p_subject_id?: number
+          p_type_ids?: number[]
+          p_with_correction?: boolean
+          search_query: string
+        }
+        Returns: {
+          chapter_id: number
+          data: string[]
+          description: string
+          id: number
+          resource_type: string
+          school_name: string
+          subject_id: number
+          subject_name: string
+          teacher_name: string
+          title: string
+          type_id: number
+          with_correction: boolean
+        }[]
+      }
+      search_schools_normalized: {
+        Args: { search_query: string }
+        Returns: {
+          school_name: string
+        }[]
+      }
+      search_teachers_normalized: {
+        Args: { search_query: string }
+        Returns: {
+          teacher_name: string
+        }[]
+      }
+      unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { normalizedIncludes } from '@/utils/textHelpers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -753,7 +754,7 @@ export default function Statistics() {
 
   const filteredResources = resources.filter(r => {
     const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
-    const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = normalizedIncludes(r.title, searchQuery);
     return matchesFilter && matchesSearch;
   });
 
@@ -765,7 +766,7 @@ export default function Statistics() {
 
   const filteredQuestions = questions.filter(q => {
     const matchesFilter = questionOcrFilter === 'all' || q.ocr_status === questionOcrFilter;
-    const matchesSearch = q.data.toLowerCase().includes(questionSearchQuery.toLowerCase());
+    const matchesSearch = normalizedIncludes(q.data, questionSearchQuery);
     return matchesFilter && matchesSearch;
   });
 

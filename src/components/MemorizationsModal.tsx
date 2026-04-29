@@ -3,6 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { normalizedIncludes } from '@/utils/textHelpers';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Brain, BookOpen, Users, ArrowLeft, Play } from 'lucide-react';
 import { toast } from 'sonner';
@@ -143,8 +144,8 @@ export const MemorizationsModal = ({ open, onClose, subjectId, chapterId }: Memo
     }
   };
 
-  const filteredMemorizations = memorizations.filter(m =>
-    m.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredMemorizations = memorizations.filter((m) =>
+    normalizedIncludes(m.title, searchQuery),
   );
 
   return (

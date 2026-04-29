@@ -567,7 +567,9 @@ const CompleteProfile: React.FC = () => {
                       {filteredInstitutes.map((institute) => (
                         <CommandItem
                           key={institute.id}
-                          value={institute.name}
+                          value={`${institute.name} ${institute.name
+                            .normalize('NFD')
+                            .replace(/[\u0300-\u036f]/g, '')}`}
                           onSelect={() => {
                             setInstituteId(institute.id);
                             setOpenInstitute(false);
