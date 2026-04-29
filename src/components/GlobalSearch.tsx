@@ -179,39 +179,29 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
 
         // Search chapters
         if (filter === 'all' || filter === 'chapters') {
-          let chaptersQuery = effectiveClassId
-            ? supabase
-                .from('chapters')
-                .select('id, name, subject_id, subjects!inner(name, class_id)')
-                .ilike('name', `%${query}%`)
-                .eq('deleted', false)
-                .eq('subjects.class_id', effectiveClassId)
-            : supabase
-                .from('chapters')
-                .select('id, name, subject_id, subjects(name, class_id)')
-                .ilike('name', `%${query}%`)
-                .eq('deleted', false);
-
-          if (subjectFilter !== 'all') {
-            chaptersQuery = chaptersQuery.eq('subject_id', parseInt(subjectFilter));
-          }
-
+          const { data: chaptersData } = await supabase.rpc(
+            'search_chapters_normalized',
+            {
+              search_query: query,
+              p_class_id: effectiveClassId ?? null,
+              p_subject_id:
+                subjectFilter !== 'all' ? parseInt(subjectFilter) : null,
+            },
+          );
+          let chapters = chaptersData || [];
           if (chapterFilter !== 'all') {
-            chaptersQuery = chaptersQuery.eq('id', parseInt(chapterFilter));
+            chapters = chapters.filter(
+              (c: any) => c.id === parseInt(chapterFilter),
+            );
           }
-
-          const { data: chapters } = await chaptersQuery.limit(10);
-
-          if (chapters) {
-            // Filter out results where subjects is null (failed inner join)
-            const validChapters = chapters.filter((ch: any) => ch.subjects);
-            searchResults.push(...validChapters.map((ch: any) => ({
+          searchResults.push(
+            ...chapters.slice(0, 10).map((ch: any) => ({
               id: ch.id,
               type: 'chapter' as const,
               title: ch.name,
-              subjectName: ch.subjects?.name,
-            })));
-          }
+              subjectName: ch.subject_name,
+            })),
+          );
         }
 
         // Search resources
@@ -221,37 +211,22 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
             .filter(([_, checked]) => checked)
             .map(([id, _]) => parseInt(id));
 
-          // Search by title and description with proper class filtering
-          let resourcesQuery = effectiveClassId
-            ? supabase
-                .from('resources')
-                .select('id, title, description, chapter_id, type_id, with_correction, data, school_name, teacher_name, resource_types(type), chapters!inner(subject_id, subjects!inner(name, class_id))')
-                .or(`title.ilike.%${query}%,description.ilike.%${query}%,school_name.ilike.%${query}%,teacher_name.ilike.%${query}%`)
-                .eq('deleted', false)
-                .eq('chapters.subjects.class_id', effectiveClassId)
-            : supabase
-                .from('resources')
-                .select('id, title, description, chapter_id, type_id, with_correction, data, school_name, teacher_name, resource_types(type), chapters(subject_id, subjects(name, class_id))')
-                .or(`title.ilike.%${query}%,description.ilike.%${query}%,school_name.ilike.%${query}%,teacher_name.ilike.%${query}%`)
-                .eq('deleted', false);
-
-          if (subjectFilter !== 'all') {
-            resourcesQuery = resourcesQuery.eq('chapters.subject_id', parseInt(subjectFilter));
-          }
-
-          if (chapterFilter !== 'all') {
-            resourcesQuery = resourcesQuery.eq('chapter_id', parseInt(chapterFilter));
-          }
-
-          if (selectedResourceTypes.length > 0) {
-            resourcesQuery = resourcesQuery.in('type_id', selectedResourceTypes);
-          }
-
-          if (withCorrectionOnly) {
-            resourcesQuery = resourcesQuery.eq('with_correction', true);
-          }
-
-          const { data: resources } = await resourcesQuery.limit(15);
+          const { data: resources } = await supabase.rpc(
+            'search_resources_normalized',
+            {
+              search_query: query,
+              p_class_id: effectiveClassId ?? null,
+              p_subject_id:
+                subjectFilter !== 'all' ? parseInt(subjectFilter) : null,
+              p_chapter_id:
+                chapterFilter !== 'all' ? parseInt(chapterFilter) : null,
+              p_type_ids:
+                selectedResourceTypes.length > 0
+                  ? selectedResourceTypes
+                  : null,
+              p_with_correction: withCorrectionOnly ? true : null,
+            },
+          );
 
           // Also search OCR content (only if enabled and class is selected)
           let ocrResults: any[] = [];
@@ -268,12 +243,9 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
           
           // Add title/description matches
           if (resources) {
-            resources.forEach((r: any) => {
-              // Skip if chapters is null (failed join when class filter is active)
-              if (effectiveClassId && !r.chapters) return;
-              
-              const titleMatch = r.title.toLowerCase().includes(query.toLowerCase());
-              
+            const normQuery = normalizeText(query);
+            (resources as any[]).forEach((r: any) => {
+              const titleMatch = normalizeText(r.title).includes(normQuery);
               resourcesMap.set(r.id, {
                 id: r.id,
                 type: 'resource' as const,
@@ -281,9 +253,9 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
                 description: r.description,
                 matchType: titleMatch ? 'title' : 'description',
                 chapterId: r.chapter_id,
-                resourceType: r.resource_types?.type,
+                resourceType: r.resource_type,
                 hasCorrection: r.with_correction,
-                subjectName: r.chapters?.subjects?.name,
+                subjectName: r.subject_name,
                 schoolName: r.school_name,
                 teacherName: r.teacher_name,
               });
@@ -325,28 +297,17 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
 
         // Search questions
         if (filter === 'all' || filter === 'questions') {
-          let questionsQuery = effectiveClassId
-            ? supabase
-                .from('questions')
-                .select('id, data, chapter_id, chapters!inner(subject_id, subjects!inner(name, class_id))')
-                .ilike('data', `%${query}%`)
-                .eq('deleted', false)
-                .eq('chapters.subjects.class_id', effectiveClassId)
-            : supabase
-                .from('questions')
-                .select('id, data, chapter_id, chapters(subject_id, subjects(name, class_id))')
-                .ilike('data', `%${query}%`)
-                .eq('deleted', false);
-
-          if (subjectFilter !== 'all') {
-            questionsQuery = questionsQuery.eq('chapters.subject_id', parseInt(subjectFilter));
-          }
-
-          if (chapterFilter !== 'all') {
-            questionsQuery = questionsQuery.eq('chapter_id', parseInt(chapterFilter));
-          }
-
-          const { data: questions } = await questionsQuery.limit(10);
+          const { data: questions } = await supabase.rpc(
+            'search_questions_normalized',
+            {
+              search_query: query,
+              p_class_id: effectiveClassId ?? null,
+              p_subject_id:
+                subjectFilter !== 'all' ? parseInt(subjectFilter) : null,
+              p_chapter_id:
+                chapterFilter !== 'all' ? parseInt(chapterFilter) : null,
+            },
+          );
 
           // Also search Question OCR content (only if enabled and class is selected)
           let questionOcrResults: any[] = [];
@@ -362,16 +323,14 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
           const questionsMap = new Map<number, any>();
 
           if (questions) {
-            // Filter out results where chapters is null (failed inner join)
-            const validQuestions = questions.filter((q: any) => !effectiveClassId || q.chapters);
-            validQuestions.forEach((q: any) => {
+            (questions as any[]).slice(0, 10).forEach((q: any) => {
               questionsMap.set(q.id, {
                 id: q.id,
                 type: 'question' as const,
                 title: q.data.substring(0, 100),
                 matchType: 'title',
                 chapterId: q.chapter_id,
-                subjectName: q.chapters?.subjects?.name,
+                subjectName: q.subject_name,
               });
             });
           }
@@ -408,35 +367,54 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
 
         // Search answers with class filtering through questions -> chapters -> subjects
         if (filter === 'all' || filter === 'answers') {
-          let answersQuery = effectiveClassId
-            ? supabase
-                .from('answers')
-                .select('id, data, question_id, questions!inner(chapter_id, chapters!inner(subjects!inner(name, class_id)))')
-                .ilike('data', `%${query}%`)
-                .eq('deleted', false)
-                .eq('questions.chapters.subjects.class_id', effectiveClassId)
-            : supabase
-                .from('answers')
-                .select('id, data, question_id, questions(chapter_id, chapters(subjects(name, class_id)))')
-                .ilike('data', `%${query}%`)
-                .eq('deleted', false);
-
-          const { data: answers } = await answersQuery.limit(10);
+          const { data: answers } = await supabase.rpc(
+            'search_answers_normalized',
+            {
+              search_query: query,
+              p_class_id: effectiveClassId ?? null,
+            },
+          );
 
           if (answers) {
-            // Filter out results where questions is null (failed inner join)
-            const validAnswers = answers.filter((a: any) => !effectiveClassId || a.questions);
-            searchResults.push(...validAnswers.map((a: any) => ({
+            searchResults.push(...(answers as any[]).slice(0, 10).map((a: any) => ({
               id: a.id,
               type: 'answer' as const,
               title: a.data.substring(0, 100),
               questionId: a.question_id,
-              subjectName: a.questions?.chapters?.subjects?.name,
+              subjectName: a.subject_name,
             })));
           }
         }
 
         setResults(searchResults);
+
+        // Smart-match re-ranking: ask AI for semantic equivalents in titles
+        if (query.length >= 3 && searchResults.length > 0) {
+          try {
+            const candidates = searchResults.slice(0, 30).map((r) => r.title);
+            const { data: smart } = await supabase.functions.invoke(
+              'smart-match',
+              { body: { query, candidates, context: 'generic' } },
+            );
+            const equivIndexes: number[] = (smart?.matches || [])
+              .filter((m: any) => m.equivalent)
+              .map((m: any) => m.index);
+            if (equivIndexes.length > 0) {
+              setResults((prev) => {
+                const flagged = prev.map((r, i) =>
+                  equivIndexes.includes(i) ? { ...r, smartMatch: true } : r,
+                );
+                // Promote AI-confirmed matches to the top
+                return [
+                  ...flagged.filter((r) => r.smartMatch),
+                  ...flagged.filter((r) => !r.smartMatch),
+                ];
+              });
+            }
+          } catch (err) {
+            console.warn('smart-match unavailable:', err);
+          }
+        }
       } catch (error) {
         console.error('Search error:', error);
       } finally {
