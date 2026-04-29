@@ -535,7 +535,9 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
                       className="relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer border-none"
                       style={{
                         background:
-                          'linear-gradient(to right, #FFFFFF 0%, #E8F0FE 100%)',
+                          ch.questionCount > 0 || ch.answerCount > 0 || ch.resourceCount > 0
+                            ? 'linear-gradient(to right, #FFFFFF 0%, #B3D4FC 100%)'
+                            : 'linear-gradient(to right, #FFFFFF 0%, #E8F0FE 100%)',
                       }}
                       onClick={() => navigate(`/chapter/${ch.id}`)}
                     >
