@@ -101,17 +101,8 @@ serve(async (req) => {
     let metadataTitle: string;
     let additionalMetadata: Record<string, string> = {};
     
-    // Sanitize names for URL use — normalize Unicode so accented characters
-    // (é, è, à, ô, ç, …) become their ASCII equivalents instead of being
-    // dropped, then replace any remaining non-alphanumerics with dashes.
-    const sanitize = (str: string) =>
-      str
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]/gi, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .toLowerCase();
+    // Sanitize names for URL use
+    const sanitize = (str: string) => str.replace(/[^a-z0-9]/gi, '-').toLowerCase();
     // Encode metadata values to ASCII-safe format for HTTP headers
     const encodeForHeader = (str: string) => encodeURIComponent(str).replace(/%20/g, ' ');
 

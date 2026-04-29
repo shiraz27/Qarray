@@ -1,12 +1,11 @@
 import { Card } from '@/components/ui/card';
 import { AudioPlayer } from '@/components/AudioPlayer';
-import { Volume2, Loader2, Clock, RefreshCw, FileText, ExternalLink, Eye, ShieldAlert, Download } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Volume2, Loader2, Clock, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
 import { AudioPlayerModal } from '@/components/AudioPlayerModal';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
 
 interface MediaPreviewProps {
   url: string;
@@ -18,32 +17,14 @@ function extractRecordingNumber(url: string): string | undefined {
   return match ? match[1] : undefined;
 }
 
-function normalizeMediaUrl(mediaUrl: string): string {
-  const withEncodedSpaces = mediaUrl.replace(/ /g, '%20');
-  try {
-    return encodeURI(decodeURI(withEncodedSpaces));
-  } catch {
-    return encodeURI(withEncodedSpaces);
-  }
-}
-
 export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   const [audioModalOpen, setAudioModalOpen] = useState(false);
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
-  const [pdfStatus, setPdfStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
-  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
-  const [pdfProbeKey, setPdfProbeKey] = useState(0);
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
-  const [pdfBlocked, setPdfBlocked] = useState(false);
-  const [pdfProxying, setPdfProxying] = useState(false);
-  const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null);
-  const [imageProxying, setImageProxying] = useState(false);
   
-  // Fully encode URL to handle spaces, parens, accents, and malformed legacy URLs
-  const encodedUrl = normalizeMediaUrl(url);
-  const fetchMediaUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-media`;
+  // Ensure URL has encoded spaces for proper loading
+  const encodedUrl = url.replace(/ /g, '%20');
   
   // Check if it's a YouTube URL
   const getYouTubeEmbedUrl = (url: string) => {
@@ -81,84 +62,6 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
                   /-(mp3|wav|webm|ogg|m4a)($|[/?#])/i.test(url) ||
                   lowerUrl.includes('audio');
 
-  // Probe PDF availability through fetch-media (which handles Archive.org propagation retries)
-  useEffect(() => {
-    if (!isPdf) return;
-    let cancelled = false;
-    setPdfStatus('loading');
-    (async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('fetch-media', {
-          body: { url: encodedUrl },
-        });
-        if (cancelled) return;
-        // fetch-media returns the file blob on success, or { unavailable: true } JSON on failure
-        if (error) {
-          setPdfStatus('unavailable');
-          return;
-        }
-        if (data && typeof data === 'object' && (data as any).unavailable) {
-          setPdfStatus('unavailable');
-          return;
-        }
-        setPdfStatus('ready');
-      } catch (e) {
-        if (!cancelled) setPdfStatus('unavailable');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [isPdf, encodedUrl, pdfProbeKey]);
-
-  // Cleanup blob URLs on unmount
-  useEffect(() => {
-    return () => {
-      if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
-      if (imageBlobUrl) URL.revokeObjectURL(imageBlobUrl);
-    };
-  }, [pdfBlobUrl, imageBlobUrl]);
-
-  // Load PDFs through the app proxy by default; direct Archive.org embeds are often blocked by privacy extensions
-  useEffect(() => {
-    if (!pdfPreviewOpen || !isPdf || pdfBlobUrl || pdfProxying) return;
-    loadProxyBlob('pdf');
-  }, [pdfPreviewOpen, isPdf, pdfBlobUrl, pdfProxying]);
-
-  const loadProxyBlob = async (target: 'pdf' | 'image') => {
-    const setter = target === 'pdf' ? setPdfBlobUrl : setImageBlobUrl;
-    const proxying = target === 'pdf' ? setPdfProxying : setImageProxying;
-    proxying(true);
-    try {
-      const res = await fetch(
-        fetchMediaUrl,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({ url: encodedUrl }),
-        }
-      );
-      const contentType = res.headers.get('Content-Type') || '';
-      if (!res.ok || contentType.includes('application/json')) {
-        throw new Error('Proxy unavailable');
-      }
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      setter(blobUrl);
-      if (target === 'pdf') setPdfBlocked(false);
-      if (target === 'image') {
-        setImageError(false);
-        setImageLoading(true);
-      }
-    } catch (e) {
-      console.error('Proxy fetch failed:', e);
-      if (target === 'pdf') setPdfBlocked(true);
-    } finally {
-      proxying(false);
-    }
-  };
-
   if (youtubeEmbedUrl) {
     return (
       <Card className={`overflow-hidden ${className}`}>
@@ -179,149 +82,21 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   }
 
   if (isPdf) {
-    if (pdfStatus === 'loading') {
-      return (
-        <Card className={`overflow-hidden ${className} p-8 flex flex-col items-center justify-center gap-3 min-h-[160px]`}>
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading document...</p>
-        </Card>
-      );
-    }
-    if (pdfStatus === 'unavailable') {
-      return (
-        <Card className={`overflow-hidden ${className} p-8 flex flex-col items-center justify-center gap-3 min-h-[160px] bg-muted/50`}>
-          <Clock className="h-8 w-8 text-muted-foreground" />
-          <div className="text-center">
-            <p className="text-sm font-medium">Document is being processed...</p>
-            <p className="text-xs text-muted-foreground">The file may still be uploading. Please wait a moment and retry.</p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPdfProbeKey((k) => k + 1)}
-            className="gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Retry
-          </Button>
-        </Card>
-      );
-    }
     return (
-      <>
-        <Card className={`overflow-hidden ${className} p-4 hover:shadow-md transition-all`}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <FileText className="w-5 h-5 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm">PDF Document</p>
-              <p className="text-xs text-muted-foreground">Preview in-app, or open / download</p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1"
-                onClick={() => setPdfPreviewOpen(true)}
-              >
-                <Eye className="h-4 w-4" />
-                Preview
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                className="gap-1"
-                asChild
-              >
-                <a href={encodedUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4" />
-                  Open
-                </a>
-              </Button>
-            </div>
+      <Card className={`overflow-hidden ${className} p-4 hover:shadow-md transition-all cursor-pointer`}>
+        <a
+          href={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 text-sm"
+        >
+          <div className="text-3xl">📄</div>
+          <div className="flex-1">
+            <p className="font-medium">PDF Document</p>
+            <p className="text-xs text-muted-foreground">Click to view</p>
           </div>
-        </Card>
-        <Dialog open={pdfPreviewOpen} onOpenChange={(open) => {
-          setPdfPreviewOpen(open);
-          if (!open) {
-            setPdfBlocked(false);
-            if (pdfBlobUrl) {
-              URL.revokeObjectURL(pdfBlobUrl);
-              setPdfBlobUrl(null);
-            }
-          }
-        }}>
-          <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] p-0 bg-background border-none flex flex-col">
-            <DialogTitle className="sr-only">PDF Preview</DialogTitle>
-            <DialogDescription className="sr-only">Preview the PDF document through the app proxy.</DialogDescription>
-            <div className="flex items-center justify-between p-3 border-b">
-              <p className="text-sm font-medium truncate">PDF Preview</p>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" asChild className="gap-1">
-                  <a href={encodedUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                    Open
-                  </a>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setPdfPreviewOpen(false)}
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-            {!pdfBlobUrl && pdfProxying ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 bg-muted/30">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <p className="text-sm font-medium">Loading secure preview...</p>
-                <p className="text-xs text-muted-foreground text-center max-w-md">
-                  The document is being loaded through the app so browser extensions cannot block it.
-                </p>
-              </div>
-            ) : pdfBlocked && !pdfBlobUrl ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 bg-muted/30">
-                <ShieldAlert className="h-12 w-12 text-amber-500" />
-                <div className="text-center max-w-md space-y-2">
-                  <p className="font-medium">Preview couldn't load</p>
-                  <p className="text-sm text-muted-foreground">
-                    Your browser may be blocking direct Archive.org access, or the file may still be processing. Retry the secure preview below.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => loadProxyBlob('pdf')}
-                    disabled={pdfProxying}
-                    className="gap-2"
-                  >
-                    {pdfProxying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                    {pdfProxying ? 'Loading...' : 'Retry secure preview'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => { setPdfBlocked(false); setPdfProbeKey(k => k + 1); }}
-                  >
-                    Try again
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground text-center max-w-md">
-                  Tip: whitelist this site in your ad blocker to load PDFs directly.
-                </p>
-              </div>
-            ) : (
-              <iframe
-                key={pdfBlobUrl || 'secure-preview'}
-                src={pdfBlobUrl || 'about:blank'}
-                title="PDF preview"
-                className="flex-1 w-full"
-                onLoad={() => setPdfBlocked(false)}
-              />
-            )}
-          </DialogContent>
-        </Dialog>
-      </>
+        </a>
+      </Card>
     );
   }
 
@@ -339,34 +114,23 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
         {/* Error/Processing state */}
         {imageError && (
           <Card className={`overflow-hidden ${className} p-8 flex flex-col items-center justify-center gap-3 min-h-[200px] bg-muted/50`}>
-            <ShieldAlert className="h-8 w-8 text-amber-500" />
+            <Clock className="h-8 w-8 text-muted-foreground" />
             <div className="text-center">
-              <p className="text-sm font-medium">Image couldn't be loaded</p>
-              <p className="text-xs text-muted-foreground">It may still be uploading, or your ad blocker is blocking archive.org. Try the proxy.</p>
+              <p className="text-sm font-medium">Image processing...</p>
+              <p className="text-xs text-muted-foreground">The file may still be uploading. Please wait a moment and refresh.</p>
             </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => loadProxyBlob('image')}
-                disabled={imageProxying}
-                className="gap-2"
-              >
-                {imageProxying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Load via proxy
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => {
-                  setImageError(false);
-                  setImageLoading(true);
-                }}
-                className="gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Retry
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                setImageError(false);
+                setImageLoading(true);
+              }}
+              className="gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </Button>
           </Card>
         )}
         
@@ -377,7 +141,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
           style={{ display: imageLoading || imageError ? 'none' : 'block' }}
         >
           <img 
-            src={imageBlobUrl || encodedUrl} 
+            src={encodedUrl} 
             alt="Media content" 
             className="w-full h-full object-cover rounded-lg" 
             style={{ minHeight: '200px', maxHeight: '500px' }}
@@ -402,7 +166,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
                 <X className="h-6 w-6" />
               </Button>
               <img 
-                src={imageBlobUrl || encodedUrl} 
+                src={encodedUrl} 
                 alt="Media content" 
                 className="max-w-full max-h-[90vh] object-contain"
               />

@@ -1,43 +1,51 @@
-## Problem
+## Goal
 
-`ERR_BLOCKED_BY_CLIENT` on `ia600505.us.archive.org` is caused by **ad blockers / privacy extensions** (uBlock, Brave Shields, AdBlock, etc.) blocking requests to Archive.org's CDN subdomains. Archive.org files are not actually broken — the URL works in incognito or with extensions disabled.
+In the "Common Chapters from other Bac classes" section, group results by **similarity to the native chapters** (not by class mapping order), and order all chapter lists by **id** instead of alphabetical name.
 
-This isn't a server/code bug, but we can make the app gracefully handle it instead of showing Chrome's blank "blocked" page inside the iframe.
+## Changes
 
-## Proposed changes
+### 1. `src/components/MainContent.tsx`
 
-### 1. `MediaPreview.tsx` — Detect blocked iframe and offer proxy fallback
+**A. Order native chapters by id**
+- Line 86: change `.order('name')` → `.order('id', { ascending: true })`.
 
-- After opening the PDF preview iframe, attach an `onLoad`/timeout check. If the iframe fails to load within ~4 seconds (typical signature of `ERR_BLOCKED_BY_CLIENT`), show an inline notice:
-  > "Your browser or an extension (ad blocker / privacy shield) is blocking archive.org. Try disabling it for this site, or use the proxy preview below."
-- Add a **"Use proxy preview"** button that fetches the PDF through our existing `fetch-media` edge function, converts the response to a blob URL, and renders that in the iframe. Since the blob is served from our own origin, ad blockers won't touch it.
-- Apply the same fallback to the **Open** action: if the user clicks Open and returns reporting it's blocked, the inline notice (already visible) tells them why.
+**B. Track which native chapter each common chapter maps to (to enable similarity grouping)**
+- In the `chapter_common_mappings` fetch (line 152-155), also select `chapter_id` so we know the source native chapter for each mapping.
+- Build a map: `commonChapterId -> nativeChapterId(s)` from the raw mappings.
 
-### 2. Add a small banner on the resource detail page
+**C. Extend `CommonChapter` type**
+```ts
+interface CommonChapter {
+  id: number;
+  name: string;
+  className: string;
+  matchedNativeId: number | null; // native chapter it's most similar to
+}
+```
 
-When any media on the page is detected as blocked, show a one-time dismissible banner explaining the ad blocker issue with a link to whitelist instructions. This avoids users thinking the app is broken.
+**D. Group + order common chapters by similarity to native chapters**
+- For each common chapter, attach its `matchedNativeId` (first native chapter id from the mapping list — these are AI-generated similarity mappings, so any mapped native is by definition similar).
+- Sort the `commons` array such that:
+  1. Common chapters that map to the **same native chapter cluster together**.
+  2. Clusters are ordered following the native chapters' **id order** (matches the new chapter order).
+  3. Within a cluster, sort by common chapter `id` ascending.
+  4. Any common chapters with no `matchedNativeId` (shouldn't happen, but safety) go to the end, sorted by id.
 
-### 3. Image previews — same fallback
+**E. Add visual separators between similarity clusters**
+- In the render block (lines 461-494), instead of a flat `.map`, iterate clusters:
+  - For each cluster (group of commons sharing the same `matchedNativeId`), render the cards.
+  - Between clusters, render a thin separator (e.g. a muted horizontal divider with the native chapter name as a small label, like `— Similar to: <Native Chapter Name> —`) so the user understands why items are grouped.
+- The first cluster has no separator above it.
 
-Apply the same blob-proxy fallback to images on `onError` (currently they just show "Image processing..." which is misleading when the real cause is an ad blocker).
+### 2. No DB / edge function changes
+The existing `chapter_common_mappings` table already provides the `chapter_id` (native) → `common_chapter_id` link, which is exactly the similarity signal we need. No migration or AI call needed for this re-ordering.
 
-## Technical details
+## Technical notes
 
-- Blob URL pattern:
-  ```ts
-  const { data } = await supabase.functions.invoke('fetch-media', { body: { url } });
-  const blobUrl = URL.createObjectURL(data as Blob);
-  // use blobUrl in <iframe src> or <img src>
-  // remember to URL.revokeObjectURL on unmount
-  ```
-- Detection heuristic for blocked iframe: start a 4s timer on mount; if `onLoad` fires, clear it; if it fires, switch to "blocked" UI state.
-- The `fetch-media` function already exists and handles Archive.org retries — no edge function changes needed.
+- Native chapter id order is already meaningful (chapters are inserted in curriculum order), so using id ordering matches the user's intent of "curriculum order, not alphabetical".
+- A common chapter could match multiple native chapters; we cluster it under its lowest-id native match to keep ordering deterministic and avoid duplicates.
+- Cluster header styling: small uppercase muted text + thin border, only between clusters (not before the first one).
 
-## Files to modify
-
-- `src/components/MediaPreview.tsx` — add blocked-detection + blob proxy fallback for PDF iframe and images
-- `src/pages/ResourceDetail.tsx` — optional dismissible banner explaining ad blocker behavior
-
-## What this does NOT fix
-
-If the user clicks **Open** (new tab) → archive.org directly, the ad blocker will still block it. Only the in-app preview (proxied through our domain) is guaranteed to work. We'll make this clear in the UI copy.
+## Out of scope
+- Other lists (resources, questions, memorizations) — not mentioned by the user.
+- Changing the AI matching logic itself.
