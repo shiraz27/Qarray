@@ -3,7 +3,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { Volume2, Loader2, Clock, RefreshCw, FileText, ExternalLink, Eye, ShieldAlert, Download } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { AudioPlayerModal } from '@/components/AudioPlayerModal';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +16,15 @@ interface MediaPreviewProps {
 function extractRecordingNumber(url: string): string | undefined {
   const match = url.match(/recording-(\d+)/);
   return match ? match[1] : undefined;
+}
+
+function normalizeMediaUrl(mediaUrl: string): string {
+  const withEncodedSpaces = mediaUrl.replace(/ /g, '%20');
+  try {
+    return encodeURI(decodeURI(withEncodedSpaces));
+  } catch {
+    return encodeURI(withEncodedSpaces);
+  }
 }
 
 export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
@@ -32,8 +41,9 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null);
   const [imageProxying, setImageProxying] = useState(false);
   
-  // Fully encode URL to handle spaces, parens, and special chars
-  const encodedUrl = encodeURI(decodeURI(url.replace(/ /g, '%20')));
+  // Fully encode URL to handle spaces, parens, accents, and malformed legacy URLs
+  const encodedUrl = normalizeMediaUrl(url);
+  const fetchMediaUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-media`;
   
   // Check if it's a YouTube URL
   const getYouTubeEmbedUrl = (url: string) => {
@@ -107,16 +117,11 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
     };
   }, [pdfBlobUrl, imageBlobUrl]);
 
-  // Detect blocked iframe (ad blocker / ERR_BLOCKED_BY_CLIENT) when preview opens
+  // Load PDFs through the app proxy by default; direct Archive.org embeds are often blocked by privacy extensions
   useEffect(() => {
-    if (!pdfPreviewOpen || pdfBlobUrl) return;
-    setPdfBlocked(false);
-    const timer = setTimeout(() => {
-      // If iframe didn't signal load within 4s, likely blocked
-      setPdfBlocked(true);
-    }, 4000);
-    return () => clearTimeout(timer);
-  }, [pdfPreviewOpen, pdfBlobUrl]);
+    if (!pdfPreviewOpen || !isPdf || pdfBlobUrl || pdfProxying) return;
+    loadProxyBlob('pdf');
+  }, [pdfPreviewOpen, isPdf, pdfBlobUrl, pdfProxying]);
 
   const loadProxyBlob = async (target: 'pdf' | 'image') => {
     const setter = target === 'pdf' ? setPdfBlobUrl : setImageBlobUrl;
@@ -124,12 +129,12 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
     proxying(true);
     try {
       const res = await fetch(
-        `https://xwqmdhnuthprzfbyoxlb.supabase.co/functions/v1/fetch-media`,
+        fetchMediaUrl,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3cW1kaG51dGhwcnpmYnlveGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4ODcxNzIsImV4cCI6MjA3NTQ2MzE3Mn0.qVP6vOLYLZcgGGIWNK5ZmydzoI4CbTZa6EPl1Q8ruKY',
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
           body: JSON.stringify({ url: encodedUrl }),
         }
@@ -141,8 +146,14 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
       setter(blobUrl);
+      if (target === 'pdf') setPdfBlocked(false);
+      if (target === 'image') {
+        setImageError(false);
+        setImageLoading(true);
+      }
     } catch (e) {
       console.error('Proxy fetch failed:', e);
+      if (target === 'pdf') setPdfBlocked(true);
     } finally {
       proxying(false);
     }
@@ -242,6 +253,8 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
           }
         }}>
           <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] p-0 bg-background border-none flex flex-col">
+            <DialogTitle className="sr-only">PDF Preview</DialogTitle>
+            <DialogDescription className="sr-only">Preview the PDF document through the app proxy.</DialogDescription>
             <div className="flex items-center justify-between p-3 border-b">
               <p className="text-sm font-medium truncate">PDF Preview</p>
               <div className="flex items-center gap-2">
@@ -260,13 +273,21 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
                 </Button>
               </div>
             </div>
-            {pdfBlocked && !pdfBlobUrl ? (
+            {!pdfBlobUrl && pdfProxying ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 bg-muted/30">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-sm font-medium">Loading secure preview...</p>
+                <p className="text-xs text-muted-foreground text-center max-w-md">
+                  The document is being loaded through the app so browser extensions cannot block it.
+                </p>
+              </div>
+            ) : pdfBlocked && !pdfBlobUrl ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 bg-muted/30">
                 <ShieldAlert className="h-12 w-12 text-amber-500" />
                 <div className="text-center max-w-md space-y-2">
-                  <p className="font-medium">Preview blocked by your browser</p>
+                  <p className="font-medium">Preview couldn't load</p>
                   <p className="text-sm text-muted-foreground">
-                    An ad blocker or privacy extension (uBlock, Brave Shields, AdBlock, etc.) is blocking <code className="text-xs">archive.org</code>. You can load the document through our proxy instead.
+                    Your browser may be blocking direct Archive.org access, or the file may still be processing. Retry the secure preview below.
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -276,7 +297,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
                     className="gap-2"
                   >
                     {pdfProxying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                    {pdfProxying ? 'Loading...' : 'Load via proxy'}
+                    {pdfProxying ? 'Loading...' : 'Retry secure preview'}
                   </Button>
                   <Button
                     variant="outline"
@@ -291,8 +312,8 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
               </div>
             ) : (
               <iframe
-                key={pdfBlobUrl || encodedUrl}
-                src={pdfBlobUrl || encodedUrl}
+                key={pdfBlobUrl || 'secure-preview'}
+                src={pdfBlobUrl || 'about:blank'}
                 title="PDF preview"
                 className="flex-1 w-full"
                 onLoad={() => setPdfBlocked(false)}
