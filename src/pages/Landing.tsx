@@ -60,10 +60,8 @@ const Landing: React.FC = () => {
 
   useEffect(() => {
     const fetchStudentCount = async () => {
-      const { count } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-      setStudentCount(count || 0);
+      const { data } = await supabase.rpc('get_student_count');
+      setStudentCount((data as number) || 0);
     };
     fetchStudentCount();
   }, []);
