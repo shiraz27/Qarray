@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { normalizeText } from '@/utils/textHelpers';
 
 interface SearchResult {
   id: number;
@@ -38,6 +39,7 @@ interface SearchResult {
   hasCorrection?: boolean;
   schoolName?: string;
   teacherName?: string;
+  smartMatch?: boolean;
 }
 
 interface GlobalSearchProps {
