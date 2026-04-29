@@ -74,12 +74,12 @@ export default function Classmates() {
       setCurrentUserInstituteId(profile.institute_id);
 
       // Get all classmates with their stats
-      const { data: profiles } = await supabase
-        .from('profiles')
+      const { data: profiles } = await (supabase as any)
+        .from('public_profiles')
         .select('user_id, full_name, avatar_color, institute_id, class_id')
         .eq('class_id', profile.class_id)
         .neq('user_id', userId)
-        .eq('deleted', false);
+        ;
 
       if (!profiles) {
         setLoading(false);
