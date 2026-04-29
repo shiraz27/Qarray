@@ -28,3 +28,9 @@ export const normalizedIncludes = (
   if (!n) return true;
   return normalizeText(haystack).includes(n);
 };
+
+/** Capitalize the first letter of each word, preserving the rest. */
+export const capitalizeEveryWord = (s: string | null | undefined): string =>
+  (s ?? '')
+    .toString()
+    .replace(/\b\p{L}/gu, (ch) => ch.toUpperCase());
