@@ -88,8 +88,8 @@ export const MemorizationsModal = ({ open, onClose, subjectId, chapterId }: Memo
             .eq('memorization_id', mem.id)
             .maybeSingle();
 
-          const { data: profile } = await supabase
-            .from('profiles')
+          const { data: profile } = await (supabase as any)
+            .from('public_profiles')
             .select('full_name, avatar_color')
             .eq('user_id', mem.creator_id)
             .maybeSingle();
