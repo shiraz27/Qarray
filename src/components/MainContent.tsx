@@ -33,6 +33,7 @@ interface CommonChapter {
   id: number;
   name: string;
   className: string;
+  matchedNativeId: number | null;
 }
 
 const BAC_CLASS_IDS = new Set([15, 16, 17, 18, 19, 20, 21]);
@@ -83,7 +84,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
           .select('id, name')
           .eq('subject_id', subjectId)
           .eq('deleted', false)
-          .order('name');
+          .order('id', { ascending: true });
 
         if (chaptersError) throw chaptersError;
 
@@ -151,11 +152,17 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
         ) {
           const { data: rawMappings } = await supabase
             .from('chapter_common_mappings')
-            .select('common_chapter_id')
+            .select('chapter_id, common_chapter_id')
             .in('chapter_id', nativeIds);
-          const targetIds = Array.from(
-            new Set((rawMappings || []).map((r: any) => r.common_chapter_id))
-          );
+          // Build common -> matched native map (lowest native id wins for determinism)
+          const commonToNative = new Map<number, number>();
+          (rawMappings || []).forEach((r: any) => {
+            const existing = commonToNative.get(r.common_chapter_id);
+            if (existing === undefined || r.chapter_id < existing) {
+              commonToNative.set(r.common_chapter_id, r.chapter_id);
+            }
+          });
+          const targetIds = Array.from(commonToNative.keys());
           let commons: CommonChapter[] = [];
           if (targetIds.length > 0) {
             const { data: chRows } = await supabase
@@ -163,11 +170,25 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
               .select('id, name, class_id, deleted, classes(name)')
               .in('id', targetIds)
               .eq('deleted', false);
+            // native id ordering map (curriculum order)
+            const nativeOrder = new Map<number, number>();
+            (chaptersData || []).forEach((c, idx) => nativeOrder.set(c.id, idx));
             commons = (chRows || []).map((ch: any) => ({
               id: ch.id,
               name: ch.name,
               className: ch.classes?.name ?? '',
+              matchedNativeId: commonToNative.get(ch.id) ?? null,
             }));
+            commons.sort((a, b) => {
+              const aOrder = a.matchedNativeId !== null
+                ? nativeOrder.get(a.matchedNativeId) ?? Number.MAX_SAFE_INTEGER
+                : Number.MAX_SAFE_INTEGER;
+              const bOrder = b.matchedNativeId !== null
+                ? nativeOrder.get(b.matchedNativeId) ?? Number.MAX_SAFE_INTEGER
+                : Number.MAX_SAFE_INTEGER;
+              if (aOrder !== bOrder) return aOrder - bOrder;
+              return a.id - b.id;
+            });
           }
           setCommonChapters(commons);
         } else {
