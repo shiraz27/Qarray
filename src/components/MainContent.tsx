@@ -480,9 +480,27 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
                 <div className="space-y-3">
-                  {commonChapters.map((ch) => (
+                  {commonChapters.map((ch, idx) => {
+                    const prev = idx > 0 ? commonChapters[idx - 1] : null;
+                    const isNewCluster =
+                      !prev || prev.matchedNativeId !== ch.matchedNativeId;
+                    const nativeName = ch.matchedNativeId
+                      ? chapters.find((c) => c.id === ch.matchedNativeId)?.name
+                      : null;
+                    return (
+                      <React.Fragment key={ch.id}>
+                        {isNewCluster && idx > 0 && (
+                          <div className="flex items-center gap-2 pt-2">
+                            <div className="h-px flex-1 bg-border" />
+                            {nativeName && (
+                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                                Similar to: {nativeName}
+                              </span>
+                            )}
+                            <div className="h-px flex-1 bg-border" />
+                          </div>
+                        )}
                     <Card
-                      key={ch.id}
                       className="relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer border-none"
                       style={{
                         background:
@@ -511,7 +529,9 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
                         </Badge>
                       </div>
                     </Card>
-                  ))}
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
               </AccordionContent>
             </AccordionItem>
