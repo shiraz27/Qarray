@@ -880,9 +880,63 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_profiles: {
+        Row: {
+          avatar_color: string | null
+          class_id: number | null
+          created_at: string | null
+          full_name: string | null
+          institute_id: string | null
+          teacher_verified: boolean | null
+          tutorial_completed: boolean | null
+          tutorial_step: number | null
+          user_id: string | null
+          user_type: Database["public"]["Enums"]["user_type"] | null
+        }
+        Insert: {
+          avatar_color?: string | null
+          class_id?: number | null
+          created_at?: string | null
+          full_name?: string | null
+          institute_id?: string | null
+          teacher_verified?: boolean | null
+          tutorial_completed?: boolean | null
+          tutorial_step?: number | null
+          user_id?: string | null
+          user_type?: Database["public"]["Enums"]["user_type"] | null
+        }
+        Update: {
+          avatar_color?: string | null
+          class_id?: number | null
+          created_at?: string | null
+          full_name?: string | null
+          institute_id?: string | null
+          teacher_verified?: boolean | null
+          tutorial_completed?: boolean | null
+          tutorial_step?: number | null
+          user_id?: string | null
+          user_type?: Database["public"]["Enums"]["user_type"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_institute_id_fkey"
+            columns: ["institute_id"]
+            isOneToOne: false
+            referencedRelation: "institutes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      get_student_count: { Args: never; Returns: number }
       get_valid_bookmark_count: { Args: { p_user_id: string }; Returns: number }
       has_role: {
         Args: {

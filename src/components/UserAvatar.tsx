@@ -24,11 +24,11 @@ export function UserAvatar({ userId, size = 'md', showName = false, showDate = f
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const { data } = await supabase
-        .from('profiles')
+      const { data } = await (supabase as any)
+        .from('public_profiles')
         .select('full_name, avatar_color, user_type, teacher_verified')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (data) {
         setProfile(data);
