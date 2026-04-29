@@ -25,6 +25,7 @@ const iconOptions = [
   { value: 'beaker', label: 'Beaker (Science)' },
   { value: 'test-tube', label: 'Test Tube (Biology)' },
   { value: 'flask-conical', label: 'Flask (Chemistry)' },
+  { value: 'database', label: 'Database' },
 ];
 
 export const ManageSubjectDialog = ({
