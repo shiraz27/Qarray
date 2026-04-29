@@ -1,51 +1,55 @@
-## Goal
+## Audit results
 
-In the "Common Chapters from other Bac classes" section, group results by **similarity to the native chapters** (not by class mapping order), and order all chapter lists by **id** instead of alphabetical name.
+I checked every PDF URL stored across all 13 active resources. **All 13 currently return HTTP 200** from Archive.org — including id=35, id=36, and id=24 (which has spaces and parens in its filename). No URL is permanently broken.
 
-## Changes
+That confirms the problem is not corrupted data in the DB. It is how the frontend renders PDFs:
 
-### 1. `src/components/MainContent.tsx`
+1. **Google Docs viewer fails silently during Archive.org's propagation window.** Right after upload, Archive.org lists the file but its CDN nodes return 404 for several minutes. `https://docs.google.com/viewer?url=...` caches that 404 and shows a blank/broken viewer with no retry. This is why id=35 and id=36 looked broken to you — they were both uploaded today.
+2. **Google Docs viewer is also unreliable for filenames with spaces or special characters** (id=24: `4sc_t1-pages-2-combined (2).pdf`). The viewer URL is built without encoding the embedded URL's special characters.
+3. **The sanitizer issue from the previous plan is still real for future uploads** — it produces ugly paths like `bac-math-matiques/maths/d-rivabilit-` and risks collisions across different chapters. Still worth fixing for new uploads.
 
-**A. Order native chapters by id**
-- Line 86: change `.order('name')` → `.order('id', { ascending: true })`.
+## Generalized fix
 
-**B. Track which native chapter each common chapter maps to (to enable similarity grouping)**
-- In the `chapter_common_mappings` fetch (line 152-155), also select `chapter_id` so we know the source native chapter for each mapping.
-- Build a map: `commonChapterId -> nativeChapterId(s)` from the raw mappings.
+### A. PDF preview rewrite in `src/components/MediaPreview.tsx`
 
-**C. Extend `CommonChapter` type**
+Replace the "click to open Google Docs viewer" card with a self-contained, reliable PDF flow:
+
+1. **Probe the URL through the existing `fetch-media` edge function** (which already retries with exponential backoff for Archive.org 404s). Show a "Document is being processed…" loading state with a friendly message during retries, mirroring the image branch.
+2. **On success**, render a card with two clear actions:
+   - **Open** — opens the raw Archive.org URL in a new tab (browsers have a built-in PDF viewer; this avoids Google Docs entirely and works for all filename shapes including spaces/parens).
+   - **Preview** — opens an in-app modal containing an `<iframe>` pointing directly at the encoded PDF URL. Native browser PDF rendering, no third-party dependency.
+3. **On permanent failure** (after retries exhausted), show the existing "processing/retry" card so users can manually retry.
+4. **Always `encodeURI()` the stored URL** before using it as an `href` or `src`, so spaces/parens in filenames like id=24 don't break the request.
+
+This eliminates Google Docs viewer as a single point of failure and removes the entire propagation-window blank-screen class of bugs.
+
+### B. Sanitizer fix in `supabase/functions/upload-to-archive/index.ts`
+
+Same change proposed previously — normalize Unicode before stripping non-ASCII so accented characters become readable ASCII rather than dashes:
+
 ```ts
-interface CommonChapter {
-  id: number;
-  name: string;
-  className: string;
-  matchedNativeId: number | null; // native chapter it's most similar to
-}
+const sanitize = (str: string) =>
+  str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/gi, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
 ```
 
-**D. Group + order common chapters by similarity to native chapters**
-- For each common chapter, attach its `matchedNativeId` (first native chapter id from the mapping list — these are AI-generated similarity mappings, so any mapped native is by definition similar).
-- Sort the `commons` array such that:
-  1. Common chapters that map to the **same native chapter cluster together**.
-  2. Clusters are ordered following the native chapters' **id order** (matches the new chapter order).
-  3. Within a cluster, sort by common chapter `id` ascending.
-  4. Any common chapters with no `matchedNativeId` (shouldn't happen, but safety) go to the end, sorted by id.
+New uploads will land at clean paths (`bac-mathematiques/maths/derivabilite/...`). Existing URLs in the DB are not touched; the files they point to still exist at the old paths and will keep working.
 
-**E. Add visual separators between similarity clusters**
-- In the render block (lines 461-494), instead of a flat `.map`, iterate clusters:
-  - For each cluster (group of commons sharing the same `matchedNativeId`), render the cards.
-  - Between clusters, render a thin separator (e.g. a muted horizontal divider with the native chapter name as a small label, like `— Similar to: <Native Chapter Name> —`) so the user understands why items are grouped.
-- The first cluster has no separator above it.
+### C. No data migration
 
-### 2. No DB / edge function changes
-The existing `chapter_common_mappings` table already provides the `chapter_id` (native) → `common_chapter_id` link, which is exactly the similarity signal we need. No migration or AI call needed for this re-ordering.
+All current URLs are reachable — no need to rewrite stored data.
 
-## Technical notes
+## Files to change
 
-- Native chapter id order is already meaningful (chapters are inserted in curriculum order), so using id ordering matches the user's intent of "curriculum order, not alphabetical".
-- A common chapter could match multiple native chapters; we cluster it under its lowest-id native match to keep ordering deterministic and avoid duplicates.
-- Cluster header styling: small uppercase muted text + thin border, only between clusters (not before the first one).
+- `src/components/MediaPreview.tsx` — new PDF preview flow with `fetch-media` probe, in-app iframe modal, proper URL encoding
+- `supabase/functions/upload-to-archive/index.ts` — Unicode-aware sanitizer
 
 ## Out of scope
-- Other lists (resources, questions, memorizations) — not mentioned by the user.
-- Changing the AI matching logic itself.
+
+- Migrating existing resource URLs to the new clean format (unnecessary; old paths still resolve).
+- Changes to the image or audio branches (already handle propagation correctly).
