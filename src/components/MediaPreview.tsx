@@ -3,7 +3,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { Volume2, Loader2, Clock, RefreshCw, FileText, ExternalLink, Eye, ShieldAlert, Download } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { AudioPlayerModal } from '@/components/AudioPlayerModal';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +16,15 @@ interface MediaPreviewProps {
 function extractRecordingNumber(url: string): string | undefined {
   const match = url.match(/recording-(\d+)/);
   return match ? match[1] : undefined;
+}
+
+function normalizeMediaUrl(mediaUrl: string): string {
+  const withEncodedSpaces = mediaUrl.replace(/ /g, '%20');
+  try {
+    return encodeURI(decodeURI(withEncodedSpaces));
+  } catch {
+    return encodeURI(withEncodedSpaces);
+  }
 }
 
 export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
@@ -32,8 +41,9 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null);
   const [imageProxying, setImageProxying] = useState(false);
   
-  // Fully encode URL to handle spaces, parens, and special chars
-  const encodedUrl = encodeURI(decodeURI(url.replace(/ /g, '%20')));
+  // Fully encode URL to handle spaces, parens, accents, and malformed legacy URLs
+  const encodedUrl = normalizeMediaUrl(url);
+  const fetchMediaUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-media`;
   
   // Check if it's a YouTube URL
   const getYouTubeEmbedUrl = (url: string) => {
