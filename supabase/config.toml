@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.admin-delete]
 verify_jwt = false
+
+[functions.smart-match]
+verify_jwt = false
