@@ -548,16 +548,32 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
                           imageRendering: 'crisp-edges',
                         }}
                       />
-                      <div className="relative z-10 flex items-center justify-between gap-3">
-                        <h3 className="font-semibold text-sm tracking-wide text-gray-900 flex-1">
-                          {ch.name.toUpperCase()}
-                        </h3>
-                        <Badge
-                          variant="outline"
-                          className="bg-white/70 text-gray-700 border-gray-300 whitespace-nowrap"
-                        >
-                          From {ch.className}
-                        </Badge>
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <h3 className="font-semibold text-sm tracking-wide text-gray-900 flex-1">
+                            {ch.name.toUpperCase()}
+                          </h3>
+                          <Badge
+                            variant="outline"
+                            className="bg-white/70 text-gray-700 border-gray-300 whitespace-nowrap"
+                          >
+                            From {ch.className}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-4 text-xs">
+                          <div className="flex items-center gap-1.5 text-gray-600">
+                            <MessageSquare size={14} className="text-gray-600" />
+                            <span className="font-medium">
+                              {ch.questionCount} {t('questions') || 'Questions'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-gray-600">
+                            <FileText size={14} className="text-gray-600" />
+                            <span className="font-medium">
+                              {ch.resourceCount} {t('resources') || 'Resources'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </Card>
                       </React.Fragment>
