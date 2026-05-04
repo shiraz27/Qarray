@@ -454,13 +454,8 @@ export default function Statistics() {
           r.ocr_status === 'failed' ||
           r.ocr_status === 'not_applicable';
         if (!isRetryableStatus) return false;
-        // For not_applicable, only retry items that actually have a PDF/image attached
-        if (r.ocr_status === 'not_applicable') {
-          return r.data?.some(url =>
-            url.toLowerCase().includes('.pdf') ||
-            !!url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)/)
-          );
-        }
+        // For not_applicable, only retry items that have a PDF/image attached
+        if (r.ocr_status === 'not_applicable') return urlsHaveOcrable(r.data);
         return true;
       });
       
@@ -541,10 +536,7 @@ export default function Statistics() {
           q.ocr_status === 'failed' ||
           q.ocr_status === 'not_applicable';
         if (!isRetryableStatus) return false;
-        if (q.ocr_status === 'not_applicable') {
-          const lower = q.data.toLowerCase();
-          return lower.includes('.pdf') || !!lower.match(/\.(jpg|jpeg|png|gif|webp)/);
-        }
+        if (q.ocr_status === 'not_applicable') return textHasOcrableUrl(q.data);
         return true;
       });
       
