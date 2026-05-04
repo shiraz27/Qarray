@@ -1,66 +1,48 @@
-# Allow Retrying OCR on "Not Applicable" Items
+I investigated the OCR flow and found a likely cause: the current file-type detection only recognizes URLs containing `.pdf` or Archive-style `-pdf`. Your example resources do have `.pdf`, but the code still has several duplicated/fragile checks and old `not_applicable` rows that can remain from earlier misclassification. Also, if a URL is encoded or redirected in a way that hides the extension, the UI and OCR processor may still treat it as non-OCR-able.
 
-## The problem
+Example URL to verify from your end:
 
-In Statistics, items end up with `ocr_status = 'not_applicable'` (the "N/A" badge) in several legitimate-but-recoverable cases:
+```text
+https://archive.org/download/qarray-educational-content/bac-math-matiques/maths/fonction-exponentielle/221-272.pdf
+```
 
-- The file extension wasn't recognized (Archive.org sometimes sanitizes URLs like `…-pdf` / `…-png`, or a file is uploaded with no extension), so `detectFileType` returns `'unknown'` and the item is marked N/A.
-- The fetch proxy returned "unavailable" (Archive.org eventual-consistency 404), so processing produced no OCR-able files and the item was marked N/A.
-- A resource truly has only video/audio (correct N/A) — but the user later edits it to add a PDF/image and wants to re-OCR.
+I confirmed this URL currently resolves as a real PDF through Archive.org and through the app’s media proxy. Another currently working example is:
 
-Today the per-row "Play" button is only shown when `ocr_status === 'pending' || 'failed'`. Once an item is N/A there is **no UI path** to re-run OCR on it, so the user is stuck. The "Process all pending" batch also skips N/A items.
+```text
+https://archive.org/download/qarray-educational-content/bac-sciences-exp-rimentales/math-matiques/primitives/119-133.pdf
+```
 
-## The fix
+Plan to fix this properly:
 
-Treat `not_applicable` as a retryable state in the admin Statistics page (it stays purely a manual, admin-triggered action — consistent with the existing OCR policy).
+1. Centralize media type detection
+   - Create one shared helper for detecting PDF/image/video/audio URLs instead of separate slightly different checks in Statistics, OCR processors, and forms.
+   - Make PDF detection more robust for:
+     - `.pdf`
+     - `%2Epdf` / encoded filenames
+     - query strings after filenames
+     - Archive.org sanitized `-pdf` paths
+     - URLs where the browser/proxy response `Content-Type` is `application/pdf` even if the URL itself is unclear.
 
-### 1. Per-row retry button (resources + questions tables)
+2. Fix OCR processor classification
+   - In `clientOcrProcessor.ts` and `clientQuestionOcrProcessor.ts`, if URL detection is unknown, fetch the file first and inspect the returned blob MIME type.
+   - If the blob MIME type is `application/pdf`, process it as a PDF.
+   - If it is an image MIME type, OCR it as an image.
+   - Only set `not_applicable` when the file is definitely video/audio or there are no attachments.
+   - If the URL/file cannot be fetched, mark it as `failed`, not `not_applicable`, so it remains retryable.
 
-`src/pages/Statistics.tsx`
+3. Fix Statistics retry visibility
+   - Use the same shared helper for `canProcess`, batch OCR, and row actions.
+   - Show the retry/play button for `not_applicable` rows that have a likely PDF/image URL.
+   - Add a small way to inspect/copy the attachment URL from the Statistics row, so you can verify a problematic URL without digging into the database.
 
-- Update `canProcess` on both the resources table (~line 1162) and questions table (~line 1432) to also include `'not_applicable'`:
-  ```ts
-  const canProcess =
-    (resource.ocr_status === 'pending' ||
-     resource.ocr_status === 'failed' ||
-     resource.ocr_status === 'not_applicable') && isPdfOrImage;
-  ```
-  For questions, mirror the same condition with `hasPdfOrImage`.
-- Change the button `title` to "Process OCR / Retry" so the intent is clear when re-running an N/A item.
-- Note: `isPdfOrImage` / `hasPdfOrImage` already gate the button so we never show retry on items that genuinely have no OCR-able media.
+4. Clean up existing stale N/A PDF rows
+   - Add a safe database migration that converts existing `not_applicable` resources/questions with PDF/image-looking URLs back to `pending`.
+   - Leave true video/audio-only content as `not_applicable`.
 
-### 2. Batch "Process all" includes N/A
-
-`handleProcessAllPending` (resources, ~line 447) and the equivalent question batch handler:
-
-- Extend the filter to also pick up `'not_applicable'` items that have at least one PDF/image in `data` (reuse the same `isPdfOrImage` check used in the table). This way the batch button can recover misclassified items in one click without re-processing legitimate audio/video N/As.
-- Rename the button label to "Process pending & retry N/A" (or similar short copy).
-
-### 3. Smarter N/A decision in the OCR processors
-
-`src/utils/clientOcrProcessor.ts` and `src/utils/clientQuestionOcrProcessor.ts`
-
-Currently `'unknown'` file types are bucketed with video/audio and cause the whole resource to be marked `not_applicable`. Two adjustments:
-
-- Treat `'unknown'` separately from video/audio. If **all** files are unknown, mark the row `failed` (with a clear message like "Could not detect file type — please retry") instead of `not_applicable`. `failed` is already retryable, which prevents this exact stuck state from re-occurring.
-- If `fetchFileViaProxy` throws "File not available" for **every** file in the resource, mark as `failed` (transient) instead of `not_applicable`. This handles the Archive.org eventual-consistency case shown in the console logs (`File not available: Not Found`).
-
-Keep video/audio-only resources as `not_applicable` (correct behavior), but they will now still be retryable through the UI in case the user edits the resource later.
-
-### 4. Small UX polish
-
-- In the OCR filter dropdown, when "Not Applicable" is selected, show a subtle hint above the table: "These items can be retried if they have a PDF or image attached."
-- Status badge tooltip on N/A: "OCR was skipped. Click the play button to retry."
-
-## Technical notes
-
-- No DB migration needed — we're just changing client-side conditions and one classification rule.
-- No edge function changes needed.
-- The existing `processResourceOCR` already overwrites `ocr_status`, `ocr_text`, and `ocr_processed_at` on every run, so retrying an N/A item naturally transitions it to `completed` / `failed` / `not_applicable` based on the new run.
-- Stats counters in `fetchOcrStats` / `fetchQuestionOcrStats` will automatically reflect the new outcomes after a retry; no changes needed there.
-
-## Files to edit
-
-- `src/pages/Statistics.tsx` — extend `canProcess`, batch filter, button title, optional hint.
-- `src/utils/clientOcrProcessor.ts` — separate `unknown` from video/audio; mark all-unavailable fetches as `failed`.
-- `src/utils/clientQuestionOcrProcessor.ts` — same two changes.
+5. Improve diagnostic messages
+   - Store clearer `ocr_text` messages such as:
+     - `No media files found`
+     - `Only video/audio files found`
+     - `Could not fetch PDF/image file — retry later`
+     - `Unknown URL type, but response was application/pdf`
+   - This should make future N/A cases much easier to diagnose.

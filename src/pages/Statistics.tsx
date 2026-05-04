@@ -16,6 +16,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { processResourceOCR } from '@/utils/clientOcrProcessor';
+import { isPdfUrl, isImageUrl, urlsHaveOcrable, textHasOcrableUrl } from '@/utils/mediaTypeUtils';
 import { processQuestionOCR } from '@/utils/clientQuestionOcrProcessor';
 import { extractAndUpdateResourceMetadata, applySuggestedTitle, type ExtractedMetadata } from '@/utils/metadataExtractor';
 import { SEO, createWebPageSchema } from '@/components/SEO';
@@ -453,13 +454,8 @@ export default function Statistics() {
           r.ocr_status === 'failed' ||
           r.ocr_status === 'not_applicable';
         if (!isRetryableStatus) return false;
-        // For not_applicable, only retry items that actually have a PDF/image attached
-        if (r.ocr_status === 'not_applicable') {
-          return r.data?.some(url =>
-            url.toLowerCase().includes('.pdf') ||
-            !!url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)/)
-          );
-        }
+        // For not_applicable, only retry items that have a PDF/image attached
+        if (r.ocr_status === 'not_applicable') return urlsHaveOcrable(r.data);
         return true;
       });
       
@@ -540,10 +536,7 @@ export default function Statistics() {
           q.ocr_status === 'failed' ||
           q.ocr_status === 'not_applicable';
         if (!isRetryableStatus) return false;
-        if (q.ocr_status === 'not_applicable') {
-          const lower = q.data.toLowerCase();
-          return lower.includes('.pdf') || !!lower.match(/\.(jpg|jpeg|png|gif|webp)/);
-        }
+        if (q.ocr_status === 'not_applicable') return textHasOcrableUrl(q.data);
         return true;
       });
       
@@ -1176,10 +1169,7 @@ export default function Statistics() {
                                   </TableHeader>
                                   <TableBody>
                                     {paginatedResources.map((resource) => {
-                                      const isPdfOrImage = resource.data.some(url => 
-                                        url.toLowerCase().includes('.pdf') || 
-                                        url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)/)
-                                      );
+                                      const isPdfOrImage = urlsHaveOcrable(resource.data);
                                       const canProcess = (
                                         resource.ocr_status === 'pending' ||
                                         resource.ocr_status === 'failed' ||
@@ -1452,8 +1442,7 @@ export default function Statistics() {
                                   </TableHeader>
                                   <TableBody>
                                     {paginatedQuestions.map((question) => {
-                                      const hasPdfOrImage = question.data.toLowerCase().includes('.pdf') || 
-                                        question.data.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)/);
+                                      const hasPdfOrImage = textHasOcrableUrl(question.data);
                                       const canProcess = (
                                         question.ocr_status === 'pending' ||
                                         question.ocr_status === 'failed' ||
