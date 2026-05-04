@@ -1169,10 +1169,7 @@ export default function Statistics() {
                                   </TableHeader>
                                   <TableBody>
                                     {paginatedResources.map((resource) => {
-                                      const isPdfOrImage = resource.data.some(url => 
-                                        url.toLowerCase().includes('.pdf') || 
-                                        url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)/)
-                                      );
+                                      const isPdfOrImage = urlsHaveOcrable(resource.data);
                                       const canProcess = (
                                         resource.ocr_status === 'pending' ||
                                         resource.ocr_status === 'failed' ||
@@ -1445,8 +1442,7 @@ export default function Statistics() {
                                   </TableHeader>
                                   <TableBody>
                                     {paginatedQuestions.map((question) => {
-                                      const hasPdfOrImage = question.data.toLowerCase().includes('.pdf') || 
-                                        question.data.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)/);
+                                      const hasPdfOrImage = textHasOcrableUrl(question.data);
                                       const canProcess = (
                                         question.ocr_status === 'pending' ||
                                         question.ocr_status === 'failed' ||
