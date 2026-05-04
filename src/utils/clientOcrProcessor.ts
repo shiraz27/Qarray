@@ -221,6 +221,9 @@ export async function processResourceOCR(
     const extractedTexts: string[] = [];
     let ocrableFileCount = 0;
     let nonOcrableFileCount = 0;
+    let unknownFileCount = 0;
+    let fetchFailedCount = 0;
+    let processableFileCount = 0;
 
     for (let i = 0; i < mediaFiles.length; i++) {
       const mediaFile = mediaFiles[i];
@@ -230,13 +233,23 @@ export async function processResourceOCR(
         `Processing file ${i + 1}/${mediaFiles.length}: ${fileType}...`
       );
 
-      if (fileType === 'video' || fileType === 'audio' || fileType === 'unknown') {
+      if (fileType === 'video' || fileType === 'audio') {
         nonOcrableFileCount++;
         extractedTexts.push(
           `[${fileType.toUpperCase()} FILE - OCR not applicable]`
         );
         continue;
       }
+
+      if (fileType === 'unknown') {
+        unknownFileCount++;
+        extractedTexts.push(
+          `[Unknown file type - could not detect from URL: ${mediaFile.url}]`
+        );
+        continue;
+      }
+
+      processableFileCount++;
 
       try {
         // Fetch file via proxy
@@ -257,6 +270,7 @@ export async function processResourceOCR(
         extractedTexts.push(text || '[No text extracted]');
       } catch (error) {
         console.error(`Error processing ${mediaFile.url}:`, error);
+        fetchFailedCount++;
         extractedTexts.push(`[Error: ${error.message}]`);
       }
     }
@@ -265,13 +279,23 @@ export async function processResourceOCR(
     const combinedText = extractedTexts.join('\n\n---\n\n');
 
     // Determine OCR status based on file types
-    let ocrStatus: 'completed' | 'not_applicable';
+    let ocrStatus: 'completed' | 'not_applicable' | 'failed';
     let ocrText: string;
 
     if (ocrableFileCount === 0) {
-      // All files are non-OCR-able (video/audio only)
-      ocrStatus = 'not_applicable';
-      ocrText = 'Contains only video/audio files - OCR not applicable';
+      if (processableFileCount > 0 && fetchFailedCount === processableFileCount) {
+        // All PDF/image fetches failed (e.g. Archive.org not yet propagated) — retryable
+        ocrStatus = 'failed';
+        ocrText = `All file fetches failed — please retry.\n\n${combinedText}`;
+      } else if (unknownFileCount > 0 && nonOcrableFileCount === 0) {
+        // Could not detect any file type — mark failed so it's retryable
+        ocrStatus = 'failed';
+        ocrText = `Could not detect file type for any attachment — please retry.\n\n${combinedText}`;
+      } else {
+        // Genuinely non-OCR-able (video/audio only, or no processable media)
+        ocrStatus = 'not_applicable';
+        ocrText = 'Contains only video/audio files - OCR not applicable';
+      }
     } else {
       // At least one file was OCR-able
       ocrStatus = 'completed';
