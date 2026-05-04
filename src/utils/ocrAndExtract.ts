@@ -1,12 +1,8 @@
-import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker } from 'tesseract.js';
 import { supabase } from '@/integrations/supabase/client';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { extractMetadataFromOCR, ExtractedMetadata } from '@/utils/metadataExtractor';
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-
-// Configure PDF.js worker using Vite URL import
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+import { extractPdfTextAndOcr } from '@/utils/pdfOcrHelpers';
 
 type FileType = 'pdf' | 'image' | 'video' | 'audio' | 'unknown';
 
@@ -79,27 +75,6 @@ function detectFileType(url: string): FileType {
 }
 
 /**
- * Extract text from PDF using pdfjs-dist
- */
-async function extractPdfText(blob: Blob): Promise<string> {
-  const arrayBuffer = await blob.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-  let fullText = '';
-
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    const pageText = textContent.items
-      .map((item: any) => item.str)
-      .join(' ');
-    fullText += pageText + '\n';
-  }
-
-  return fullText.trim();
-}
-
-/**
  * Extract text from image using Tesseract.js OCR
  */
 async function extractImageText(
@@ -124,103 +99,6 @@ async function extractImageText(
   } finally {
     await worker.terminate();
   }
-}
-
-/**
- * Convert PDF pages to images and OCR them
- */
-async function ocrPdfPages(
-  blob: Blob,
-  onSubProgress?: (ratio: number) => void,
-  registerWorker?: (terminate: () => Promise<void>) => void,
-  signal?: AbortSignal
-): Promise<string> {
-  const arrayBuffer = await blob.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-  const totalPages = pdf.numPages;
-  const worker = await createWorker('eng+ara', 1, {
-    logger: (m: any) => {
-      if (m.status === 'recognizing text' && typeof m.progress === 'number') {
-        // currentPageIndex is captured in closure below
-        const overall = (currentPageIndex + m.progress) / totalPages;
-        onSubProgress?.(overall);
-      }
-    },
-  } as any);
-  registerWorker?.(async () => { await worker.terminate(); });
-  let fullText = '';
-  let currentPageIndex = 0;
-
-  try {
-    for (let i = 1; i <= totalPages; i++) {
-      if (signal?.aborted) throw new Error('Aborted');
-      currentPageIndex = i - 1;
-      const page = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: 2.0 });
-
-      // Create canvas
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d')!;
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-
-      // Render PDF page to canvas
-      const renderContext = {
-        canvasContext: context,
-        viewport: viewport,
-      };
-      await page.render(renderContext as any).promise;
-
-      // Convert canvas to blob
-      const imageBlob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((blob) => resolve(blob!), 'image/png');
-      });
-
-      // OCR the image
-      const {
-        data: { text },
-      } = await worker.recognize(imageBlob);
-      fullText += text + '\n\n';
-    }
-
-    return fullText.trim();
-  } finally {
-    await worker.terminate();
-  }
-}
-
-/**
- * Two-stage PDF processing: Extract text first, then OCR if needed
- */
-async function processPdfWithFallback(
-  blob: Blob,
-  onSubProgress?: (ratio: number) => void,
-  registerWorker?: (terminate: () => Promise<void>) => void,
-  signal?: AbortSignal
-): Promise<string> {
-  console.log('Stage 1: Attempting text extraction from PDF...');
-
-  // Stage 1: Try to extract text
-  const extractedText = await extractPdfText(blob);
-
-  // Check if we got meaningful text (more than 50 chars with real words)
-  const hasRealText =
-    extractedText.length > 50 &&
-    /[a-zA-Z\u0600-\u06FF]{3,}/.test(extractedText);
-
-  if (hasRealText) {
-    console.log('Stage 1: Success! Text extracted from PDF');
-    onSubProgress?.(1);
-    return extractedText;
-  }
-
-  console.log(
-    'Stage 2: No text layer found. Treating as scanned PDF, running OCR...'
-  );
-
-  // Stage 2: Fallback to OCR for scanned PDFs
-  return await ocrPdfPages(blob, onSubProgress, registerWorker, signal);
 }
 
 /**
@@ -307,7 +185,15 @@ export async function processOcrAndExtractMetadata(
         };
 
         if (fileType === 'pdf') {
-          text = await processPdfWithFallback(blob, onSub, registerWorker, signal);
+          // Per-page hybrid extraction. Map per-page progress (page+sub) to
+          // the 0..1 sub-ratio expected by `onSub`.
+          text = await extractPdfTextAndOcr(blob, {
+            signal,
+            onPageProgress: (pageIndex, totalPages, subRatio) => {
+              const overall = (pageIndex + subRatio) / totalPages;
+              onSub(overall);
+            },
+          });
           processedFileCount++;
         } else if (fileType === 'image') {
           text = await extractImageText(blob, onSub, registerWorker);
