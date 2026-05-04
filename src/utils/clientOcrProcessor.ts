@@ -2,12 +2,13 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker } from 'tesseract.js';
 import { supabase } from '@/integrations/supabase/client';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
+import { detectMediaType, mediaTypeFromMime, type MediaType } from '@/utils/mediaTypeUtils';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 // Configure PDF.js worker using Vite URL import
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
-type FileType = 'pdf' | 'image' | 'video' | 'audio' | 'unknown';
+type FileType = MediaType;
 
 /**
  * Fetch file via proxy to bypass CORS
@@ -44,31 +45,7 @@ async function fetchFileViaProxy(url: string): Promise<Blob> {
   return await response.blob();
 }
 
-/**
- * Detect file type from URL
- * Handles both standard extensions (.png) and Archive.org sanitized URLs (-png)
- */
-function detectFileType(url: string): FileType {
-  const lower = url.toLowerCase();
-
-  // Check for PDF (with dot or dash for Archive.org sanitized URLs)
-  if (lower.includes('.pdf') || lower.endsWith('-pdf') || lower.includes('-pdf/') || lower.includes('-pdf?')) return 'pdf';
-  
-  // Check for images (with dot or dash for Archive.org sanitized URLs)
-  if (lower.match(/\.(jpg|jpeg|png|gif|webp)/i) || 
-      lower.match(/-(jpg|jpeg|png|gif|webp)($|[/?#])/i)) return 'image';
-  
-  // Check for video
-  if (lower.match(/\.(mp4|webm|mov)/i) || 
-      lower.match(/-(mp4|webm|mov)($|[/?#])/i) ||
-      lower.includes('youtube')) return 'video';
-  
-  // Check for audio
-  if (lower.match(/\.(mp3|wav|ogg|m4a)/i) || 
-      lower.match(/-(mp3|wav|ogg|m4a)($|[/?#])/i)) return 'audio';
-
-  return 'unknown';
-}
+const detectFileType = detectMediaType;
 
 /**
  * Extract text from PDF using pdfjs-dist
@@ -227,7 +204,7 @@ export async function processResourceOCR(
 
     for (let i = 0; i < mediaFiles.length; i++) {
       const mediaFile = mediaFiles[i];
-      const fileType = detectFileType(mediaFile.url);
+      let fileType = detectFileType(mediaFile.url);
 
       onProgress?.(
         `Processing file ${i + 1}/${mediaFiles.length}: ${fileType}...`
@@ -241,19 +218,34 @@ export async function processResourceOCR(
         continue;
       }
 
-      if (fileType === 'unknown') {
-        unknownFileCount++;
-        extractedTexts.push(
-          `[Unknown file type - could not detect from URL: ${mediaFile.url}]`
-        );
-        continue;
-      }
-
-      processableFileCount++;
-
       try {
-        // Fetch file via proxy
+        // Fetch file via proxy. For unknown URL types, the response
+        // Content-Type is our last chance to classify the file.
         const blob = await fetchFileViaProxy(mediaFile.url);
+
+        if (fileType === 'unknown') {
+          const mimeType = mediaTypeFromMime(blob.type);
+          if (mimeType === 'pdf' || mimeType === 'image') {
+            console.log(
+              `URL had unknown extension, but server returned ${blob.type}. Treating as ${mimeType}.`
+            );
+            fileType = mimeType;
+          } else if (mimeType === 'video' || mimeType === 'audio') {
+            nonOcrableFileCount++;
+            extractedTexts.push(
+              `[${mimeType.toUpperCase()} FILE - OCR not applicable]`
+            );
+            continue;
+          } else {
+            unknownFileCount++;
+            extractedTexts.push(
+              `[Unknown file type - URL: ${mediaFile.url}, server returned: ${blob.type || 'no content-type'}]`
+            );
+            continue;
+          }
+        }
+
+        processableFileCount++;
 
         let text = '';
 
@@ -271,6 +263,7 @@ export async function processResourceOCR(
       } catch (error) {
         console.error(`Error processing ${mediaFile.url}:`, error);
         fetchFailedCount++;
+        if (fileType !== 'unknown') processableFileCount++;
         extractedTexts.push(`[Error: ${error.message}]`);
       }
     }
