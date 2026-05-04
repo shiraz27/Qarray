@@ -1,51 +1,66 @@
-## Goal
+# Allow Retrying OCR on "Not Applicable" Items
 
-In the "Common Chapters from other Bac classes" section, group results by **similarity to the native chapters** (not by class mapping order), and order all chapter lists by **id** instead of alphabetical name.
+## The problem
 
-## Changes
+In Statistics, items end up with `ocr_status = 'not_applicable'` (the "N/A" badge) in several legitimate-but-recoverable cases:
 
-### 1. `src/components/MainContent.tsx`
+- The file extension wasn't recognized (Archive.org sometimes sanitizes URLs like `…-pdf` / `…-png`, or a file is uploaded with no extension), so `detectFileType` returns `'unknown'` and the item is marked N/A.
+- The fetch proxy returned "unavailable" (Archive.org eventual-consistency 404), so processing produced no OCR-able files and the item was marked N/A.
+- A resource truly has only video/audio (correct N/A) — but the user later edits it to add a PDF/image and wants to re-OCR.
 
-**A. Order native chapters by id**
-- Line 86: change `.order('name')` → `.order('id', { ascending: true })`.
+Today the per-row "Play" button is only shown when `ocr_status === 'pending' || 'failed'`. Once an item is N/A there is **no UI path** to re-run OCR on it, so the user is stuck. The "Process all pending" batch also skips N/A items.
 
-**B. Track which native chapter each common chapter maps to (to enable similarity grouping)**
-- In the `chapter_common_mappings` fetch (line 152-155), also select `chapter_id` so we know the source native chapter for each mapping.
-- Build a map: `commonChapterId -> nativeChapterId(s)` from the raw mappings.
+## The fix
 
-**C. Extend `CommonChapter` type**
-```ts
-interface CommonChapter {
-  id: number;
-  name: string;
-  className: string;
-  matchedNativeId: number | null; // native chapter it's most similar to
-}
-```
+Treat `not_applicable` as a retryable state in the admin Statistics page (it stays purely a manual, admin-triggered action — consistent with the existing OCR policy).
 
-**D. Group + order common chapters by similarity to native chapters**
-- For each common chapter, attach its `matchedNativeId` (first native chapter id from the mapping list — these are AI-generated similarity mappings, so any mapped native is by definition similar).
-- Sort the `commons` array such that:
-  1. Common chapters that map to the **same native chapter cluster together**.
-  2. Clusters are ordered following the native chapters' **id order** (matches the new chapter order).
-  3. Within a cluster, sort by common chapter `id` ascending.
-  4. Any common chapters with no `matchedNativeId` (shouldn't happen, but safety) go to the end, sorted by id.
+### 1. Per-row retry button (resources + questions tables)
 
-**E. Add visual separators between similarity clusters**
-- In the render block (lines 461-494), instead of a flat `.map`, iterate clusters:
-  - For each cluster (group of commons sharing the same `matchedNativeId`), render the cards.
-  - Between clusters, render a thin separator (e.g. a muted horizontal divider with the native chapter name as a small label, like `— Similar to: <Native Chapter Name> —`) so the user understands why items are grouped.
-- The first cluster has no separator above it.
+`src/pages/Statistics.tsx`
 
-### 2. No DB / edge function changes
-The existing `chapter_common_mappings` table already provides the `chapter_id` (native) → `common_chapter_id` link, which is exactly the similarity signal we need. No migration or AI call needed for this re-ordering.
+- Update `canProcess` on both the resources table (~line 1162) and questions table (~line 1432) to also include `'not_applicable'`:
+  ```ts
+  const canProcess =
+    (resource.ocr_status === 'pending' ||
+     resource.ocr_status === 'failed' ||
+     resource.ocr_status === 'not_applicable') && isPdfOrImage;
+  ```
+  For questions, mirror the same condition with `hasPdfOrImage`.
+- Change the button `title` to "Process OCR / Retry" so the intent is clear when re-running an N/A item.
+- Note: `isPdfOrImage` / `hasPdfOrImage` already gate the button so we never show retry on items that genuinely have no OCR-able media.
+
+### 2. Batch "Process all" includes N/A
+
+`handleProcessAllPending` (resources, ~line 447) and the equivalent question batch handler:
+
+- Extend the filter to also pick up `'not_applicable'` items that have at least one PDF/image in `data` (reuse the same `isPdfOrImage` check used in the table). This way the batch button can recover misclassified items in one click without re-processing legitimate audio/video N/As.
+- Rename the button label to "Process pending & retry N/A" (or similar short copy).
+
+### 3. Smarter N/A decision in the OCR processors
+
+`src/utils/clientOcrProcessor.ts` and `src/utils/clientQuestionOcrProcessor.ts`
+
+Currently `'unknown'` file types are bucketed with video/audio and cause the whole resource to be marked `not_applicable`. Two adjustments:
+
+- Treat `'unknown'` separately from video/audio. If **all** files are unknown, mark the row `failed` (with a clear message like "Could not detect file type — please retry") instead of `not_applicable`. `failed` is already retryable, which prevents this exact stuck state from re-occurring.
+- If `fetchFileViaProxy` throws "File not available" for **every** file in the resource, mark as `failed` (transient) instead of `not_applicable`. This handles the Archive.org eventual-consistency case shown in the console logs (`File not available: Not Found`).
+
+Keep video/audio-only resources as `not_applicable` (correct behavior), but they will now still be retryable through the UI in case the user edits the resource later.
+
+### 4. Small UX polish
+
+- In the OCR filter dropdown, when "Not Applicable" is selected, show a subtle hint above the table: "These items can be retried if they have a PDF or image attached."
+- Status badge tooltip on N/A: "OCR was skipped. Click the play button to retry."
 
 ## Technical notes
 
-- Native chapter id order is already meaningful (chapters are inserted in curriculum order), so using id ordering matches the user's intent of "curriculum order, not alphabetical".
-- A common chapter could match multiple native chapters; we cluster it under its lowest-id native match to keep ordering deterministic and avoid duplicates.
-- Cluster header styling: small uppercase muted text + thin border, only between clusters (not before the first one).
+- No DB migration needed — we're just changing client-side conditions and one classification rule.
+- No edge function changes needed.
+- The existing `processResourceOCR` already overwrites `ocr_status`, `ocr_text`, and `ocr_processed_at` on every run, so retrying an N/A item naturally transitions it to `completed` / `failed` / `not_applicable` based on the new run.
+- Stats counters in `fetchOcrStats` / `fetchQuestionOcrStats` will automatically reflect the new outcomes after a retry; no changes needed there.
 
-## Out of scope
-- Other lists (resources, questions, memorizations) — not mentioned by the user.
-- Changing the AI matching logic itself.
+## Files to edit
+
+- `src/pages/Statistics.tsx` — extend `canProcess`, batch filter, button title, optional hint.
+- `src/utils/clientOcrProcessor.ts` — separate `unknown` from video/audio; mark all-unavailable fetches as `failed`.
+- `src/utils/clientQuestionOcrProcessor.ts` — same two changes.
