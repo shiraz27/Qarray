@@ -447,9 +447,21 @@ export default function Statistics() {
   const handleProcessAllPending = async () => {
     setIsProcessingBatch(true);
     try {
-      const resourcesToProcess = resources.filter(
-        r => r.ocr_status === 'pending' || r.ocr_status === 'failed'
-      );
+      const resourcesToProcess = resources.filter(r => {
+        const isRetryableStatus =
+          r.ocr_status === 'pending' ||
+          r.ocr_status === 'failed' ||
+          r.ocr_status === 'not_applicable';
+        if (!isRetryableStatus) return false;
+        // For not_applicable, only retry items that actually have a PDF/image attached
+        if (r.ocr_status === 'not_applicable') {
+          return r.data?.some(url =>
+            url.toLowerCase().includes('.pdf') ||
+            !!url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)/)
+          );
+        }
+        return true;
+      });
       
       if (resourcesToProcess.length === 0) {
         toast.info('No resources to process');
@@ -522,9 +534,18 @@ export default function Statistics() {
   const handleProcessAllPendingQuestions = async () => {
     setIsProcessingQuestionBatch(true);
     try {
-      const questionsToProcess = questions.filter(
-        q => q.ocr_status === 'pending' || q.ocr_status === 'failed'
-      );
+      const questionsToProcess = questions.filter(q => {
+        const isRetryableStatus =
+          q.ocr_status === 'pending' ||
+          q.ocr_status === 'failed' ||
+          q.ocr_status === 'not_applicable';
+        if (!isRetryableStatus) return false;
+        if (q.ocr_status === 'not_applicable') {
+          const lower = q.data.toLowerCase();
+          return lower.includes('.pdf') || !!lower.match(/\.(jpg|jpeg|png|gif|webp)/);
+        }
+        return true;
+      });
       
       if (questionsToProcess.length === 0) {
         toast.info('No questions to process');
@@ -1159,7 +1180,11 @@ export default function Statistics() {
                                         url.toLowerCase().includes('.pdf') || 
                                         url.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)/)
                                       );
-                                      const canProcess = (resource.ocr_status === 'pending' || resource.ocr_status === 'failed') && isPdfOrImage;
+                                      const canProcess = (
+                                        resource.ocr_status === 'pending' ||
+                                        resource.ocr_status === 'failed' ||
+                                        resource.ocr_status === 'not_applicable'
+                                      ) && isPdfOrImage;
                                       const suggestedTitle = suggestedTitles.find(st => st.resourceId === resource.id);
                                       
                                       return (
@@ -1240,7 +1265,7 @@ export default function Statistics() {
                                                   variant="ghost"
                                                   onClick={() => handleProcessSingle(resource.id)}
                                                   disabled={processingId === resource.id}
-                                                  title="Process OCR"
+                                                  title={resource.ocr_status === 'not_applicable' ? 'Retry OCR' : 'Process OCR'}
                                                 >
                                                   {processingId === resource.id ? (
                                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1429,7 +1454,11 @@ export default function Statistics() {
                                     {paginatedQuestions.map((question) => {
                                       const hasPdfOrImage = question.data.toLowerCase().includes('.pdf') || 
                                         question.data.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)/);
-                                      const canProcess = (question.ocr_status === 'pending' || question.ocr_status === 'failed') && hasPdfOrImage;
+                                      const canProcess = (
+                                        question.ocr_status === 'pending' ||
+                                        question.ocr_status === 'failed' ||
+                                        question.ocr_status === 'not_applicable'
+                                      ) && hasPdfOrImage;
                                       
                                       return (
                                         <TableRow key={question.id}>
