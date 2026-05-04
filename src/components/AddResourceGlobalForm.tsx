@@ -17,6 +17,7 @@ import { Loader2, Bot, Edit3, Clock, Zap, AlertTriangle, Sparkles, ArrowLeft, Ch
 import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
 import { processOcrAndExtractMetadata, OcrAndExtractResult } from '@/utils/ocrAndExtract';
+import { mergeDescriptionWithAi } from '@/utils/metadataExtractor';
 import { SchoolAutocomplete } from './SchoolAutocomplete';
 import { AIBadge } from './AIBadge';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
@@ -342,17 +343,10 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
         form.setValue('devoir_type_id', result.metadata.suggested_devoir_type_id.toString());
       }
 
-      // Use AI-generated description if available
-      if (result.metadata.suggested_description) {
-        form.setValue('description', result.metadata.suggested_description);
-      } else if (!form.getValues('description')) {
-        // Fallback to old behavior if no AI description
-        const parts: string[] = [];
-        if (result.metadata.suggested_title) parts.push(result.metadata.suggested_title);
-        if (result.metadata.school_name) parts.push(`🏫 ${result.metadata.school_name}`);
-        if (result.metadata.teacher_name) parts.push(`👨‍🏫 ${result.metadata.teacher_name}`);
-        form.setValue('description', parts.join(' - ') || 'Resource description');
-      }
+      // Merge AI block (summary + key metadata) into existing description,
+      // replacing any prior auto-block so retries don't duplicate content.
+      const merged = mergeDescriptionWithAi(form.getValues('description'), result.metadata);
+      if (merged) form.setValue('description', merged);
 
       setTimeout(() => {
         setStep('review');
