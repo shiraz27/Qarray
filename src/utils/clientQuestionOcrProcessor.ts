@@ -101,6 +101,7 @@ export async function processQuestionOCR(
     let unknownFileCount = 0;
     let fetchFailedCount = 0;
     let processableFileCount = 0;
+    let hadFetchFailure = false;
 
     for (let i = 0; i < mediaFiles.length; i++) {
       const mediaFile = mediaFiles[i];
@@ -118,6 +119,10 @@ export async function processQuestionOCR(
         continue;
       }
 
+      if (fileType === 'pdf' || fileType === 'image') {
+        processableFileCount++;
+      }
+
       try {
         const blob = await fetchFileViaProxy(mediaFile.url);
 
@@ -128,6 +133,7 @@ export async function processQuestionOCR(
               `URL had unknown extension, but server returned ${blob.type}. Treating as ${mimeType}.`
             );
             fileType = mimeType;
+            processableFileCount++;
           } else if (mimeType === 'video' || mimeType === 'audio') {
             nonOcrableFileCount++;
             extractedTexts.push(
@@ -142,8 +148,6 @@ export async function processQuestionOCR(
             continue;
           }
         }
-
-        processableFileCount++;
 
         let text = '';
 
@@ -161,7 +165,7 @@ export async function processQuestionOCR(
       } catch (error: any) {
         console.error(`Error processing ${mediaFile.url}:`, error);
         fetchFailedCount++;
-        if (fileType !== 'unknown') processableFileCount++;
+        hadFetchFailure = true;
         extractedTexts.push(`[Error: ${error.message}]`);
       }
     }
@@ -174,7 +178,10 @@ export async function processQuestionOCR(
     let ocrText: string;
 
     if (ocrableFileCount === 0) {
-      if (processableFileCount > 0 && fetchFailedCount === processableFileCount) {
+      if (hadFetchFailure) {
+        ocrStatus = 'failed';
+        ocrText = `Some files could not be fetched yet (Archive.org may still be processing) — please retry.\n\n${combinedText}`;
+      } else if (processableFileCount > 0 && fetchFailedCount === processableFileCount) {
         ocrStatus = 'failed';
         ocrText = `All file fetches failed — please retry.\n\n${combinedText}`;
       } else if (unknownFileCount > 0 && nonOcrableFileCount === 0) {
@@ -185,8 +192,7 @@ export async function processQuestionOCR(
         ocrText = 'Contains only video/audio files - OCR not applicable';
       }
     } else {
-      // At least one file was OCR-able
-      ocrStatus = 'completed';
+      ocrStatus = hadFetchFailure ? 'failed' : 'completed';
       ocrText = combinedText;
     }
 
