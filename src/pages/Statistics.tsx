@@ -629,6 +629,75 @@ export default function Statistics() {
     }
   };
 
+  // Force retry — runs OCR regardless of current status
+  const runBulkResourceOcr = async (ids: number[]) => {
+    if (ids.length === 0) return;
+    setIsProcessingBatch(true);
+    let successCount = 0;
+    let failCount = 0;
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        try {
+          const result = await processResourceOCR(ids[i], (message) => {
+            toast.loading(`[${i + 1}/${ids.length}] ${message}`, { id: 'bulk-resource-ocr' });
+          });
+          if (result.success) successCount++; else failCount++;
+        } catch {
+          failCount++;
+        }
+      }
+      toast.dismiss('bulk-resource-ocr');
+      toast.success(`Done: ${successCount} ok, ${failCount} failed`);
+      setSelectedResourceIds(new Set());
+      fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
+  const runBulkQuestionOcr = async (ids: number[]) => {
+    if (ids.length === 0) return;
+    setIsProcessingQuestionBatch(true);
+    let successCount = 0;
+    let failCount = 0;
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        try {
+          const result = await processQuestionOCR(ids[i], (message) => {
+            toast.loading(`[${i + 1}/${ids.length}] ${message}`, { id: 'bulk-question-ocr' });
+          });
+          if (result.success) successCount++; else failCount++;
+        } catch {
+          failCount++;
+        }
+      }
+      toast.dismiss('bulk-question-ocr');
+      toast.success(`Done: ${successCount} ok, ${failCount} failed`);
+      setSelectedQuestionIds(new Set());
+      fetchQuestionOcrStats(selectedClass, selectedSubject, selectedChapter);
+      fetchQuestions(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsProcessingQuestionBatch(false);
+    }
+  };
+
+  const toggleResourceSelected = (id: number) => {
+    setSelectedResourceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleQuestionSelected = (id: number) => {
+    setSelectedQuestionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   // Metadata extraction handlers
   const handleExtractMetadata = async (resourceId: number) => {
     const resource = resources.find(r => r.id === resourceId);
