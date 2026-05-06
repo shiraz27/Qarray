@@ -1837,6 +1837,40 @@ export default function Statistics() {
           </div>
         )}
       </main>
+
+      <AlertDialog
+        open={forceRetryConfirm !== null}
+        onOpenChange={(open) => {
+          if (!open) setForceRetryConfirm(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Force retry OCR?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This {forceRetryConfirm?.kind} already has completed OCR text. Re-running will
+              overwrite the existing text. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!forceRetryConfirm) return;
+                const { kind, id } = forceRetryConfirm;
+                setForceRetryConfirm(null);
+                if (kind === 'resource') {
+                  handleProcessSingle(id);
+                } else {
+                  handleProcessSingleQuestion(id);
+                }
+              }}
+            >
+              Force retry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
