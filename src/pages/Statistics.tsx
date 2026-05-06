@@ -1239,6 +1239,32 @@ export default function Statistics() {
                               />
                             </div>
                           </div>
+                          {selectedResourceIds.size > 0 && (
+                            <div className="flex items-center justify-between gap-2 mb-3 p-2 rounded-md bg-muted/40 border">
+                              <span className="text-sm font-medium">
+                                {selectedResourceIds.size} selected
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => runBulkResourceOcr(Array.from(selectedResourceIds))}
+                                  disabled={isProcessingBatch}
+                                >
+                                  {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                  Retry selected
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setSelectedResourceIds(new Set())}
+                                >
+                                  <X className="mr-2 h-4 w-4" />
+                                  Clear
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                           {resourcesLoading ? (
                             <div className="text-center py-8 text-muted-foreground">Loading resources...</div>
                           ) : paginatedResources.length === 0 ? (
@@ -1249,11 +1275,31 @@ export default function Statistics() {
                                 <Table>
                                   <TableHeader>
                                     <TableRow>
+                                      <TableHead className="w-[40px]">
+                                        <Checkbox
+                                          checked={
+                                            paginatedResources.length > 0 &&
+                                            paginatedResources.every((r) => selectedResourceIds.has(r.id))
+                                          }
+                                          onCheckedChange={(checked) => {
+                                            setSelectedResourceIds((prev) => {
+                                              const next = new Set(prev);
+                                              if (checked) {
+                                                paginatedResources.forEach((r) => next.add(r.id));
+                                              } else {
+                                                paginatedResources.forEach((r) => next.delete(r.id));
+                                              }
+                                              return next;
+                                            });
+                                          }}
+                                        />
+                                      </TableHead>
                                       <TableHead className="w-[80px]">ID</TableHead>
                                       <TableHead>Title</TableHead>
                                       <TableHead>Type</TableHead>
                                       <TableHead>Chapter</TableHead>
                                       <TableHead>OCR Status</TableHead>
+                                      <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                   </TableHeader>
@@ -1269,6 +1315,12 @@ export default function Statistics() {
                                       
                                       return (
                                         <TableRow key={resource.id}>
+                                          <TableCell>
+                                            <Checkbox
+                                              checked={selectedResourceIds.has(resource.id)}
+                                              onCheckedChange={() => toggleResourceSelected(resource.id)}
+                                            />
+                                          </TableCell>
                                           <TableCell className="font-medium">{resource.id}</TableCell>
                                           <TableCell>
                                             <div className="space-y-1">
@@ -1320,7 +1372,43 @@ export default function Statistics() {
                                             {resource.chapters?.name || 'N/A'}
                                           </TableCell>
                                           <TableCell>
-                                            {getOcrStatusBadge(resource.ocr_status)}
+                                            <div className="space-y-1">
+                                              {getOcrStatusBadge(resource.ocr_status)}
+                                              <div className="text-[10px] font-mono text-muted-foreground">
+                                                {resource.ocr_status ?? 'null'}
+                                              </div>
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>
+                                            {resource.ocr_text ? (
+                                              <Popover>
+                                                <PopoverTrigger asChild>
+                                                  <button className="text-xs text-left text-muted-foreground hover:text-foreground max-w-[200px] truncate underline-offset-2 hover:underline">
+                                                    {resource.ocr_text.substring(0, 60)}
+                                                    {resource.ocr_text.length > 60 ? '…' : ''}
+                                                  </button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-[480px] max-h-[400px] overflow-auto">
+                                                  <div className="flex justify-end mb-2">
+                                                    <Button
+                                                      size="sm"
+                                                      variant="ghost"
+                                                      onClick={() => {
+                                                        navigator.clipboard.writeText(resource.ocr_text || '');
+                                                        toast.success('Copied OCR text');
+                                                      }}
+                                                    >
+                                                      Copy
+                                                    </Button>
+                                                  </div>
+                                                  <pre className="text-xs whitespace-pre-wrap break-words">
+                                                    {resource.ocr_text}
+                                                  </pre>
+                                                </PopoverContent>
+                                              </Popover>
+                                            ) : (
+                                              <span className="text-xs text-muted-foreground">—</span>
+                                            )}
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
@@ -1354,6 +1442,21 @@ export default function Statistics() {
                                                   )}
                                                 </Button>
                                               )}
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => {
+                                                  if (resource.ocr_status === 'completed') {
+                                                    setForceRetryConfirm({ kind: 'resource', id: resource.id });
+                                                  } else {
+                                                    handleProcessSingle(resource.id);
+                                                  }
+                                                }}
+                                                disabled={processingId === resource.id}
+                                                title="Force retry OCR (any status)"
+                                              >
+                                                <RefreshCw className="h-4 w-4" />
+                                              </Button>
                                             </div>
                                           </TableCell>
                                         </TableRow>
