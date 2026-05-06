@@ -25,31 +25,6 @@ function isReal(s: string): boolean {
   return t.length >= 10 && /[a-zA-Z\u0600-\u06FF]/.test(t);
 }
 
-/** Heuristic: is the text-layer content rich enough to likely be exhaustive? */
-function isVeryRichText(s: string): boolean {
-  return s.trim().length >= 200 && /[a-zA-Z\u0600-\u06FF]{3,}/.test(s);
-}
-
-/**
- * Detect whether a PDF page contains embedded raster images.
- * Used to skip Tesseract on pure-text pages.
- */
-async function pageHasImages(page: any): Promise<boolean> {
-  try {
-    const opList = await page.getOperatorList();
-    const fns: number[] = opList.fnArray || [];
-    const ops = (pdfjsLib as any).OPS || {};
-    const imageOps = new Set<number>(
-      [ops.paintImageXObject, ops.paintInlineImageXObject, ops.paintImageMaskXObject, ops.paintJpegXObject]
-        .filter((v) => typeof v === 'number') as number[]
-    );
-    return fns.some((fn) => imageOps.has(fn));
-  } catch {
-    // If we can't tell, assume yes so we still OCR.
-    return true;
-  }
-}
-
 async function getPageText(page: any): Promise<string> {
   try {
     const tc = await page.getTextContent();
@@ -145,24 +120,17 @@ export async function extractPdfTextAndOcr(
 
       const textLayer = await getPageText(page);
 
-      // Decide whether to skip OCR for this page.
+      // Always OCR every page so embedded images are textified, regardless
+      // of how rich the text layer is. The combine step dedupes overlap.
       let ocrText = '';
-      let skipOcr = false;
-      if (isVeryRichText(textLayer)) {
-        const hasImg = await pageHasImages(page);
-        if (!hasImg) skipOcr = true;
-      }
-
-      if (!skipOcr) {
-        try {
-          const imageBlob = await renderPageToBlob(page);
-          const w = await ensureWorker();
-          const { data } = await w.recognize(imageBlob);
-          ocrText = (data.text || '').trim();
-        } catch (err: any) {
-          console.warn(`[pdf-ocr] page ${i} OCR failed:`, err);
-          ocrText = `[ocr failed: ${err?.message || err}]`;
-        }
+      try {
+        const imageBlob = await renderPageToBlob(page);
+        const w = await ensureWorker();
+        const { data } = await w.recognize(imageBlob);
+        ocrText = (data.text || '').trim();
+      } catch (err: any) {
+        console.warn(`[pdf-ocr] page ${i} OCR failed:`, err);
+        ocrText = `[ocr failed: ${err?.message || err}]`;
       }
 
       const combined = combinePageOutput(textLayer, ocrText);
