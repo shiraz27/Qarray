@@ -124,6 +124,14 @@ export default function Statistics() {
   const [applyingTitleId, setApplyingTitleId] = useState<number | null>(null);
   const itemsPerPage = 20;
 
+  // Multi-select state
+  const [selectedResourceIds, setSelectedResourceIds] = useState<Set<number>>(new Set());
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<number>>(new Set());
+  const [forceRetryConfirm, setForceRetryConfirm] = useState<
+    | { kind: 'resource' | 'question'; id: number }
+    | null
+  >(null);
+
   useEffect(() => {
     if (!roleLoading && (isModerator || isAdmin)) {
       fetchClasses();
@@ -439,7 +447,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('questions')
-        .select('id, data, ocr_status, chapter_id, chapters(name, subject_id)')
+        .select('id, data, ocr_status, ocr_text, chapter_id, chapters(name, subject_id)')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
