@@ -1,55 +1,30 @@
-## Issue 1: PDFs marked `not_applicable` (Archive.org propagation)
+## Problem
 
-**Root cause confirmed.** When a PDF is freshly uploaded to Archive.org, the derivatives URL often returns 404 for several minutes. The proxy retries 5x with backoff, then `fetchFileViaProxy` throws `"File not available yet"`. In `clientOcrProcessor.ts`, that exception is caught per-file and pushed into `extractedTexts` with `[Error: ...]`. Then:
+Resource #35's `ocr_text` contains only text-layer content (23KB, no `[ocr]` markers). The per-page hybrid extractor skipped Tesseract on every page because of an optimization in `extractPdfTextAndOcr`:
 
-- `ocrableFileCount` stays 0 (we never reached the OCR step)
-- `processableFileCount` stays 0 too, **because** the increment line `if (fileType !== 'unknown') processableFileCount++;` runs only inside the catch — but the earlier line `processableFileCount++;` (line 150) runs only on success. The fall-through path can land in the `unknown`/`not_applicable` branch.
-- Net result: `ocr_status = 'not_applicable'` instead of `failed` → user can't see it should be retried.
+```ts
+if (isVeryRichText(textLayer)) {
+  const hasImg = await pageHasImages(page);
+  if (!hasImg) skipOcr = true;
+}
+```
 
-There is also a subtler bug: `processableFileCount` is incremented **after** the fetch succeeds (line 150), so a fetch failure on a known PDF/image URL only bumps the catch-side counter. The status logic (lines 180-198) then can route to `not_applicable` if any non-OCR-able files were also present.
+`pageHasImages` only checks a small set of pdf.js OPS (`paintImageXObject`, `paintInlineImageXObject`, `paintImageMaskXObject`, `paintJpegXObject`). Many PDFs embed images via form XObjects, scanned-overlay constructs, or other ops not in that list, so it returns `false` even when raster content is present — and OCR is skipped.
 
-### Fix
+This contradicts the explicit requirement: **ocr_text must always include OCR output, regardless of how rich the text layer is**.
 
-1. In `src/utils/clientOcrProcessor.ts`:
-   - Increment `processableFileCount` **before** the fetch when `fileType` is `pdf` or `image` (known OCR-able from URL).
-   - In the catch block, distinguish "unavailable / network" errors (message includes `"not available"`, `"Failed to fetch"`, `"timeout"`) and force `ocr_status = 'failed'` for the whole resource if any such error occurred — never `not_applicable`.
-   - Track a `hadFetchFailure` boolean and use it in the final status decision: if true, status is always `failed`.
-2. Same fix in `src/utils/clientQuestionOcrProcessor.ts`.
-3. Update the proxy error message in `fetch-media/index.ts` so the front-end can recognize it: include `"upstream not ready"` in the JSON error string when `upstreamStatus === 404`.
+## Fix
 
-## Issue 2: Statistics page — better OCR visibility & batch retry
+In `src/utils/pdfOcrHelpers.ts`:
 
-### A. New columns in the resources table
+1. **Always run Tesseract on every page.** Remove the `isVeryRichText` + `pageHasImages` skip path. Drop the now-unused `isVeryRichText` and `pageHasImages` helpers.
+2. Keep the existing per-page combine logic (`combinePageOutput`) — it already concatenates text-layer and OCR with `[text layer]` / `[ocr]` markers when neither contains the other, and dedupes when one is a subset.
+3. Keep all other behavior (worker reuse, progress reporting, abort signal, error handling).
 
-Add to the resources table on `Statistics.tsx`:
-- **OCR Text** column — truncated preview (~80 chars) with a popover/tooltip showing the full text on hover, plus a "Copy" button.
-- **OCR Status** already exists as a badge — also display the **raw DB value** in muted small text underneath the badge (e.g. `not_applicable`, `pending`, …).
+## Re-OCR resource 35
 
-Same for the questions table (OCR Text + raw status string).
+After the code change, the user can use the existing **Force Retry** action on the Statistics page to re-process resource 35 and verify the new `ocr_text` contains `[ocr]` blocks with text from the embedded images.
 
-### B. "Force retry" action (regardless of status)
+## Files
 
-Per-row: add a second action button **Force Retry** (refresh icon, distinct from the existing Retry/Process button) that calls `processResourceOCR(id)` even when status is `completed`. Confirm with `AlertDialog` for completed rows so users don't overwrite good text by accident.
-
-### C. Multi-select + bulk retry
-
-- Add a checkbox column to both resource and question tables (header checkbox toggles all on the current page).
-- New state: `selectedResourceIds: Set<number>`, `selectedQuestionIds: Set<number>`.
-- New toolbar above each table when selection > 0:
-  - Counter ("3 selected")
-  - **Retry selected** button — runs `processResourceOCR` sequentially for every selected id with a single progress toast (`[i/N]`), regardless of current status.
-  - **Clear selection** button.
-- After completion, refresh stats + tables and clear the selection.
-
-### D. Minor
-
-- Filter dropdown already has all status options; verify `not_applicable` shows correctly and add `"failed"` quick-filter chip.
-
-## Files to modify
-
-- `src/utils/clientOcrProcessor.ts` — fix status routing for fetch failures
-- `src/utils/clientQuestionOcrProcessor.ts` — same fix
-- `supabase/functions/fetch-media/index.ts` — clearer error message
-- `src/pages/Statistics.tsx` — new columns, force-retry action, multi-select toolbar, bulk retry handler
-
-No DB schema changes. No new dependencies.
+- `src/utils/pdfOcrHelpers.ts` — remove skip-OCR branch; always OCR every page.
