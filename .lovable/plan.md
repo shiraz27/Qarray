@@ -1,113 +1,55 @@
-# Always-complete PDF OCR
+## Issue 1: PDFs marked `not_applicable` (Archive.org propagation)
 
-## Problem
+**Root cause confirmed.** When a PDF is freshly uploaded to Archive.org, the derivatives URL often returns 404 for several minutes. The proxy retries 5x with backoff, then `fetchFileViaProxy` throws `"File not available yet"`. In `clientOcrProcessor.ts`, that exception is caught per-file and pushed into `extractedTexts` with `[Error: ...]`. Then:
 
-Today `processPdfWithFallback` is all-or-nothing on the whole PDF:
+- `ocrableFileCount` stays 0 (we never reached the OCR step)
+- `processableFileCount` stays 0 too, **because** the increment line `if (fileType !== 'unknown') processableFileCount++;` runs only inside the catch — but the earlier line `processableFileCount++;` (line 150) runs only on success. The fall-through path can land in the `unknown`/`not_applicable` branch.
+- Net result: `ocr_status = 'not_applicable'` instead of `failed` → user can't see it should be retried.
 
-- If the document's combined text layer has >50 chars of letters, it returns that and **never runs Tesseract**.
-- If not, it OCRs the whole document and returns only the OCR.
+There is also a subtler bug: `processableFileCount` is incremented **after** the fetch succeeds (line 150), so a fetch failure on a known PDF/image URL only bumps the catch-side counter. The status logic (lines 180-198) then can route to `not_applicable` if any non-OCR-able files were also present.
 
-Consequences for `ocr_text`:
+### Fix
 
-- A mixed PDF (typed cover page + scanned exam pages) loses every scanned page.
-- A PDF where text-layer covers some content but images on the same page contain different content (formulas, tables) loses the image content.
+1. In `src/utils/clientOcrProcessor.ts`:
+   - Increment `processableFileCount` **before** the fetch when `fileType` is `pdf` or `image` (known OCR-able from URL).
+   - In the catch block, distinguish "unavailable / network" errors (message includes `"not available"`, `"Failed to fetch"`, `"timeout"`) and force `ocr_status = 'failed'` for the whole resource if any such error occurred — never `not_applicable`.
+   - Track a `hadFetchFailure` boolean and use it in the final status decision: if true, status is always `failed`.
+2. Same fix in `src/utils/clientQuestionOcrProcessor.ts`.
+3. Update the proxy error message in `fetch-media/index.ts` so the front-end can recognize it: include `"upstream not ready"` in the JSON error string when `upstreamStatus === 404`.
 
-You want `ocr_text` to be the **union** of every readable signal in the PDF, every time.
+## Issue 2: Statistics page — better OCR visibility & batch retry
 
-## Fix: per-page, capture-everything
+### A. New columns in the resources table
 
-Replace the document-level branch with a per-page loop that always emits content for each page:
+Add to the resources table on `Statistics.tsx`:
+- **OCR Text** column — truncated preview (~80 chars) with a popover/tooltip showing the full text on hover, plus a "Copy" button.
+- **OCR Status** already exists as a badge — also display the **raw DB value** in muted small text underneath the badge (e.g. `not_applicable`, `pending`, …).
 
-For each page in the PDF:
+Same for the questions table (OCR Text + raw status string).
 
-1. Read the page's text layer.
-2. Render the page to a canvas and run Tesseract on it.
-3. Combine both into the page's output (deduped if identical).
+### B. "Force retry" action (regardless of status)
 
-Then concat all pages with a `--- Page N ---` header.
+Per-row: add a second action button **Force Retry** (refresh icon, distinct from the existing Retry/Process button) that calls `processResourceOCR(id)` even when status is `completed`. Confirm with `AlertDialog` for completed rows so users don't overwrite good text by accident.
 
-This guarantees:
+### C. Multi-select + bulk retry
 
-- Text-layer pages: text-layer text is in `ocr_text`.
-- Scanned pages: Tesseract output is in `ocr_text`.
-- Mixed pages (typed paragraph + scanned figure with text): both are in `ocr_text`.
-- Empty pages: a `[no text]` marker so page numbering stays consistent.
+- Add a checkbox column to both resource and question tables (header checkbox toggles all on the current page).
+- New state: `selectedResourceIds: Set<number>`, `selectedQuestionIds: Set<number>`.
+- New toolbar above each table when selection > 0:
+  - Counter ("3 selected")
+  - **Retry selected** button — runs `processResourceOCR` sequentially for every selected id with a single progress toast (`[i/N]`), regardless of current status.
+  - **Clear selection** button.
+- After completion, refresh stats + tables and clear the selection.
 
-## Per-page combine rule
+### D. Minor
 
-```text
-if textLayer is "real" AND ocrText is "real":
-    if normalized(ocrText) ⊇ normalized(textLayer): keep ocrText
-    elif normalized(textLayer) ⊇ normalized(ocrText): keep textLayer
-    else: emit both, labeled [text layer] / [ocr]
-elif textLayer is "real": keep textLayer
-elif ocrText is "real": keep ocrText
-else: "[no text]"
-```
+- Filter dropdown already has all status options; verify `not_applicable` shows correctly and add `"failed"` quick-filter chip.
 
-"real" = trimmed length ≥ 10 and contains a letter or Arabic char. Normalization for the dedupe check = lowercased, whitespace-collapsed.
+## Files to modify
 
-This avoids duplicating the same paragraph twice while still capturing extra OCR content when the text layer is partial.
+- `src/utils/clientOcrProcessor.ts` — fix status routing for fetch failures
+- `src/utils/clientQuestionOcrProcessor.ts` — same fix
+- `supabase/functions/fetch-media/index.ts` — clearer error message
+- `src/pages/Statistics.tsx` — new columns, force-retry action, multi-select toolbar, bulk retry handler
 
-## Performance
-
-- Open the PDF once, reuse the pdfjs document.
-- Lazily create **one** Tesseract worker on the first page, reuse it for every page, terminate at the end. This is critical for 30+ page PDFs.
-- Render scale stays at 2.0 (current value).
-- Per-page progress is reported so the existing 0–90% progress slice in `ocrAndExtract.ts` still updates smoothly.
-
-## Where to change
-
-The same broken logic is duplicated in three files. Consolidate into one helper to fix it once and avoid drift:
-
-New file:
-
-- `src/utils/pdfOcrHelpers.ts` exporting `extractPdfTextAndOcr(blob, opts?)`:
-  - `opts.onPageProgress?(pageIndex, totalPages, subRatio)` — for granular progress
-  - `opts.signal?` — for the upload flow's abort handling
-  - Returns the combined per-page string described above
-
-Update callers to use the helper and delete their local `extractPdfText`, `ocrPdfPages`, `processPdfWithFallback` copies:
-
-- `src/utils/clientOcrProcessor.ts` (admin OCR for resources, Statistics page)
-- `src/utils/clientQuestionOcrProcessor.ts` (admin OCR for questions)
-- `src/utils/ocrAndExtract.ts` (user upload AI fill — keeps its progress wiring intact)
-
-## Output format example
-
-```text
---- Page 1 ---
-[text layer]
-Devoir de contrôle n°1 - Mathématiques - 4ème SE
-
---- Page 2 ---
-[ocr]
-Exercice 1 (5 points)
-Soit f la fonction définie sur R par ...
-
---- Page 3 ---
-[text layer]
-Question 1: ...
-
-[ocr]
-(handwritten formula transcription)
-```
-
-The `[text layer]` / `[ocr]` labels are only added when both signals exist on the same page; pages with a single source emit just the text. The existing `search_pdf_content` ILIKE search keeps working unchanged.
-
-## What does NOT change
-
-- Media-type detection (`mediaTypeUtils.ts`).
-- Image-only OCR path (`extractImageText`) — single-image inputs already get full Tesseract.
-- Status logic (`completed` / `failed` / `not_applicable`) and proxy-fetch behavior.
-- AI metadata extraction and the description-merge block added previously.
-- No DB migration needed. After deploy, admins re-run OCR from Statistics to refresh affected resources; `ocr_text` is overwritten with the complete per-page output.
-
-## Edge cases
-
-- Pure text-layer PDF: Tesseract still runs per page (cost: significant for big PDFs). Mitigation: skip Tesseract on a page when its text-layer content is "very rich" (≥ 200 chars with letters AND no embedded images detected via `page.getOperatorList()` image ops). Fallback if detection is uncertain: still OCR.
-- Pure scanned PDF: text layer empty for every page, Tesseract runs every page (same cost as today's stage-2 path).
-- Tesseract error on one page: capture `[ocr failed: <msg>]` for that page, continue.
-- Render error on one page: capture `[render failed: <msg>]` for that page, continue.
-- Abort signal (upload flow only): checked between pages; worker terminated.
-- Overall status remains `completed` if any page produced any text; `failed` only if every page errored.
+No DB schema changes. No new dependencies.

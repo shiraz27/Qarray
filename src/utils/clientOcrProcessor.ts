@@ -103,6 +103,7 @@ export async function processResourceOCR(
     let unknownFileCount = 0;
     let fetchFailedCount = 0;
     let processableFileCount = 0;
+    let hadFetchFailure = false;
 
     for (let i = 0; i < mediaFiles.length; i++) {
       const mediaFile = mediaFiles[i];
@@ -120,6 +121,13 @@ export async function processResourceOCR(
         continue;
       }
 
+      // For URLs we already know are OCR-able (pdf/image), count them as
+      // processable BEFORE the fetch — otherwise a fetch failure leaves the
+      // file uncounted and the resource may end up tagged `not_applicable`.
+      if (fileType === 'pdf' || fileType === 'image') {
+        processableFileCount++;
+      }
+
       try {
         // Fetch file via proxy. For unknown URL types, the response
         // Content-Type is our last chance to classify the file.
@@ -132,6 +140,7 @@ export async function processResourceOCR(
               `URL had unknown extension, but server returned ${blob.type}. Treating as ${mimeType}.`
             );
             fileType = mimeType;
+            processableFileCount++;
           } else if (mimeType === 'video' || mimeType === 'audio') {
             nonOcrableFileCount++;
             extractedTexts.push(
@@ -146,8 +155,6 @@ export async function processResourceOCR(
             continue;
           }
         }
-
-        processableFileCount++;
 
         let text = '';
 
@@ -165,7 +172,7 @@ export async function processResourceOCR(
       } catch (error) {
         console.error(`Error processing ${mediaFile.url}:`, error);
         fetchFailedCount++;
-        if (fileType !== 'unknown') processableFileCount++;
+        hadFetchFailure = true;
         extractedTexts.push(`[Error: ${error.message}]`);
       }
     }
@@ -178,6 +185,13 @@ export async function processResourceOCR(
     let ocrText: string;
 
     if (ocrableFileCount === 0) {
+      if (hadFetchFailure) {
+        // Any fetch failure on an OCR-able URL is retryable (e.g. Archive.org
+        // derivative still propagating). Never mark such resources as
+        // `not_applicable`.
+        ocrStatus = 'failed';
+        ocrText = `Some files could not be fetched yet (Archive.org may still be processing) — please retry.\n\n${combinedText}`;
+      } else
       if (processableFileCount > 0 && fetchFailedCount === processableFileCount) {
         // All PDF/image fetches failed (e.g. Archive.org not yet propagated) — retryable
         ocrStatus = 'failed';
@@ -192,8 +206,9 @@ export async function processResourceOCR(
         ocrText = 'Contains only video/audio files - OCR not applicable';
       }
     } else {
-      // At least one file was OCR-able
-      ocrStatus = 'completed';
+      // At least one file was OCR-able. If others failed to fetch, still mark
+      // as failed so the user knows to retry.
+      ocrStatus = hadFetchFailure ? 'failed' : 'completed';
       ocrText = combinedText;
     }
 

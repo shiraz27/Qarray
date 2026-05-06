@@ -9,7 +9,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { BarChart3, BookOpen, MessageCircle, Brain, FileText, CheckCircle2, Clock, Play, Loader2, Search, HelpCircle, Sparkles, Building2, User, FileEdit, Check } from 'lucide-react';
+import { BarChart3, BookOpen, MessageCircle, Brain, FileText, CheckCircle2, Clock, Play, Loader2, Search, HelpCircle, Sparkles, Building2, User, FileEdit, Check, RefreshCw, X } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Navigate } from 'react-router-dom';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
@@ -67,6 +79,7 @@ interface QuestionRow {
   id: number;
   data: string;
   ocr_status: string | null;
+  ocr_text?: string | null;
   chapter_id: number | null;
   chapters?: { name: string };
 }
@@ -110,6 +123,14 @@ export default function Statistics() {
   const [suggestedTitles, setSuggestedTitles] = useState<SuggestedTitleEntry[]>([]);
   const [applyingTitleId, setApplyingTitleId] = useState<number | null>(null);
   const itemsPerPage = 20;
+
+  // Multi-select state
+  const [selectedResourceIds, setSelectedResourceIds] = useState<Set<number>>(new Set());
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<number>>(new Set());
+  const [forceRetryConfirm, setForceRetryConfirm] = useState<
+    | { kind: 'resource' | 'question'; id: number }
+    | null
+  >(null);
 
   useEffect(() => {
     if (!roleLoading && (isModerator || isAdmin)) {
@@ -426,7 +447,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('questions')
-        .select('id, data, ocr_status, chapter_id, chapters(name, subject_id)')
+        .select('id, data, ocr_status, ocr_text, chapter_id, chapters(name, subject_id)')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -606,6 +627,75 @@ export default function Statistics() {
     } finally {
       setProcessingQuestionId(null);
     }
+  };
+
+  // Force retry — runs OCR regardless of current status
+  const runBulkResourceOcr = async (ids: number[]) => {
+    if (ids.length === 0) return;
+    setIsProcessingBatch(true);
+    let successCount = 0;
+    let failCount = 0;
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        try {
+          const result = await processResourceOCR(ids[i], (message) => {
+            toast.loading(`[${i + 1}/${ids.length}] ${message}`, { id: 'bulk-resource-ocr' });
+          });
+          if (result.success) successCount++; else failCount++;
+        } catch {
+          failCount++;
+        }
+      }
+      toast.dismiss('bulk-resource-ocr');
+      toast.success(`Done: ${successCount} ok, ${failCount} failed`);
+      setSelectedResourceIds(new Set());
+      fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
+  const runBulkQuestionOcr = async (ids: number[]) => {
+    if (ids.length === 0) return;
+    setIsProcessingQuestionBatch(true);
+    let successCount = 0;
+    let failCount = 0;
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        try {
+          const result = await processQuestionOCR(ids[i], (message) => {
+            toast.loading(`[${i + 1}/${ids.length}] ${message}`, { id: 'bulk-question-ocr' });
+          });
+          if (result.success) successCount++; else failCount++;
+        } catch {
+          failCount++;
+        }
+      }
+      toast.dismiss('bulk-question-ocr');
+      toast.success(`Done: ${successCount} ok, ${failCount} failed`);
+      setSelectedQuestionIds(new Set());
+      fetchQuestionOcrStats(selectedClass, selectedSubject, selectedChapter);
+      fetchQuestions(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsProcessingQuestionBatch(false);
+    }
+  };
+
+  const toggleResourceSelected = (id: number) => {
+    setSelectedResourceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleQuestionSelected = (id: number) => {
+    setSelectedQuestionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
   // Metadata extraction handlers
@@ -1149,6 +1239,32 @@ export default function Statistics() {
                               />
                             </div>
                           </div>
+                          {selectedResourceIds.size > 0 && (
+                            <div className="flex items-center justify-between gap-2 mb-3 p-2 rounded-md bg-muted/40 border">
+                              <span className="text-sm font-medium">
+                                {selectedResourceIds.size} selected
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => runBulkResourceOcr(Array.from(selectedResourceIds))}
+                                  disabled={isProcessingBatch}
+                                >
+                                  {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                  Retry selected
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setSelectedResourceIds(new Set())}
+                                >
+                                  <X className="mr-2 h-4 w-4" />
+                                  Clear
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                           {resourcesLoading ? (
                             <div className="text-center py-8 text-muted-foreground">Loading resources...</div>
                           ) : paginatedResources.length === 0 ? (
@@ -1159,11 +1275,31 @@ export default function Statistics() {
                                 <Table>
                                   <TableHeader>
                                     <TableRow>
+                                      <TableHead className="w-[40px]">
+                                        <Checkbox
+                                          checked={
+                                            paginatedResources.length > 0 &&
+                                            paginatedResources.every((r) => selectedResourceIds.has(r.id))
+                                          }
+                                          onCheckedChange={(checked) => {
+                                            setSelectedResourceIds((prev) => {
+                                              const next = new Set(prev);
+                                              if (checked) {
+                                                paginatedResources.forEach((r) => next.add(r.id));
+                                              } else {
+                                                paginatedResources.forEach((r) => next.delete(r.id));
+                                              }
+                                              return next;
+                                            });
+                                          }}
+                                        />
+                                      </TableHead>
                                       <TableHead className="w-[80px]">ID</TableHead>
                                       <TableHead>Title</TableHead>
                                       <TableHead>Type</TableHead>
                                       <TableHead>Chapter</TableHead>
                                       <TableHead>OCR Status</TableHead>
+                                      <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                   </TableHeader>
@@ -1179,6 +1315,12 @@ export default function Statistics() {
                                       
                                       return (
                                         <TableRow key={resource.id}>
+                                          <TableCell>
+                                            <Checkbox
+                                              checked={selectedResourceIds.has(resource.id)}
+                                              onCheckedChange={() => toggleResourceSelected(resource.id)}
+                                            />
+                                          </TableCell>
                                           <TableCell className="font-medium">{resource.id}</TableCell>
                                           <TableCell>
                                             <div className="space-y-1">
@@ -1230,7 +1372,43 @@ export default function Statistics() {
                                             {resource.chapters?.name || 'N/A'}
                                           </TableCell>
                                           <TableCell>
-                                            {getOcrStatusBadge(resource.ocr_status)}
+                                            <div className="space-y-1">
+                                              {getOcrStatusBadge(resource.ocr_status)}
+                                              <div className="text-[10px] font-mono text-muted-foreground">
+                                                {resource.ocr_status ?? 'null'}
+                                              </div>
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>
+                                            {resource.ocr_text ? (
+                                              <Popover>
+                                                <PopoverTrigger asChild>
+                                                  <button className="text-xs text-left text-muted-foreground hover:text-foreground max-w-[200px] truncate underline-offset-2 hover:underline">
+                                                    {resource.ocr_text.substring(0, 60)}
+                                                    {resource.ocr_text.length > 60 ? '…' : ''}
+                                                  </button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-[480px] max-h-[400px] overflow-auto">
+                                                  <div className="flex justify-end mb-2">
+                                                    <Button
+                                                      size="sm"
+                                                      variant="ghost"
+                                                      onClick={() => {
+                                                        navigator.clipboard.writeText(resource.ocr_text || '');
+                                                        toast.success('Copied OCR text');
+                                                      }}
+                                                    >
+                                                      Copy
+                                                    </Button>
+                                                  </div>
+                                                  <pre className="text-xs whitespace-pre-wrap break-words">
+                                                    {resource.ocr_text}
+                                                  </pre>
+                                                </PopoverContent>
+                                              </Popover>
+                                            ) : (
+                                              <span className="text-xs text-muted-foreground">—</span>
+                                            )}
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
@@ -1264,6 +1442,21 @@ export default function Statistics() {
                                                   )}
                                                 </Button>
                                               )}
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => {
+                                                  if (resource.ocr_status === 'completed') {
+                                                    setForceRetryConfirm({ kind: 'resource', id: resource.id });
+                                                  } else {
+                                                    handleProcessSingle(resource.id);
+                                                  }
+                                                }}
+                                                disabled={processingId === resource.id}
+                                                title="Force retry OCR (any status)"
+                                              >
+                                                <RefreshCw className="h-4 w-4" />
+                                              </Button>
                                             </div>
                                           </TableCell>
                                         </TableRow>
@@ -1423,6 +1616,32 @@ export default function Statistics() {
                               />
                             </div>
                           </div>
+                          {selectedQuestionIds.size > 0 && (
+                            <div className="flex items-center justify-between gap-2 mb-3 p-2 rounded-md bg-muted/40 border">
+                              <span className="text-sm font-medium">
+                                {selectedQuestionIds.size} selected
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => runBulkQuestionOcr(Array.from(selectedQuestionIds))}
+                                  disabled={isProcessingQuestionBatch}
+                                >
+                                  {isProcessingQuestionBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                  Retry selected
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setSelectedQuestionIds(new Set())}
+                                >
+                                  <X className="mr-2 h-4 w-4" />
+                                  Clear
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                           {questionsLoading ? (
                             <div className="text-center py-8 text-muted-foreground">Loading questions...</div>
                           ) : paginatedQuestions.length === 0 ? (
@@ -1433,10 +1652,30 @@ export default function Statistics() {
                                 <Table>
                                   <TableHeader>
                                     <TableRow>
+                                      <TableHead className="w-[40px]">
+                                        <Checkbox
+                                          checked={
+                                            paginatedQuestions.length > 0 &&
+                                            paginatedQuestions.every((q) => selectedQuestionIds.has(q.id))
+                                          }
+                                          onCheckedChange={(checked) => {
+                                            setSelectedQuestionIds((prev) => {
+                                              const next = new Set(prev);
+                                              if (checked) {
+                                                paginatedQuestions.forEach((q) => next.add(q.id));
+                                              } else {
+                                                paginatedQuestions.forEach((q) => next.delete(q.id));
+                                              }
+                                              return next;
+                                            });
+                                          }}
+                                        />
+                                      </TableHead>
                                       <TableHead className="w-[80px]">ID</TableHead>
                                       <TableHead>Question</TableHead>
                                       <TableHead>Chapter</TableHead>
                                       <TableHead>OCR Status</TableHead>
+                                      <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                   </TableHeader>
@@ -1451,6 +1690,12 @@ export default function Statistics() {
                                       
                                       return (
                                         <TableRow key={question.id}>
+                                          <TableCell>
+                                            <Checkbox
+                                              checked={selectedQuestionIds.has(question.id)}
+                                              onCheckedChange={() => toggleQuestionSelected(question.id)}
+                                            />
+                                          </TableCell>
                                           <TableCell className="font-medium">{question.id}</TableCell>
                                           <TableCell>
                                             <div className="max-w-[400px] truncate">{question.data.substring(0, 100)}</div>
@@ -1459,23 +1704,77 @@ export default function Statistics() {
                                             {question.chapters?.name || 'N/A'}
                                           </TableCell>
                                           <TableCell>
-                                            {getOcrStatusBadge(question.ocr_status)}
+                                            <div className="space-y-1">
+                                              {getOcrStatusBadge(question.ocr_status)}
+                                              <div className="text-[10px] font-mono text-muted-foreground">
+                                                {question.ocr_status ?? 'null'}
+                                              </div>
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>
+                                            {question.ocr_text ? (
+                                              <Popover>
+                                                <PopoverTrigger asChild>
+                                                  <button className="text-xs text-left text-muted-foreground hover:text-foreground max-w-[200px] truncate underline-offset-2 hover:underline">
+                                                    {question.ocr_text.substring(0, 60)}
+                                                    {question.ocr_text.length > 60 ? '…' : ''}
+                                                  </button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-[480px] max-h-[400px] overflow-auto">
+                                                  <div className="flex justify-end mb-2">
+                                                    <Button
+                                                      size="sm"
+                                                      variant="ghost"
+                                                      onClick={() => {
+                                                        navigator.clipboard.writeText(question.ocr_text || '');
+                                                        toast.success('Copied OCR text');
+                                                      }}
+                                                    >
+                                                      Copy
+                                                    </Button>
+                                                  </div>
+                                                  <pre className="text-xs whitespace-pre-wrap break-words">
+                                                    {question.ocr_text}
+                                                  </pre>
+                                                </PopoverContent>
+                                              </Popover>
+                                            ) : (
+                                              <span className="text-xs text-muted-foreground">—</span>
+                                            )}
                                           </TableCell>
                                           <TableCell className="text-right">
-                                            {canProcess && (
+                                            <div className="flex items-center justify-end gap-1">
+                                              {canProcess && (
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={() => handleProcessSingleQuestion(question.id)}
+                                                  disabled={processingQuestionId === question.id}
+                                                  title={question.ocr_status === 'not_applicable' ? 'Retry OCR' : 'Process OCR'}
+                                                >
+                                                  {processingQuestionId === question.id ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                  ) : (
+                                                    <Play className="h-4 w-4" />
+                                                  )}
+                                                </Button>
+                                              )}
                                               <Button
                                                 size="sm"
                                                 variant="ghost"
-                                                onClick={() => handleProcessSingleQuestion(question.id)}
+                                                onClick={() => {
+                                                  if (question.ocr_status === 'completed') {
+                                                    setForceRetryConfirm({ kind: 'question', id: question.id });
+                                                  } else {
+                                                    handleProcessSingleQuestion(question.id);
+                                                  }
+                                                }}
                                                 disabled={processingQuestionId === question.id}
+                                                title="Force retry OCR (any status)"
                                               >
-                                                {processingQuestionId === question.id ? (
-                                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                                ) : (
-                                                  <Play className="h-4 w-4" />
-                                                )}
+                                                <RefreshCw className="h-4 w-4" />
                                               </Button>
-                                            )}
+                                            </div>
                                           </TableCell>
                                         </TableRow>
                                       );
@@ -1538,6 +1837,40 @@ export default function Statistics() {
           </div>
         )}
       </main>
+
+      <AlertDialog
+        open={forceRetryConfirm !== null}
+        onOpenChange={(open) => {
+          if (!open) setForceRetryConfirm(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Force retry OCR?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This {forceRetryConfirm?.kind} already has completed OCR text. Re-running will
+              overwrite the existing text. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!forceRetryConfirm) return;
+                const { kind, id } = forceRetryConfirm;
+                setForceRetryConfirm(null);
+                if (kind === 'resource') {
+                  handleProcessSingle(id);
+                } else {
+                  handleProcessSingleQuestion(id);
+                }
+              }}
+            >
+              Force retry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
