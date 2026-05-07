@@ -603,7 +603,7 @@ export default function ResourceDetail() {
               <p className="text-sm text-muted-foreground mb-3">{resource.description}</p>
               
               {/* School and Teacher Info */}
-              {(resource.school_name || resource.teacher_name) && (
+              {(resource.school_name || resource.teacher_name || resource.book) && (
                 <div className="flex flex-wrap gap-3 mb-3 p-2 bg-background/50 rounded-lg">
                   {resource.school_name && (
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -617,6 +617,7 @@ export default function ResourceDetail() {
                       <span>{resource.teacher_name}</span>
                     </div>
                   )}
+                  <BookBadge book={resource.book} />
                 </div>
               )}
               
