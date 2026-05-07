@@ -748,6 +748,7 @@ export default function QuestionDetail() {
                     questionId={question.id}
                     chapterId={question.chapter_id}
                     initialData={question.data}
+                    initialBook={(question as any).book}
                     onSuccess={async () => {
                       setIsEditDialogOpen(false);
                       // Refetch question data
@@ -759,7 +760,7 @@ export default function QuestionDetail() {
                         .single();
                       
                       if (questionData) {
-                        setQuestion(prev => prev ? { ...prev, data: questionData.data } : null);
+                        setQuestion(prev => prev ? { ...prev, data: questionData.data, book: questionData.book } : null);
                       }
                     }}
                     onCancel={() => setIsEditDialogOpen(false)}
