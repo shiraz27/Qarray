@@ -908,6 +908,11 @@ export default function Chapter() {
                       </span>
                     )}
                   </div>
+                  {question.book && (
+                    <div className="mb-2">
+                      <BookBadge book={question.book} />
+                    </div>
+                  )}
                   
                   {/* Media indicators */}
                   {media.length > 0 && (
