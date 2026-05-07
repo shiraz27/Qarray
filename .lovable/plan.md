@@ -1,26 +1,31 @@
-## Add "Chapitre général" to every subject
+## Problem
 
-Currently there are 39 active subjects across 6 classes, and no chapter named "Chapitre général" exists yet.
+Adding a resource fails with:
+> Could not find the 'type_ids' column of 'resources' in the schema cache
 
-### What I'll do
+The earlier multi-type migration updated the `search_resources_normalized` function to reference `r.type_ids`, and frontend forms were updated to send `type_ids`, but the actual `type_ids` column was never added to the `resources` (or `questions`) tables.
 
-Run a single data insert (via the insert tool) that creates one chapter per active subject:
+## Fix
+
+Single migration that adds the missing columns and backfills them from the existing single `type_id`:
 
 ```sql
-INSERT INTO chapters (name, subject_id, class_id, verified, deleted)
-SELECT 'Chapitre général', s.id, s.class_id, true, false
-FROM subjects s
-WHERE s.deleted = false
-  AND NOT EXISTS (
-    SELECT 1 FROM chapters c
-    WHERE c.subject_id = s.id
-      AND lower(c.name) = 'chapitre général'
-  );
+ALTER TABLE public.resources
+  ADD COLUMN IF NOT EXISTS type_ids integer[] DEFAULT '{}'::integer[];
+
+ALTER TABLE public.questions
+  ADD COLUMN IF NOT EXISTS type_ids integer[] DEFAULT '{}'::integer[];
+
+-- Backfill from existing type_id so old records keep showing a badge
+UPDATE public.resources
+SET type_ids = ARRAY[type_id]
+WHERE type_id IS NOT NULL
+  AND (type_ids IS NULL OR array_length(type_ids, 1) IS NULL);
+
+UPDATE public.questions
+SET type_ids = ARRAY[type_id]
+WHERE type_id IS NOT NULL
+  AND (type_ids IS NULL OR array_length(type_ids, 1) IS NULL);
 ```
 
-This will create ~39 new chapters (one per `(subject_id, class_id)`), marked `verified=true`, `deleted=false`. The `NOT EXISTS` guard makes the operation idempotent — re-running it won't create duplicates, and any subjects later added can be backfilled by running it again.
-
-### Notes
-
-- No schema change, no migration, no code change required — these chapters will appear automatically anywhere chapters are listed (Chapter pages, AddResource selection, GlobalSearch, etc.).
-- If you'd later want this chapter to sort first in the UI, that would be a separate UI change (currently chapters are ordered by id desc / insertion order in most places). Let me know if you want that too.
+No code changes needed — the existing forms (`AddResourceForm`, `AddResourceGlobalForm`, `EditResourceForm`, `ResourceTypeBadges`, etc.) already write/read `type_ids`. After this migration, adding resources will work and existing resources will display their badge.
