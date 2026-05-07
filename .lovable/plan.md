@@ -1,34 +1,79 @@
-# Improve book matching in Global Search
+# Multiple Resource Types per Resource
 
-Two scoped changes to `src/components/GlobalSearch.tsx`. No DB changes (book is already searched in all four RPCs).
+Allow a resource to have several types (e.g. *Cours* + *Résumé*, or *Exercices* + *Devoirs*) with one badge displayed per type.
 
-## 1. Detect `matchType: 'book'`
+## Scope
 
-Currently when a result matches only via `book` (not title/description/OCR text), the result still labels itself as `'description'`. Update result construction so the label is accurate:
+- Resource type (`Devoirs / Cours / Exercices / Résumé / PDF / Vidéo`) becomes multi-select.
+- `devoir_type_id` stays single (it only refines the *Devoirs* type).
+- Questions are **not** changed (out of scope).
 
-- For resources (line ~249): compute `bookMatch = r.book && normalizeText(r.book).includes(normQuery)` and `titleMatch`/`descMatch` similarly. Set `matchType = titleMatch ? 'title' : descMatch ? 'description' : bookMatch ? 'book' : 'description'`. Add `'book'` to the `matchType` union in `SearchResult`.
-- For questions (line ~329): if the question `data` doesn't contain `normQuery` but `q.book` does, set `matchType: 'book'`.
+## Database
 
-In the result card rendering (~line 730), when `matchType === 'book'`, show a small "Matched in book" hint next to the existing `BookBadge` so the user sees why it matched.
+Add a new array column on `resources`, backfill from current `type_id`, and keep `type_id` populated as the "primary" type for backward compatibility (it's read in many places — Chapter list, ResourceDetail, OCR/metadata, GlobalSearch).
 
-## 2. Dedicated book input with autocomplete
+```sql
+ALTER TABLE resources
+  ADD COLUMN type_ids integer[] NOT NULL DEFAULT '{}';
 
-Add a separate **Book** filter input next to the existing Subject/Chapter selects (above the results list). It:
+UPDATE resources
+SET type_ids = ARRAY[type_id]
+WHERE type_id IS NOT NULL AND array_length(type_ids,1) IS NULL;
 
-- Uses the existing `BookAutocomplete` component (`source="resource"`).
-- Stored in new state `bookFilter: string` (default `''`).
-- When non-empty, the search constrains results to rows whose `book` ILIKE-matches `bookFilter` — implemented client-side after the RPC results return (filter `resourcesMap` and `questionsMap` by `r.book`/`q.book` containing the normalized `bookFilter`). No new RPC needed.
-- A small "Clear" affordance (the existing `BookAutocomplete` already exposes "Clear current value").
-- The `bookFilter` is also passed as the `query` to the RPC when the main search box is empty AND a book is chosen, so the user can browse purely by book without typing a query. Implementation: if `query.length < 2` but `bookFilter.length >= 1`, run the searches with `search_query = bookFilter` and skip OCR-content searches (they'd be noisy).
+CREATE INDEX resources_type_ids_gin ON resources USING gin (type_ids);
+```
 
-## Technical notes
+A trigger keeps `type_id` in sync with `type_ids[1]` so existing reads keep working without a sweeping rewrite:
 
-- `SearchResult.matchType` becomes `'title' | 'description' | 'content' | 'book'`.
-- New state: `const [bookFilter, setBookFilter] = useState('');` reset alongside other filters.
-- Place the `BookAutocomplete` in the filter row used by Subject/Chapter selects; on mobile it stacks the same way.
-- No migrations; the existing `search_resource_books_normalized` and `search_question_books_normalized` RPCs power the autocomplete suggestions.
+```sql
+CREATE OR REPLACE FUNCTION sync_resource_primary_type()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.type_ids IS NOT NULL AND array_length(NEW.type_ids,1) >= 1 THEN
+    NEW.type_id := NEW.type_ids[1];
+  ELSIF NEW.type_id IS NOT NULL AND (NEW.type_ids IS NULL OR array_length(NEW.type_ids,1) IS NULL) THEN
+    NEW.type_ids := ARRAY[NEW.type_id];
+  END IF;
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER trg_sync_resource_primary_type
+BEFORE INSERT OR UPDATE ON resources
+FOR EACH ROW EXECUTE FUNCTION sync_resource_primary_type();
+```
+
+## Forms (write side)
+
+Replace the single `<Select>` for *Resource Type* with a multi-select chip picker (checkbox list inside a Popover, using existing shadcn primitives — same pattern already used for filter chips in `Chapter.tsx`).
+
+Files:
+- `src/components/AddResourceForm.tsx`
+- `src/components/AddResourceFormWithSelection.tsx`
+- `src/components/AddResourceGlobalForm.tsx`
+- `src/components/EditResourceForm.tsx`
+
+Schema change (Zod): `type_ids: z.array(z.number()).default([])`.
+On submit: send `type_ids` array; `type_id` is auto-set by the DB trigger. AI auto-detect (`suggested_type_id`) seeds the array with one value; the user can add more.
+
+Devoir-type field stays as-is, but is only shown when `type_ids` includes the "Devoirs" id (id=1).
+
+## Display (read side)
+
+A small reusable `ResourceTypeBadges` component renders one colored badge per id in `type_ids`, falling back to `[type_id]` if the array is empty (legacy rows before the trigger fires).
+
+Updated to render multi-badges:
+- `src/pages/Chapter.tsx` — resource cards (~line 1159, 1194) and any other place printing `resourceType.type`.
+- `src/pages/ResourceDetail.tsx` — header badge area.
+- `src/components/GlobalSearch.tsx` — result cards.
+
+Filtering on the Chapter page changes from `selectedTypeFilters.includes(r.type_id)` to `r.type_ids.some(id => selectedTypeFilters.includes(id))` (with the same fallback to `type_id` for legacy rows).
+
+## Types
+
+`src/integrations/supabase/types.ts` regenerates automatically after the migration, exposing `type_ids: number[]`. Local `Resource` interfaces in `Chapter.tsx`, `ResourceDetail.tsx`, `GlobalSearch.tsx` get a `type_ids: number[] | null` field added.
 
 ## Out of scope
 
-- No new dedicated "Books" tab in the result list.
-- No ranking/score changes — results still ordered by `id DESC` from the RPCs.
+- No change to `questions.type_id` (questions remain single-typed).
+- No change to `devoir_type_id` cardinality.
+- No change to AI metadata extractor output shape (still returns one suggested id; user picks the rest).
