@@ -211,7 +211,7 @@ export default function Chapter() {
 
         // Count resources
         const { count: resourceCount } = await supabase
-          .from('resources' as any)
+          .from('resources')
           .select('*', { count: 'exact', head: true })
           .eq('chapter_id', chapterId)
           .eq('deleted', false);
@@ -327,7 +327,7 @@ export default function Chapter() {
 
         // Fetch resources with vote counts
         const { data: resourcesData } = await supabase
-          .from('resources' as any)
+          .from('resources')
           .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, book')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
@@ -591,7 +591,7 @@ export default function Chapter() {
         setQuestions(questionsWithVotes);
       } else {
         const { data: resourcesData } = await supabase
-          .from('resources' as any)
+          .from('resources')
           .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by')
           .eq('chapter_id', chapter?.id)
           .eq('deleted', false)
@@ -1086,7 +1086,7 @@ export default function Chapter() {
                     // Refresh data
                     const fetchResources = async () => {
                       const { data: resourcesData } = await supabase
-                        .from('resources' as any)
+                        .from('resources')
                         .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by')
                         .eq('chapter_id', chapter.id)
                         .eq('deleted', false)
