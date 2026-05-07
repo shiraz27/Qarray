@@ -1,31 +1,24 @@
 ## Problem
 
-Adding a resource fails with:
-> Could not find the 'type_ids' column of 'resources' in the schema cache
+`capitalizeEveryWord` only uppercases the first letter of each word but leaves the rest of the letters untouched. So a stored string like `RÉSumÉ Maths Toute L'AnnÉE` stays mangled instead of becoming `Résumé Maths Toute L'Année`. This affects every place that uses the helper:
 
-The earlier multi-type migration updated the `search_resources_normalized` function to reference `r.type_ids`, and frontend forms were updated to send `type_ids`, but the actual `type_ids` column was never added to the `resources` (or `questions`) tables.
+- Chapter page — chapter titles and resource titles (`src/pages/Chapter.tsx`)
+- Resource detail page — resource title (`src/pages/ResourceDetail.tsx`)
+- Question detail page (`src/pages/QuestionDetail.tsx`)
+- MediaList text body (`src/components/MediaList.tsx`)
 
 ## Fix
 
-Single migration that adds the missing columns and backfills them from the existing single `type_id`:
+Single change in `src/utils/textHelpers.ts`: lowercase the whole string first, then uppercase the first letter of every word. Since every call site already routes through this helper, this one edit generalizes the fix across the entire app.
 
-```sql
-ALTER TABLE public.resources
-  ADD COLUMN IF NOT EXISTS type_ids integer[] DEFAULT '{}'::integer[];
-
-ALTER TABLE public.questions
-  ADD COLUMN IF NOT EXISTS type_ids integer[] DEFAULT '{}'::integer[];
-
--- Backfill from existing type_id so old records keep showing a badge
-UPDATE public.resources
-SET type_ids = ARRAY[type_id]
-WHERE type_id IS NOT NULL
-  AND (type_ids IS NULL OR array_length(type_ids, 1) IS NULL);
-
-UPDATE public.questions
-SET type_ids = ARRAY[type_id]
-WHERE type_id IS NOT NULL
-  AND (type_ids IS NULL OR array_length(type_ids, 1) IS NULL);
+```ts
+export const capitalizeEveryWord = (s: string | null | undefined): string =>
+  (s ?? '')
+    .toString()
+    .toLocaleLowerCase()
+    .replace(/\b\p{L}/gu, (ch) => ch.toLocaleUpperCase());
 ```
 
-No code changes needed — the existing forms (`AddResourceForm`, `AddResourceGlobalForm`, `EditResourceForm`, `ResourceTypeBadges`, etc.) already write/read `type_ids`. After this migration, adding resources will work and existing resources will display their badge.
+The existing `\b\p{L}` Unicode word-boundary regex correctly handles accents and apostrophes (e.g. `L'Année`), so no other adjustments are needed.
+
+No DB changes, no other files touched.

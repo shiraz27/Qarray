@@ -33,4 +33,5 @@ export const normalizedIncludes = (
 export const capitalizeEveryWord = (s: string | null | undefined): string =>
   (s ?? '')
     .toString()
-    .replace(/\b\p{L}/gu, (ch) => ch.toUpperCase());
+    .toLocaleLowerCase()
+    .replace(/\b\p{L}/gu, (ch) => ch.toLocaleUpperCase());
