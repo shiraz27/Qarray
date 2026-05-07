@@ -632,6 +632,16 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
               </div>
             </div>
 
+            <div>
+              <Label className="text-xs mb-1 block">📘 {t('book') || 'Book'} ({t('optional')})</Label>
+              <BookAutocomplete
+                value={bookFilter}
+                onChange={setBookFilter}
+                source={filter === 'questions' ? 'question' : 'resource'}
+                placeholder="📘 Filter by book name…"
+              />
+            </div>
+
             <div className="space-y-2">
               <Label className="text-xs">{t('resourceTypes')}</Label>
               <div className="flex flex-wrap gap-2 sm:gap-3">
