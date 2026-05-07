@@ -21,6 +21,7 @@ import { processOcrAndExtractMetadata, OcrAndExtractResult } from '@/utils/ocrAn
 import { mergeDescriptionWithAi } from '@/utils/metadataExtractor';
 import { SchoolAutocomplete } from './SchoolAutocomplete';
 import { AIBadge } from './AIBadge';
+import { ResourceTypeMultiSelect } from './ResourceTypeMultiSelect';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
 
