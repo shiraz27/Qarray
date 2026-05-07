@@ -308,24 +308,17 @@ export const AddResourceFormWithSelection: React.FC<AddResourceFormWithSelection
 
         <FormField
           control={form.control}
-          name="type_id"
+          name="type_ids"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Resource Type (Optional - Auto-detected)</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select resource type (optional)" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {resourceTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id.toString()}>
-                      {type.type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormLabel>Resource Types (Optional - select one or more)</FormLabel>
+              <FormControl>
+                <ResourceTypeMultiSelect
+                  options={resourceTypes}
+                  value={(field.value as number[]) || []}
+                  onChange={field.onChange}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
