@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { AddResourceForm } from '@/components/AddResourceForm';
 import { UserAvatar } from '@/components/UserAvatar';
+import { BookBadge } from '@/components/BookBadge';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { SEO, createCourseSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
@@ -40,6 +41,7 @@ interface Question {
   verified: boolean;
   contributors: string[];
   isBookmarked?: boolean;
+  book?: string | null;
 }
 
 interface Resource {
@@ -57,6 +59,7 @@ interface Resource {
   verified: boolean;
   published_by: string | null;
   isBookmarked?: boolean;
+  book?: string | null;
 }
 
 interface ResourceType {
@@ -263,7 +266,7 @@ export default function Chapter() {
         // Fetch questions with vote counts
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, data, created_at, type_id, verified, contributors')
+          .select('id, data, created_at, type_id, verified, contributors, book')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -324,7 +327,7 @@ export default function Chapter() {
         // Fetch resources with vote counts
         const { data: resourcesData } = await supabase
           .from('resources')
-          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified, published_by')
+          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified, published_by, book')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -905,6 +908,11 @@ export default function Chapter() {
                       </span>
                     )}
                   </div>
+                  {question.book && (
+                    <div className="mb-2">
+                      <BookBadge book={question.book} />
+                    </div>
+                  )}
                   
                   {/* Media indicators */}
                   {media.length > 0 && (
@@ -1199,6 +1207,11 @@ export default function Chapter() {
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground mb-3">{resource.description}</p>
+                  {resource.book && (
+                    <div className="mb-3">
+                      <BookBadge book={resource.book} />
+                    </div>
+                  )}
                   
                   {/* Media indicators */}
                   {allMediaFiles.length > 0 && (
