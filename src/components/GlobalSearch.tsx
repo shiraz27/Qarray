@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, X, FileText, HelpCircle, MessageSquare, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { BookBadge } from '@/components/BookBadge';
+import { BookAutocomplete } from '@/components/BookAutocomplete';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
@@ -32,7 +33,7 @@ interface SearchResult {
   title: string;
   description?: string;
   matchSnippet?: string;
-  matchType?: 'title' | 'description' | 'content';
+  matchType?: 'title' | 'description' | 'content' | 'book';
   chapterId?: number;
   questionId?: number;
   subjectName?: string;
@@ -62,6 +63,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
   const [withCorrectionOnly, setWithCorrectionOnly] = useState(false);
   const [searchInOcrContent, setSearchInOcrContent] = useState(true);
   const [searchInQuestionOcrContent, setSearchInQuestionOcrContent] = useState(true);
+  const [bookFilter, setBookFilter] = useState('');
   const [subjects, setSubjects] = useState<Array<{ id: number; name: string }>>([]);
   const [chapters, setChapters] = useState<Array<{ id: number; name: string }>>([]);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
@@ -169,22 +171,27 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
   };
 
   useEffect(() => {
-    if (query.length < 2) {
+    const effectiveQuery = query.length >= 2 ? query : (bookFilter.trim().length >= 1 ? bookFilter.trim() : '');
+    if (effectiveQuery.length < 1) {
       setResults([]);
       return;
     }
+    const isBookOnlyMode = query.length < 2 && bookFilter.trim().length >= 1;
 
     const searchTimeout = setTimeout(async () => {
       setLoading(true);
       try {
         const searchResults: SearchResult[] = [];
+        const normBook = bookFilter ? normalizeText(bookFilter.trim()) : '';
+        const matchesBookFilter = (book: string | null | undefined) =>
+          !normBook || (book && normalizeText(book).includes(normBook));
 
         // Search chapters
-        if (filter === 'all' || filter === 'chapters') {
+        if ((filter === 'all' || filter === 'chapters') && !isBookOnlyMode && !normBook) {
           const { data: chaptersData } = await supabase.rpc(
             'search_chapters_normalized',
             {
-              search_query: query,
+              search_query: effectiveQuery,
               p_class_id: effectiveClassId ?? null,
               p_subject_id:
                 subjectFilter !== 'all' ? parseInt(subjectFilter) : null,
@@ -216,7 +223,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
           const { data: resources } = await supabase.rpc(
             'search_resources_normalized',
             {
-              search_query: query,
+              search_query: effectiveQuery,
               p_class_id: effectiveClassId ?? null,
               p_subject_id:
                 subjectFilter !== 'all' ? parseInt(subjectFilter) : null,
@@ -232,9 +239,9 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
 
           // Also search OCR content (only if enabled and class is selected)
           let ocrResults: any[] = [];
-          if (searchInOcrContent && effectiveClassId) {
+          if (searchInOcrContent && effectiveClassId && !isBookOnlyMode) {
             const { data: ocrData } = await supabase.rpc('search_pdf_content', {
-              search_query: query,
+              search_query: effectiveQuery,
               user_class_id: effectiveClassId
             });
             ocrResults = ocrData || [];
@@ -245,15 +252,18 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
           
           // Add title/description matches
           if (resources) {
-            const normQuery = normalizeText(query);
+            const normQuery = normalizeText(effectiveQuery);
             (resources as any[]).forEach((r: any) => {
-              const titleMatch = normalizeText(r.title).includes(normQuery);
+              if (!matchesBookFilter(r.book)) return;
+              const titleMatch = normalizeText(r.title || '').includes(normQuery);
+              const descMatch = normalizeText(r.description || '').includes(normQuery);
+              const bookMatchOnly = !titleMatch && !descMatch && r.book && normalizeText(r.book).includes(normQuery);
               resourcesMap.set(r.id, {
                 id: r.id,
                 type: 'resource' as const,
                 title: r.title,
                 description: r.description,
-                matchType: titleMatch ? 'title' : 'description',
+                matchType: titleMatch ? 'title' : descMatch ? 'description' : bookMatchOnly ? 'book' : 'description',
                 chapterId: r.chapter_id,
                 resourceType: r.resource_type,
                 hasCorrection: r.with_correction,
@@ -267,6 +277,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
 
           // Add or merge OCR matches
           ocrResults.forEach((ocr: any) => {
+            if (!matchesBookFilter(ocr.book)) return;
             // Apply additional filters to OCR results
             const passesFilters = 
               (subjectFilter === 'all' || ocr.subject_id === parseInt(subjectFilter)) &&
@@ -280,6 +291,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
               // Already found via title/description, add OCR snippet
               const existing = resourcesMap.get(ocr.id);
               existing.matchSnippet = ocr.match_snippet;
+              if (ocr.book && !existing.book) existing.book = ocr.book;
             } else {
               // New match from OCR content only
               resourcesMap.set(ocr.id, {
@@ -291,6 +303,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
                 matchSnippet: ocr.match_snippet,
                 chapterId: ocr.chapter_id,
                 subjectName: ocr.subjects?.name,
+                book: ocr.book,
               });
             }
           });
@@ -303,7 +316,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
           const { data: questions } = await supabase.rpc(
             'search_questions_normalized',
             {
-              search_query: query,
+              search_query: effectiveQuery,
               p_class_id: effectiveClassId ?? null,
               p_subject_id:
                 subjectFilter !== 'all' ? parseInt(subjectFilter) : null,
@@ -314,9 +327,9 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
 
           // Also search Question OCR content (only if enabled and class is selected)
           let questionOcrResults: any[] = [];
-          if (searchInQuestionOcrContent && effectiveClassId) {
+          if (searchInQuestionOcrContent && effectiveClassId && !isBookOnlyMode) {
             const { data: questionOcrData } = await supabase.rpc('search_question_content', {
-              search_query: query,
+              search_query: effectiveQuery,
               user_class_id: effectiveClassId
             });
             questionOcrResults = questionOcrData || [];
@@ -326,12 +339,16 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
           const questionsMap = new Map<number, any>();
 
           if (questions) {
+            const normQuery = normalizeText(effectiveQuery);
             (questions as any[]).slice(0, 10).forEach((q: any) => {
+              if (!matchesBookFilter(q.book)) return;
+              const dataMatch = normalizeText(q.data || '').includes(normQuery);
+              const bookMatchOnly = !dataMatch && q.book && normalizeText(q.book).includes(normQuery);
               questionsMap.set(q.id, {
                 id: q.id,
                 type: 'question' as const,
                 title: q.data.substring(0, 100),
-                matchType: 'title',
+                matchType: bookMatchOnly ? 'book' : 'title',
                 chapterId: q.chapter_id,
                 subjectName: q.subject_name,
                 book: q.book,
@@ -341,6 +358,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
 
           // Add or merge Question OCR matches
           questionOcrResults.forEach((ocr: any) => {
+            if (!matchesBookFilter(ocr.book)) return;
             // Apply additional filters to OCR results
             const passesFilters = 
               (subjectFilter === 'all' || ocr.subject_id === parseInt(subjectFilter)) &&
@@ -353,6 +371,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
               const existing = questionsMap.get(ocr.id);
               existing.matchSnippet = ocr.match_snippet;
               existing.matchType = 'content';
+              if (ocr.book && !existing.book) existing.book = ocr.book;
             } else {
               // New match from OCR content only
               questionsMap.set(ocr.id, {
@@ -362,6 +381,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
                 matchType: 'content',
                 matchSnippet: ocr.match_snippet,
                 chapterId: ocr.chapter_id,
+                book: ocr.book,
               });
             }
           });
@@ -370,11 +390,11 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
         }
 
         // Search answers with class filtering through questions -> chapters -> subjects
-        if (filter === 'all' || filter === 'answers') {
+        if ((filter === 'all' || filter === 'answers') && !normBook) {
           const { data: answers } = await supabase.rpc(
             'search_answers_normalized',
             {
-              search_query: query,
+              search_query: effectiveQuery,
               p_class_id: effectiveClassId ?? null,
             },
           );
@@ -427,7 +447,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
     }, 300);
 
     return () => clearTimeout(searchTimeout);
-  }, [query, filter, subjectFilter, chapterFilter, resourceTypeFilters, withCorrectionOnly, searchInOcrContent, searchInQuestionOcrContent, effectiveClassId]);
+  }, [query, bookFilter, filter, subjectFilter, chapterFilter, resourceTypeFilters, withCorrectionOnly, searchInOcrContent, searchInQuestionOcrContent, effectiveClassId]);
 
   const handleResultClick = (result: SearchResult) => {
     if (publicMode) {
@@ -612,6 +632,16 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
               </div>
             </div>
 
+            <div>
+              <Label className="text-xs mb-1 block">📘 {t('book') || 'Book'} ({t('optional')})</Label>
+              <BookAutocomplete
+                value={bookFilter}
+                onChange={setBookFilter}
+                source={filter === 'questions' ? 'question' : 'resource'}
+                placeholder="📘 Filter by book name…"
+              />
+            </div>
+
             <div className="space-y-2">
               <Label className="text-xs">{t('resourceTypes')}</Label>
               <div className="flex flex-wrap gap-2 sm:gap-3">
@@ -696,6 +726,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
                             <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0.5">
                               {result.matchType === 'title' ? 'In Title' : 
                                result.matchType === 'description' ? 'In Description' : 
+                               result.matchType === 'book' ? 'In Book' :
                                'In Content'}
                             </Badge>
                           )}
