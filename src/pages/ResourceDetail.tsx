@@ -700,6 +700,7 @@ export default function ResourceDetail() {
                       with_correction: resource.with_correction,
                       school_name: resource.school_name,
                       teacher_name: resource.teacher_name,
+                      book: (resource as any).book,
                     }}
                     resourceTypes={resourceTypes}
                     devoirTypes={devoirTypes}
@@ -724,6 +725,7 @@ export default function ResourceDetail() {
                           with_correction: resourceData.with_correction,
                           school_name: resourceData.school_name,
                           teacher_name: resourceData.teacher_name,
+                          book: resourceData.book,
                         } : null);
                       }
                     }}
