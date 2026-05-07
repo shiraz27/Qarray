@@ -22,6 +22,7 @@ const resourceSchema = z.object({
   with_correction: z.boolean().default(false),
   school_name: z.string().max(200).optional(),
   teacher_name: z.string().max(200).optional(),
+  book: z.string().max(200).optional(),
 });
 
 type ResourceFormData = z.infer<typeof resourceSchema>;
@@ -38,6 +39,7 @@ interface EditResourceFormProps {
     with_correction: boolean;
     school_name?: string | null;
     teacher_name?: string | null;
+    book?: string | null;
   };
   resourceTypes: Array<{ id: number; type: string }>;
   devoirTypes: Array<{ id: number; devoir_type: string }>;
@@ -75,6 +77,7 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
       with_correction: initialData.with_correction,
       school_name: initialData.school_name || '',
       teacher_name: initialData.teacher_name || '',
+      book: initialData.book || '',
     },
   });
 
@@ -132,6 +135,7 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
         data: mediaUrls,
         school_name: data.school_name || null,
         teacher_name: data.teacher_name || null,
+        book: data.book || null,
       };
 
       // Only update OCR status if new PDF/image was added
@@ -283,6 +287,20 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="book"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Book (Optional)</FormLabel>
+              <FormControl>
+                <Input placeholder="📘 e.g. CMS / CLS / Manuel scolaire" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

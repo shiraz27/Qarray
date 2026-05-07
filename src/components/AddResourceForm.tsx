@@ -31,6 +31,7 @@ const resourceSchema = z.object({
   with_correction: z.boolean().default(false),
   school_name: z.string().max(200).optional(),
   teacher_name: z.string().max(200).optional(),
+  book: z.string().max(200).optional(),
 });
 
 type ResourceFormData = z.infer<typeof resourceSchema>;
@@ -93,6 +94,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
       with_correction: false,
       school_name: '',
       teacher_name: '',
+      book: '',
     },
   });
 
@@ -309,6 +311,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           school_name: data.school_name || null,
           teacher_name: data.teacher_name || null,
           institute_id: selectedInstituteId || null,
+          book: data.book || null,
         });
 
       if (error) throw error;
@@ -713,6 +716,20 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="book"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Book (Optional)</FormLabel>
+              <FormControl>
+                <Input placeholder="📘 e.g. CMS / CLS / Manuel scolaire" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

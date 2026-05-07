@@ -577,6 +577,7 @@ export type Database = {
       }
       questions: {
         Row: {
+          book: string | null
           chapter_id: number | null
           contributors: string[] | null
           created_at: string | null
@@ -592,6 +593,7 @@ export type Database = {
           verified: boolean
         }
         Insert: {
+          book?: string | null
           chapter_id?: number | null
           contributors?: string[] | null
           created_at?: string | null
@@ -607,6 +609,7 @@ export type Database = {
           verified?: boolean
         }
         Update: {
+          book?: string | null
           chapter_id?: number | null
           contributors?: string[] | null
           created_at?: string | null
@@ -662,6 +665,7 @@ export type Database = {
       }
       resources: {
         Row: {
+          book: string | null
           chapter_id: number | null
           contributors: string[] | null
           created_at: string | null
@@ -685,6 +689,7 @@ export type Database = {
           with_correction: boolean
         }
         Insert: {
+          book?: string | null
           chapter_id?: number | null
           contributors?: string[] | null
           created_at?: string | null
@@ -708,6 +713,7 @@ export type Database = {
           with_correction?: boolean
         }
         Update: {
+          book?: string | null
           chapter_id?: number | null
           contributors?: string[] | null
           created_at?: string | null
@@ -980,6 +986,7 @@ export type Database = {
       search_pdf_content: {
         Args: { search_query: string; user_class_id: number }
         Returns: {
+          book: string
           chapter_id: number
           data: string[]
           description: string
@@ -994,6 +1001,7 @@ export type Database = {
       search_question_content: {
         Args: { search_query: string; user_class_id: number }
         Returns: {
+          book: string
           chapter_id: number
           data: string
           id: number
@@ -1009,6 +1017,7 @@ export type Database = {
           search_query: string
         }
         Returns: {
+          book: string
           chapter_id: number
           data: string
           id: number
@@ -1026,6 +1035,7 @@ export type Database = {
           search_query: string
         }
         Returns: {
+          book: string
           chapter_id: number
           data: string[]
           description: string

@@ -7,12 +7,14 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
 
 const questionSchema = z.object({
   question: z.string().min(10, 'Question must be at least 10 characters').max(500, 'Question must be less than 500 characters'),
+  book: z.string().max(200).optional(),
 });
 
 type QuestionFormData = z.infer<typeof questionSchema>;
@@ -21,6 +23,7 @@ interface EditQuestionFormProps {
   questionId: number;
   chapterId: number;
   initialData: string;
+  initialBook?: string | null;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -29,6 +32,7 @@ export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
   questionId,
   chapterId,
   initialData,
+  initialBook,
   onSuccess, 
   onCancel 
 }) => {
@@ -57,6 +61,7 @@ export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
     resolver: zodResolver(questionSchema),
     defaultValues: {
       question: initialText,
+      book: initialBook || '',
     },
   });
 
@@ -102,6 +107,7 @@ export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
         .update({
           data: questionData,
           type_id: typeId,
+          book: data.book || null,
         })
         .eq('id', questionId);
 
@@ -132,6 +138,20 @@ export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
                   className="min-h-32 resize-none"
                   {...field}
                 />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="book"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Book (Optional)</FormLabel>
+              <FormControl>
+                <Input placeholder="📘 e.g. CMS / CLS / Manuel scolaire" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

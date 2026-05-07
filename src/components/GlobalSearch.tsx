@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, FileText, HelpCircle, MessageSquare, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { BookBadge } from '@/components/BookBadge';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
@@ -39,6 +40,7 @@ interface SearchResult {
   hasCorrection?: boolean;
   schoolName?: string;
   teacherName?: string;
+  book?: string | null;
   smartMatch?: boolean;
 }
 
@@ -258,6 +260,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
                 subjectName: r.subject_name,
                 schoolName: r.school_name,
                 teacherName: r.teacher_name,
+                book: r.book,
               });
             });
           }
@@ -331,6 +334,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
                 matchType: 'title',
                 chapterId: q.chapter_id,
                 subjectName: q.subject_name,
+                book: q.book,
               });
             });
           }
@@ -723,6 +727,11 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
                           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                             {result.schoolName && <span>🏫 {result.schoolName}</span>}
                             {result.teacherName && <span>👨‍🏫 {result.teacherName}</span>}
+                          </div>
+                        )}
+                        {result.book && (
+                          <div className="mt-1">
+                            <BookBadge book={result.book} />
                           </div>
                         )}
                         {result.description && (

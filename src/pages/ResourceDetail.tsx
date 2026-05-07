@@ -17,6 +17,7 @@ import { MediaPreview } from '@/components/MediaPreview';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
+import { BookBadge } from '@/components/BookBadge';
 import { EmptyState } from '@/components/EmptyState';
 import { SEO, createLearningResourceSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
@@ -43,6 +44,7 @@ interface Resource {
   ocr_status?: string | null;
   school_name?: string | null;
   teacher_name?: string | null;
+  book?: string | null;
 }
 
 interface ContextData {
@@ -602,7 +604,7 @@ export default function ResourceDetail() {
               <p className="text-sm text-muted-foreground mb-3">{resource.description}</p>
               
               {/* School and Teacher Info */}
-              {(resource.school_name || resource.teacher_name) && (
+              {(resource.school_name || resource.teacher_name || resource.book) && (
                 <div className="flex flex-wrap gap-3 mb-3 p-2 bg-background/50 rounded-lg">
                   {resource.school_name && (
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -616,6 +618,7 @@ export default function ResourceDetail() {
                       <span>{resource.teacher_name}</span>
                     </div>
                   )}
+                  <BookBadge book={resource.book} />
                 </div>
               )}
               
@@ -700,6 +703,7 @@ export default function ResourceDetail() {
                       with_correction: resource.with_correction,
                       school_name: resource.school_name,
                       teacher_name: resource.teacher_name,
+                      book: (resource as any).book,
                     }}
                     resourceTypes={resourceTypes}
                     devoirTypes={devoirTypes}
@@ -724,6 +728,7 @@ export default function ResourceDetail() {
                           with_correction: resourceData.with_correction,
                           school_name: resourceData.school_name,
                           teacher_name: resourceData.teacher_name,
+                          book: resourceData.book,
                         } : null);
                       }
                     }}

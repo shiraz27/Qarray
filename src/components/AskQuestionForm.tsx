@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -14,6 +15,7 @@ import { useUploadManager } from '@/contexts/UploadManagerContext';
 
 const questionSchema = z.object({
   question: z.string().min(10, 'Question must be at least 10 characters').max(500, 'Question must be less than 500 characters'),
+  book: z.string().max(200).optional(),
 });
 
 type QuestionFormData = z.infer<typeof questionSchema>;
@@ -49,6 +51,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
     resolver: zodResolver(questionSchema),
     defaultValues: {
       question: '',
+      book: '',
     },
   });
 
@@ -110,6 +113,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
           type_id: typeId,
           contributors: [user.id],
           verified: isModerator || isAdmin,
+          book: data.book || null,
         })
         .select();
 
@@ -146,6 +150,20 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
                   className="min-h-32 resize-none"
                   {...field}
                 />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="book"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Book (Optional)</FormLabel>
+              <FormControl>
+                <Input placeholder="📘 e.g. CMS / CLS / Manuel scolaire" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
