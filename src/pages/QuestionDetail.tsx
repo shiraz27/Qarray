@@ -37,6 +37,7 @@ interface Question {
   userVote: string | null;
   answerCount: number;
   isBookmarked?: boolean;
+  book?: string | null;
 }
 
 interface Answer {
