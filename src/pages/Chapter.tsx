@@ -1207,6 +1207,11 @@ export default function Chapter() {
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground mb-3">{resource.description}</p>
+                  {resource.book && (
+                    <div className="mb-3">
+                      <BookBadge book={resource.book} />
+                    </div>
+                  )}
                   
                   {/* Media indicators */}
                   {allMediaFiles.length > 0 && (
