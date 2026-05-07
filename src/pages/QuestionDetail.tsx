@@ -16,6 +16,7 @@ import { MediaList } from '@/components/MediaList';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AnswerQuestionForm } from '@/components/AnswerQuestionForm';
 import { EditQuestionForm } from '@/components/EditQuestionForm';
+import { BookBadge } from '@/components/BookBadge';
 import { EditAnswerForm } from '@/components/EditAnswerForm';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { EmptyState } from '@/components/EmptyState';
