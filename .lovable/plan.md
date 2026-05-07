@@ -1,53 +1,34 @@
-# Add book to OCR search + autocomplete on all book inputs
+# Improve book matching in Global Search
 
-## 1. Search functions — include `book` in OCR-content search
+Two scoped changes to `src/components/GlobalSearch.tsx`. No DB changes (book is already searched in all four RPCs).
 
-Currently `search_pdf_content` and `search_question_content` return `book` but only filter on `ocr_text`. Update both via migration so the WHERE clause also matches `book`:
+## 1. Detect `matchType: 'book'`
 
-```sql
--- search_pdf_content
-WHERE c.class_id = user_class_id
-  AND r.deleted = false
-  AND (
-    (r.ocr_status = 'completed' AND unaccent(lower(r.ocr_text)) LIKE '%' || norm_query || '%')
-    OR unaccent(lower(coalesce(r.book,''))) LIKE '%' || norm_query || '%'
-  )
-```
+Currently when a result matches only via `book` (not title/description/OCR text), the result still labels itself as `'description'`. Update result construction so the label is accurate:
 
-Same shape for `search_question_content` (match `q.book`). `match_snippet` falls back to the book name when the OCR text doesn't contain the query.
+- For resources (line ~249): compute `bookMatch = r.book && normalizeText(r.book).includes(normQuery)` and `titleMatch`/`descMatch` similarly. Set `matchType = titleMatch ? 'title' : descMatch ? 'description' : bookMatch ? 'book' : 'description'`. Add `'book'` to the `matchType` union in `SearchResult`.
+- For questions (line ~329): if the question `data` doesn't contain `normQuery` but `q.book` does, set `matchType: 'book'`.
 
-`search_resources_normalized` and `search_questions_normalized` already match on `book` — no change.
+In the result card rendering (~line 730), when `matchType === 'book'`, show a small "Matched in book" hint next to the existing `BookBadge` so the user sees why it matched.
 
-## 2. New RPCs for book autocomplete
+## 2. Dedicated book input with autocomplete
 
-Add two `SECURITY DEFINER STABLE` functions returning distinct book names:
+Add a separate **Book** filter input next to the existing Subject/Chapter selects (above the results list). It:
 
-- `search_resource_books_normalized(search_query text)` → `TABLE(book text)` from `resources` where `book IS NOT NULL AND book <> '' AND deleted = false` matching `unaccent(lower(book)) LIKE`. `LIMIT 15`, ordered alphabetically.
-- `search_question_books_normalized(search_query text)` → same shape from `questions`.
+- Uses the existing `BookAutocomplete` component (`source="resource"`).
+- Stored in new state `bookFilter: string` (default `''`).
+- When non-empty, the search constrains results to rows whose `book` ILIKE-matches `bookFilter` — implemented client-side after the RPC results return (filter `resourcesMap` and `questionsMap` by `r.book`/`q.book` containing the normalized `bookFilter`). No new RPC needed.
+- A small "Clear" affordance (the existing `BookAutocomplete` already exposes "Clear current value").
+- The `bookFilter` is also passed as the `query` to the RPC when the main search box is empty AND a book is chosen, so the user can browse purely by book without typing a query. Implementation: if `query.length < 2` but `bookFilter.length >= 1`, run the searches with `search_query = bookFilter` and skip OCR-content searches (they'd be noisy).
 
-Mirrors the existing `search_schools_normalized` / `search_teachers_normalized` pattern.
+## Technical notes
 
-## 3. New `BookAutocomplete` component
+- `SearchResult.matchType` becomes `'title' | 'description' | 'content' | 'book'`.
+- New state: `const [bookFilter, setBookFilter] = useState('');` reset alongside other filters.
+- Place the `BookAutocomplete` in the filter row used by Subject/Chapter selects; on mobile it stacks the same way.
+- No migrations; the existing `search_resource_books_normalized` and `search_question_books_normalized` RPCs power the autocomplete suggestions.
 
-`src/components/BookAutocomplete.tsx`, modeled on `SchoolAutocomplete` / a slimmed `TeacherBadge` autocomplete:
+## Out of scope
 
-- Props: `value`, `onChange(name)`, `source: 'resource' | 'question'`, `placeholder`, `disabled`.
-- Popover + `Command` UI with `BookOpen` icon trigger.
-- Debounced (300ms) RPC call to the matching `search_*_books_normalized`.
-- Shows distinct existing books; user can also choose "Use exact name: …" for a free-form value (no separate `books` table — it remains a free text column).
-- Matches the visual language of `SchoolAutocomplete` (same trigger button shape, AI badge omitted since we don't auto-suggest book).
-
-## 4. Wire `BookAutocomplete` into all forms
-
-Replace the plain `<Input name="book">` added previously with `<BookAutocomplete source="resource" .../>` (or `"question"`) inside the `FormField` render in:
-
-- `AddResourceForm.tsx`, `AddResourceFormWithSelection.tsx`, `AddResourceGlobalForm.tsx`, `EditResourceForm.tsx` → `source="resource"`.
-- `AskQuestionForm.tsx`, `AskQuestionFormWithSelection.tsx`, `AskQuestionGlobalForm.tsx`, `EditQuestionForm.tsx` → `source="question"`.
-
-Zod schema and payload handling stay the same (still optional string).
-
-## 5. Notes
-
-- No new tables; book remains a free-text column. Autocomplete is purely a UX helper sourced from existing rows.
-- Types regenerate automatically after the migration.
-- `.lovable/plan.md` updated to reflect the new RPCs, autocomplete component, and the OCR-search WHERE clause change.
+- No new dedicated "Books" tab in the result list.
+- No ranking/score changes — results still ordered by `id DESC` from the RPCs.
