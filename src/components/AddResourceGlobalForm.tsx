@@ -431,8 +431,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
       // Determine OCR status based on step
       const ocrStatus = step === 'review' ? 'completed' : (isPdfOrImage ? 'pending' : 'not_applicable');
 
-      const { error } = await supabase
-        .from('resources')
+      const { error } = await (supabase as any).from('resources')
         .insert({
           chapter_id: parseInt(data.chapter_id),
           subject_id: parseInt(data.subject_id),

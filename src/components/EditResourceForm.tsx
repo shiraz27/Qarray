@@ -153,8 +153,7 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
         updateData.ocr_status = 'pending';
       }
 
-      const { error } = await supabase
-        .from('resources')
+      const { error } = await (supabase as any).from('resources')
         .update(updateData)
         .eq('id', resourceId);
 

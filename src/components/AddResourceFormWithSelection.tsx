@@ -170,8 +170,7 @@ export const AddResourceFormWithSelection: React.FC<AddResourceFormWithSelection
                lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)/);
       });
 
-      const { data: insertedResource, error } = await supabase
-        .from('resources')
+      const { data: insertedResource, error } = await (supabase as any).from('resources')
         .insert({
           chapter_id: parseInt(data.chapter_id),
           subject_id: parseInt(data.subject_id),
