@@ -23,11 +23,12 @@ import { mergeDescriptionWithAi } from '@/utils/metadataExtractor';
 import { SchoolAutocomplete } from './SchoolAutocomplete';
 import { AIBadge } from './AIBadge';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
+import { ResourceTypeMultiSelect } from './ResourceTypeMultiSelect';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
   description: z.string().min(10, 'Description must be at least 10 characters').max(500, 'Description must be less than 500 characters'),
-  type_id: z.string().optional(),
+  type_ids: z.array(z.number()).default([]),
   devoir_type_id: z.string().optional(),
   with_correction: z.boolean().default(false),
   school_name: z.string().max(200).optional(),
@@ -90,7 +91,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
     defaultValues: {
       title: '',
       description: '',
-      type_id: '',
+      type_ids: [],
       devoir_type_id: '',
       with_correction: false,
       school_name: '',
@@ -212,7 +213,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
         form.setValue('teacher_name', result.metadata.teacher_name);
       }
       if (result.metadata.suggested_type_id) {
-        form.setValue('type_id', result.metadata.suggested_type_id.toString());
+        form.setValue('type_ids', [result.metadata.suggested_type_id]);
       }
       if (result.metadata.suggested_devoir_type_id) {
         form.setValue('devoir_type_id', result.metadata.suggested_devoir_type_id.toString());
@@ -271,16 +272,18 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
       }
 
       // Auto-detect resource type based on media
-      let typeId = parseInt(data.type_id || '1') || 1;
-      if (!data.type_id && mediaUrls.length > 0) {
+      let typeIds: number[] = data.type_ids ?? [];
+      if (typeIds.length === 0 && mediaUrls.length > 0) {
+        let detected = 1;
         const firstUrl = mediaUrls[0].toLowerCase();
         if (firstUrl.includes('youtube') || firstUrl.includes('youtu.be')) {
-          typeId = 2; // Video type
+          detected = 6;
         } else if (firstUrl.includes('.pdf')) {
-          typeId = 3; // Document type
+          detected = 5;
         } else if (firstUrl.includes('archive.org') && firstUrl.includes('audio')) {
-          typeId = 4; // Audio type
+          detected = 4;
         }
+        typeIds = [detected];
       }
 
       // Check if any media is PDF or image
@@ -300,7 +303,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           subject_id: subjectId,
           title: data.title,
           description: data.description,
-          type_id: typeId,
+          type_ids: typeIds,
           devoir_type_id: data.devoir_type_id ? parseInt(data.devoir_type_id) : null,
           with_correction: data.with_correction,
           data: mediaUrls,
@@ -614,29 +617,22 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="type_id"
+            name="type_ids"
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="flex items-center gap-2">
-                  Resource Type
+                  Resource Types
                   {isReviewMode && extractedData?.metadata.suggested_type_id && (
                     <AIBadge />
                   )}
                 </FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select resource type" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {resourceTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id.toString()}>
-                        {type.type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <ResourceTypeMultiSelect
+                    options={resourceTypes}
+                    value={(field.value as number[]) || []}
+                    onChange={field.onChange}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
