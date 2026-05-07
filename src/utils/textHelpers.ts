@@ -29,9 +29,17 @@ export const normalizedIncludes = (
   return normalizeText(haystack).includes(n);
 };
 
-/** Capitalize the first letter of each word, preserving the rest. */
+/**
+ * Title-case every word, normalizing weird mixed casing in the input.
+ *
+ * Uses a Unicode-aware word-start matcher because JavaScript's `\b` is
+ * ASCII-only and would treat accented letters (é, à, ü, …) as word
+ * boundaries, leaving inner letters uppercased.
+ */
 export const capitalizeEveryWord = (s: string | null | undefined): string =>
   (s ?? '')
     .toString()
     .toLocaleLowerCase()
-    .replace(/\b\p{L}/gu, (ch) => ch.toLocaleUpperCase());
+    .replace(/(^|[^\p{L}\p{N}])(\p{L})/gu, (_m, sep: string, ch: string) =>
+      sep + ch.toLocaleUpperCase(),
+    );
