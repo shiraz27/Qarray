@@ -1140,7 +1140,7 @@ export default function Chapter() {
             </Dialog>
 
             {resources.filter(r => 
-              (selectedTypeFilters.length === 0 || selectedTypeFilters.includes(r.type_id)) &&
+              (selectedTypeFilters.length === 0 || ((r.type_ids && r.type_ids.length > 0 ? r.type_ids : [r.type_id]).some((id) => selectedTypeFilters.includes(id)))) &&
               (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
               (!showWithCorrectionOnly || r.with_correction)
             ).length === 0 ? (
@@ -1151,13 +1151,16 @@ export default function Chapter() {
             ) : (
               resources
                 .filter(r => 
-                  (selectedTypeFilters.length === 0 || selectedTypeFilters.includes(r.type_id)) &&
+                  (selectedTypeFilters.length === 0 || ((r.type_ids && r.type_ids.length > 0 ? r.type_ids : [r.type_id]).some((id) => selectedTypeFilters.includes(id)))) &&
                   (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
                   (!showWithCorrectionOnly || r.with_correction)
                 )
                 .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
                 .map((resource) => {
-                  const resourceType = resourceTypes.find(t => t.id === resource.type_id);
+                  const resourceTypeIds = resource.type_ids && resource.type_ids.length > 0 ? resource.type_ids : (resource.type_id ? [resource.type_id] : []);
+                  const resolvedResourceTypes = resourceTypeIds
+                    .map((id) => resourceTypes.find((t) => t.id === id))
+                    .filter((t): t is ResourceType => Boolean(t));
                   const devoirType = devoirTypes.find(t => t.id === resource.devoir_type_id);
                   
                   // Check media types in resource data
@@ -1190,11 +1193,11 @@ export default function Chapter() {
                           Unverified
                         </span>
                       )}
-                      {resourceType && (
-                        <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full whitespace-nowrap">
-                          {resourceType.type}
+                      {resolvedResourceTypes.map((rt) => (
+                        <span key={rt.id} className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full whitespace-nowrap">
+                          {rt.type}
                         </span>
-                      )}
+                      ))}
                       {devoirType && (
                         <span className="text-xs px-2 py-1 bg-secondary/10 text-secondary-foreground rounded-full whitespace-nowrap">
                           {devoirType.devoir_type}
