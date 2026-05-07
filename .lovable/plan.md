@@ -1,60 +1,53 @@
-# Add `book` field to resources and questions
+# Add book to OCR search + autocomplete on all book inputs
 
-## 1. Database migration
+## 1. Search functions — include `book` in OCR-content search
 
-- Add column `book text` (nullable) to `public.resources`.
-- Add column `book text` (nullable) to `public.questions`.
-- Backfill: `UPDATE public.resources SET book = 'CMS CLS correction manuel scolaire' WHERE book IS NULL;` (existing resources only).
-- Update search RPCs to include and match on `book`:
-  - `search_resources_normalized`: add `book` to RETURNS, SELECT `r.book`, add `OR unaccent(lower(coalesce(r.book,''))) LIKE norm_query`.
-  - `search_questions_normalized`: add `book` to RETURNS, SELECT `q.book`, add `OR unaccent(lower(coalesce(q.book,''))) LIKE norm_query`.
-  - `search_pdf_content` and `search_question_content`: add `book` to returned columns so the OCR-search UI can also display it.
+Currently `search_pdf_content` and `search_question_content` return `book` but only filter on `ocr_text`. Update both via migration so the WHERE clause also matches `book`:
 
-## 2. Resource forms
+```sql
+-- search_pdf_content
+WHERE c.class_id = user_class_id
+  AND r.deleted = false
+  AND (
+    (r.ocr_status = 'completed' AND unaccent(lower(r.ocr_text)) LIKE '%' || norm_query || '%')
+    OR unaccent(lower(coalesce(r.book,''))) LIKE '%' || norm_query || '%'
+  )
+```
 
-Files: `AddResourceForm.tsx`, `AddResourceFormWithSelection.tsx`, `AddResourceGlobalForm.tsx`, `EditResourceForm.tsx`.
+Same shape for `search_question_content` (match `q.book`). `match_snippet` falls back to the book name when the OCR text doesn't contain the query.
 
-- Extend zod schema with `book: z.string().max(200).optional()`.
-- Add to defaultValues (edit form reads from `initialData.book`).
-- Add a `<FormField name="book">` input next to school/teacher with label "Book (Optional)" and placeholder `📘 e.g. CMS / CLS / Manuel scolaire`.
-- Include `book: data.book || null` in insert/update payloads.
-- Extend `EditResourceFormProps.initialData` with `book?: string | null` and pass it from `ResourceDetail.tsx`.
+`search_resources_normalized` and `search_questions_normalized` already match on `book` — no change.
 
-## 3. Question forms
+## 2. New RPCs for book autocomplete
 
-Files: `AskQuestionForm.tsx`, `AskQuestionFormWithSelection.tsx`, `AskQuestionGlobalForm.tsx`, `EditQuestionForm.tsx`.
+Add two `SECURITY DEFINER STABLE` functions returning distinct book names:
 
-- Same pattern as above: zod field, default, input, payload, edit-form initialData.
+- `search_resource_books_normalized(search_query text)` → `TABLE(book text)` from `resources` where `book IS NOT NULL AND book <> '' AND deleted = false` matching `unaccent(lower(book)) LIKE`. `LIMIT 15`, ordered alphabetically.
+- `search_question_books_normalized(search_query text)` → same shape from `questions`.
 
-## 4. Display the book name
+Mirrors the existing `search_schools_normalized` / `search_teachers_normalized` pattern.
 
-A new shared component `src/components/BookBadge.tsx`:
+## 3. New `BookAutocomplete` component
 
-- Small pill with a book icon (lucide `BookOpen`), gradient background that adapts to dark mode, truncated text with tooltip showing full value.
-- Renders nothing when `book` is empty/null.
+`src/components/BookAutocomplete.tsx`, modeled on `SchoolAutocomplete` / a slimmed `TeacherBadge` autocomplete:
 
-Usage:
+- Props: `value`, `onChange(name)`, `source: 'resource' | 'question'`, `placeholder`, `disabled`.
+- Popover + `Command` UI with `BookOpen` icon trigger.
+- Debounced (300ms) RPC call to the matching `search_*_books_normalized`.
+- Shows distinct existing books; user can also choose "Use exact name: …" for a free-form value (no separate `books` table — it remains a free text column).
+- Matches the visual language of `SchoolAutocomplete` (same trigger button shape, AI badge omitted since we don't auto-suggest book).
 
-- **Resource cards / lists** (`MainContent.tsx`, `Chapter.tsx`, `GlobalSearch.tsx`, anywhere resources are listed): render `<BookBadge book={resource.book} />` in the metadata row alongside school/teacher badges.
-- **Question cards / lists** (`Chapter.tsx`, `ActionButtons.tsx` lists, `GlobalSearch.tsx`): render `<BookBadge book={question.book} />` in the same metadata area.
-- **Resource detail page** (`ResourceDetail.tsx`): show the badge prominently in the header near the title, alongside school/teacher info.
-- **Question detail page** (`QuestionDetail.tsx`): same — next to the question metadata.
-- **Statistics page**: add a `Book` column for verification.
+## 4. Wire `BookAutocomplete` into all forms
 
-Visual:
-- Light: soft amber/indigo gradient with dark text.
-- Dark: deeper gradient, light text (follows existing badge pattern from `TeacherBadge`/`SchoolAutocomplete`).
+Replace the plain `<Input name="book">` added previously with `<BookAutocomplete source="resource" .../>` (or `"question"`) inside the `FormField` render in:
 
-## 5. Search
+- `AddResourceForm.tsx`, `AddResourceFormWithSelection.tsx`, `AddResourceGlobalForm.tsx`, `EditResourceForm.tsx` → `source="resource"`.
+- `AskQuestionForm.tsx`, `AskQuestionFormWithSelection.tsx`, `AskQuestionGlobalForm.tsx`, `EditQuestionForm.tsx` → `source="question"`.
 
-- `GlobalSearch.tsx`: surface `book` from RPC results via the new `BookBadge`. Filtering against `book` is automatic once the RPCs include it in the OR clause.
+Zod schema and payload handling stay the same (still optional string).
 
-## 6. Types
+## 5. Notes
 
-`src/integrations/supabase/types.ts` regenerates automatically after the migration — no manual edit.
-
-## Notes
-
-- Backfill applies to existing resources only (per user request). Questions are not backfilled.
-- `book` is fully optional; max length 200.
-- Form persistence (`useFormPersistence`) picks up the new field automatically.
+- No new tables; book remains a free-text column. Autocomplete is purely a UX helper sourced from existing rows.
+- Types regenerate automatically after the migration.
+- `.lovable/plan.md` updated to reflect the new RPCs, autocomplete component, and the OCR-search WHERE clause change.

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { BookAutocomplete } from "@/components/BookAutocomplete";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -251,7 +252,7 @@ export const AskQuestionFormWithSelection: React.FC<AskQuestionFormWithSelection
             <FormItem>
               <FormLabel>Book (Optional)</FormLabel>
               <FormControl>
-                <Input placeholder="📘 e.g. CMS / CLS / Manuel scolaire" {...field} />
+                <BookAutocomplete value={field.value || ""} onChange={field.onChange} source="question" />
               </FormControl>
               <FormMessage />
             </FormItem>

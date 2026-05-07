@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { BookAutocomplete } from "@/components/BookAutocomplete";
 import { useForm } from 'react-hook-form';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -724,7 +725,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
             <FormItem>
               <FormLabel>Book (Optional)</FormLabel>
               <FormControl>
-                <Input placeholder="📘 e.g. CMS / CLS / Manuel scolaire" {...field} />
+                <BookAutocomplete value={field.value || ""} onChange={field.onChange} source="resource" />
               </FormControl>
               <FormMessage />
             </FormItem>
