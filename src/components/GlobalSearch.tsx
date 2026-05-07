@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, FileText, HelpCircle, MessageSquare, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { BookBadge } from '@/components/BookBadge';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
