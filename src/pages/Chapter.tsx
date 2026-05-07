@@ -40,6 +40,7 @@ interface Question {
   verified: boolean;
   contributors: string[];
   isBookmarked?: boolean;
+  book?: string | null;
 }
 
 interface Resource {
@@ -57,6 +58,7 @@ interface Resource {
   verified: boolean;
   published_by: string | null;
   isBookmarked?: boolean;
+  book?: string | null;
 }
 
 interface ResourceType {
