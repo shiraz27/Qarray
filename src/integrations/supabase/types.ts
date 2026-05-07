@@ -1059,6 +1059,7 @@ export type Database = {
           teacher_name: string
           title: string
           type_id: number
+          type_ids: number[]
           with_correction: boolean
         }[]
       }
