@@ -43,6 +43,7 @@ interface Resource {
   ocr_status?: string | null;
   school_name?: string | null;
   teacher_name?: string | null;
+  book?: string | null;
 }
 
 interface ContextData {
