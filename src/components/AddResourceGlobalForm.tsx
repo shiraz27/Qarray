@@ -820,29 +820,22 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="type_id"
+            name="type_ids"
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="flex items-center gap-2">
-                  Resource Type
+                  Resource Types
                   {isReviewMode && extractedData?.metadata.suggested_type_id && (
                     <AIBadge />
                   )}
                 </FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select resource type" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {resourceTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id.toString()}>
-                        {type.type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <ResourceTypeMultiSelect
+                    options={resourceTypes}
+                    value={(field.value as number[]) || []}
+                    onChange={field.onChange}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
