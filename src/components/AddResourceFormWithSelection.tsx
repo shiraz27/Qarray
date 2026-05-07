@@ -14,13 +14,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
+import { ResourceTypeMultiSelect } from './ResourceTypeMultiSelect';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
   description: z.string().min(10, 'Description must be at least 10 characters').max(500, 'Description must be less than 500 characters'),
   subject_id: z.string().min(1, 'Please select a subject'),
   chapter_id: z.string().min(1, 'Please select a chapter'),
-  type_id: z.string().optional(),
+  type_ids: z.array(z.number()).default([]),
   devoir_type_id: z.string().optional(),
   with_correction: z.boolean().default(false),
   school_name: z.string().max(200).optional(),
@@ -74,7 +75,7 @@ export const AddResourceFormWithSelection: React.FC<AddResourceFormWithSelection
       description: '',
       subject_id: '',
       chapter_id: '',
-      type_id: '',
+      type_ids: [],
       devoir_type_id: '',
       with_correction: false,
       school_name: '',
@@ -150,14 +151,16 @@ export const AddResourceFormWithSelection: React.FC<AddResourceFormWithSelection
         return;
       }
 
-      let typeId = parseInt(data.type_id) || 1;
-      if (!data.type_id && mediaUrls.length > 0) {
+      let typeIds: number[] = data.type_ids ?? [];
+      if (typeIds.length === 0 && mediaUrls.length > 0) {
         const firstUrl = mediaUrls[0].toLowerCase();
+        let detected = 1;
         if (firstUrl.includes('youtube') || firstUrl.includes('youtu.be')) {
-          typeId = 6;
+          detected = 6;
         } else if (firstUrl.includes('.pdf')) {
-          typeId = 5;
+          detected = 5;
         }
+        typeIds = [detected];
       }
 
       // Check if any media is PDF or image
@@ -174,7 +177,7 @@ export const AddResourceFormWithSelection: React.FC<AddResourceFormWithSelection
           subject_id: parseInt(data.subject_id),
           title: data.title,
           description: data.description,
-          type_id: typeId,
+          type_ids: typeIds,
           devoir_type_id: data.devoir_type_id ? parseInt(data.devoir_type_id) : null,
           with_correction: data.with_correction,
           data: mediaUrls,
