@@ -1,24 +1,15 @@
-## Problem
+New hypothesis: the previous fix failed because JavaScript `\b` word boundaries are ASCII-oriented, so accented letters like `é` are incorrectly treated as boundaries and get re-uppercased inside words.
 
-`capitalizeEveryWord` only uppercases the first letter of each word but leaves the rest of the letters untouched. So a stored string like `RÉSumÉ Maths Toute L'AnnÉE` stays mangled instead of becoming `Résumé Maths Toute L'Année`. This affects every place that uses the helper:
+Evidence gathered:
+- The shared helper already lowercases first, so the code change was present.
+- Testing the exact string showed the current regex matches multiple letters inside `résumé` and `année`, producing the unchanged bad result: `RÉSumÉ Maths Toute L'AnnÉE`.
 
-- Chapter page — chapter titles and resource titles (`src/pages/Chapter.tsx`)
-- Resource detail page — resource title (`src/pages/ResourceDetail.tsx`)
-- Question detail page (`src/pages/QuestionDetail.tsx`)
-- MediaList text body (`src/components/MediaList.tsx`)
+Plan:
+1. Replace the regex in `src/utils/textHelpers.ts` with a Unicode-aware word-start matcher that treats accented letters as letters.
+2. Keep the helper centralized so the fix applies everywhere it is used: chapter page, resource detail page, question detail page, and media list.
+3. Update the helper comment to reflect that it normalizes weird mixed casing, not just simple capitalization.
+4. Verify with the exact failing title that the output becomes `Résumé Maths Toute L'Année`, including accented letters and apostrophes.
 
-## Fix
-
-Single change in `src/utils/textHelpers.ts`: lowercase the whole string first, then uppercase the first letter of every word. Since every call site already routes through this helper, this one edit generalizes the fix across the entire app.
-
-```ts
-export const capitalizeEveryWord = (s: string | null | undefined): string =>
-  (s ?? '')
-    .toString()
-    .toLocaleLowerCase()
-    .replace(/\b\p{L}/gu, (ch) => ch.toLocaleUpperCase());
-```
-
-The existing `\b\p{L}` Unicode word-boundary regex correctly handles accents and apostrophes (e.g. `L'Année`), so no other adjustments are needed.
-
-No DB changes, no other files touched.
+Technical detail:
+- Use a pattern like `/(^|[^\p{L}])\p{L}/gu` instead of `\b\p{L}`.
+- The replacement preserves any separator/punctuation and uppercases only the final letter in the matched segment, so `l'année` becomes `L'Année` and `RÉSumÉ` becomes `Résumé`.
