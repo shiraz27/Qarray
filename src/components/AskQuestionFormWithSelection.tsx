@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
@@ -16,6 +17,7 @@ const questionSchema = z.object({
   question: z.string().min(10, 'Question must be at least 10 characters').max(500, 'Question must be less than 500 characters'),
   subject_id: z.string().min(1, 'Please select a subject'),
   chapter_id: z.string().min(1, 'Please select a chapter'),
+  book: z.string().max(200).optional(),
 });
 
 type QuestionFormData = z.infer<typeof questionSchema>;
@@ -60,6 +62,7 @@ export const AskQuestionFormWithSelection: React.FC<AskQuestionFormWithSelection
       question: '',
       subject_id: '',
       chapter_id: '',
+      book: '',
     },
   });
 
@@ -149,6 +152,7 @@ export const AskQuestionFormWithSelection: React.FC<AskQuestionFormWithSelection
           data: questionData,
           type_id: typeId,
           contributors: [user.id],
+          book: data.book || null,
         });
 
       if (error) throw error;
@@ -234,6 +238,20 @@ export const AskQuestionFormWithSelection: React.FC<AskQuestionFormWithSelection
                   className="min-h-32 resize-none"
                   {...field}
                 />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="book"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Book (Optional)</FormLabel>
+              <FormControl>
+                <Input placeholder="📘 e.g. CMS / CLS / Manuel scolaire" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
