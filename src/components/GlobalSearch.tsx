@@ -39,6 +39,7 @@ interface SearchResult {
   hasCorrection?: boolean;
   schoolName?: string;
   teacherName?: string;
+  book?: string | null;
   smartMatch?: boolean;
 }
 
