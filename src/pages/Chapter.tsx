@@ -54,6 +54,7 @@ interface Resource {
   downvotes: number;
   userVote: 'upvote' | 'downvote' | null;
   type_id: number;
+  type_ids?: number[] | null;
   devoir_type_id: number | null;
   with_correction: boolean;
   verified: boolean;
@@ -325,16 +326,16 @@ export default function Chapter() {
         setQuestions(questionsWithVotes);
 
         // Fetch resources with vote counts
-        const { data: resourcesData } = await supabase
+        const { data: resourcesData } = await (supabase as any)
           .from('resources')
-          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified, published_by, book')
+          .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, book')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
 
         // Fetch vote counts and user votes for resources
       const resourcesWithVotes = await Promise.all(
-        (resourcesData || []).map(async (resource) => {
+        ((resourcesData || []) as any[]).map(async (resource: any) => {
           const { count: upvotes } = await supabase
             .from('votes')
             .select('*', { count: 'exact', head: true })
@@ -589,15 +590,15 @@ export default function Chapter() {
 
         setQuestions(questionsWithVotes);
       } else {
-        const { data: resourcesData } = await supabase
+        const { data: resourcesData } = await (supabase as any)
           .from('resources')
-          .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified, published_by')
+          .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by')
           .eq('chapter_id', chapter?.id)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
 
         const resourcesWithVotes = await Promise.all(
-          (resourcesData || []).map(async (resource) => {
+          ((resourcesData || []) as any[]).map(async (resource: any) => {
             const { count: upvotes } = await supabase
               .from('votes')
               .select('*', { count: 'exact', head: true })
@@ -1084,15 +1085,15 @@ export default function Chapter() {
                     setIsResourceDialogOpen(false);
                     // Refresh data
                     const fetchResources = async () => {
-                      const { data: resourcesData } = await supabase
+                      const { data: resourcesData } = await (supabase as any)
                         .from('resources')
-                        .select('id, title, description, data, created_at, type_id, devoir_type_id, with_correction, verified, published_by')
+                        .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by')
                         .eq('chapter_id', chapter.id)
                         .eq('deleted', false)
                         .order('created_at', { ascending: false });
 
                       const resourcesWithVotes = await Promise.all(
-                        (resourcesData || []).map(async (resource) => {
+                        ((resourcesData || []) as any[]).map(async (resource: any) => {
                           const { count: upvotes } = await supabase
                             .from('votes')
                             .select('*', { count: 'exact', head: true })
@@ -1139,7 +1140,7 @@ export default function Chapter() {
             </Dialog>
 
             {resources.filter(r => 
-              (selectedTypeFilters.length === 0 || selectedTypeFilters.includes(r.type_id)) &&
+              (selectedTypeFilters.length === 0 || ((r.type_ids && r.type_ids.length > 0 ? r.type_ids : [r.type_id]).some((id) => selectedTypeFilters.includes(id)))) &&
               (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
               (!showWithCorrectionOnly || r.with_correction)
             ).length === 0 ? (
@@ -1150,13 +1151,16 @@ export default function Chapter() {
             ) : (
               resources
                 .filter(r => 
-                  (selectedTypeFilters.length === 0 || selectedTypeFilters.includes(r.type_id)) &&
+                  (selectedTypeFilters.length === 0 || ((r.type_ids && r.type_ids.length > 0 ? r.type_ids : [r.type_id]).some((id) => selectedTypeFilters.includes(id)))) &&
                   (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
                   (!showWithCorrectionOnly || r.with_correction)
                 )
                 .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
                 .map((resource) => {
-                  const resourceType = resourceTypes.find(t => t.id === resource.type_id);
+                  const resourceTypeIds = resource.type_ids && resource.type_ids.length > 0 ? resource.type_ids : (resource.type_id ? [resource.type_id] : []);
+                  const resolvedResourceTypes = resourceTypeIds
+                    .map((id) => resourceTypes.find((t) => t.id === id))
+                    .filter((t): t is ResourceType => Boolean(t));
                   const devoirType = devoirTypes.find(t => t.id === resource.devoir_type_id);
                   
                   // Check media types in resource data
@@ -1189,11 +1193,11 @@ export default function Chapter() {
                           Unverified
                         </span>
                       )}
-                      {resourceType && (
-                        <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full whitespace-nowrap">
-                          {resourceType.type}
+                      {resolvedResourceTypes.map((rt) => (
+                        <span key={rt.id} className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full whitespace-nowrap">
+                          {rt.type}
                         </span>
-                      )}
+                      ))}
                       {devoirType && (
                         <span className="text-xs px-2 py-1 bg-secondary/10 text-secondary-foreground rounded-full whitespace-nowrap">
                           {devoirType.devoir_type}

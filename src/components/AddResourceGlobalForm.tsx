@@ -21,6 +21,7 @@ import { processOcrAndExtractMetadata, OcrAndExtractResult } from '@/utils/ocrAn
 import { mergeDescriptionWithAi } from '@/utils/metadataExtractor';
 import { SchoolAutocomplete } from './SchoolAutocomplete';
 import { AIBadge } from './AIBadge';
+import { ResourceTypeMultiSelect } from './ResourceTypeMultiSelect';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
 
@@ -29,7 +30,7 @@ const resourceSchema = z.object({
   description: z.string().min(10, 'Description must be at least 10 characters').max(500, 'Description must be less than 500 characters'),
   subject_id: z.string().min(1, 'Please select a subject'),
   chapter_id: z.string().min(1, 'Please select a chapter'),
-  type_id: z.string().optional(),
+  type_ids: z.array(z.number()).default([]),
   devoir_type_id: z.string().optional(),
   with_correction: z.boolean().default(false),
   school_name: z.string().max(200).optional(),
@@ -106,7 +107,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
       description: '',
       subject_id: '',
       chapter_id: '',
-      type_id: '',
+      type_ids: [],
       devoir_type_id: '',
       with_correction: false,
       school_name: '',
@@ -340,7 +341,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
         form.setValue('teacher_name', result.metadata.teacher_name);
       }
       if (result.metadata.suggested_type_id) {
-        form.setValue('type_id', result.metadata.suggested_type_id.toString());
+        form.setValue('type_ids', [result.metadata.suggested_type_id]);
       }
       if (result.metadata.suggested_devoir_type_id) {
         form.setValue('devoir_type_id', result.metadata.suggested_devoir_type_id.toString());
@@ -406,16 +407,18 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
       }
 
       // Auto-detect resource type based on media
-      let typeId = parseInt(data.type_id || '1') || 1;
-      if (!data.type_id && mediaUrls.length > 0) {
+      let typeIds: number[] = data.type_ids ?? [];
+      if (typeIds.length === 0 && mediaUrls.length > 0) {
+        let detected = 1;
         const firstUrl = mediaUrls[0].toLowerCase();
         if (firstUrl.includes('youtube') || firstUrl.includes('youtu.be')) {
-          typeId = 2; // Video type
+          detected = 6; // Vidéo
         } else if (firstUrl.includes('.pdf')) {
-          typeId = 3; // Document type
+          detected = 5; // PDF
         } else if (firstUrl.includes('archive.org') && firstUrl.includes('audio')) {
-          typeId = 4; // Audio type
+          detected = 4;
         }
+        typeIds = [detected];
       }
 
       // Check if any media is PDF or image
@@ -428,14 +431,13 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
       // Determine OCR status based on step
       const ocrStatus = step === 'review' ? 'completed' : (isPdfOrImage ? 'pending' : 'not_applicable');
 
-      const { error } = await supabase
-        .from('resources')
+      const { error } = await (supabase as any).from('resources')
         .insert({
           chapter_id: parseInt(data.chapter_id),
           subject_id: parseInt(data.subject_id),
           title: data.title,
           description: data.description,
-          type_id: typeId,
+          type_ids: typeIds,
           devoir_type_id: data.devoir_type_id ? parseInt(data.devoir_type_id) : null,
           with_correction: data.with_correction,
           data: mediaUrls,
@@ -818,29 +820,22 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="type_id"
+            name="type_ids"
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="flex items-center gap-2">
-                  Resource Type
+                  Resource Types
                   {isReviewMode && extractedData?.metadata.suggested_type_id && (
                     <AIBadge />
                   )}
                 </FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select resource type" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {resourceTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id.toString()}>
-                        {type.type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <ResourceTypeMultiSelect
+                    options={resourceTypes}
+                    value={(field.value as number[]) || []}
+                    onChange={field.onChange}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
