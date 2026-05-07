@@ -146,7 +146,12 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
           })
         );
 
-        setChapters(chaptersWithCounts);
+        const sortedChapters = [...chaptersWithCounts].sort((a, b) => {
+          const aGen = a.name.trim().toLowerCase() === 'chapitre général' ? 0 : 1;
+          const bGen = b.name.trim().toLowerCase() === 'chapitre général' ? 0 : 1;
+          return aGen - bGen;
+        });
+        setChapters(sortedChapters);
 
         // Fetch common chapters from other Bac classes
         const currentClassId = subjectData?.class_id;
@@ -351,7 +356,12 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
           })
         );
 
-        setChapters(chaptersWithCounts);
+        const sortedChapters = [...chaptersWithCounts].sort((a, b) => {
+          const aGen = a.name.trim().toLowerCase() === 'chapitre général' ? 0 : 1;
+          const bGen = b.name.trim().toLowerCase() === 'chapitre général' ? 0 : 1;
+          return aGen - bGen;
+        });
+        setChapters(sortedChapters);
       } catch (error) {
         console.error('Error fetching chapters:', error);
       } finally {
@@ -429,15 +439,19 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
         )}
         {chapters.map((chapter) => {
           const hasContent = chapter.questionCount > 0 || chapter.answerCount > 0 || chapter.resourceCount > 0;
-          
+          const isGeneral = chapter.name.trim().toLowerCase() === 'chapitre général';
+
           return (
             <Card 
               key={chapter.id}
               className="relative overflow-hidden p-4 hover:shadow-md transition-all cursor-pointer border-none group"
               style={{
-                background: hasContent 
-                  ? 'linear-gradient(to right, #FFFFFF 0%, #FDE6E6 100%)' 
+                background: isGeneral
+                  ? 'linear-gradient(to right, #FFF8DC 0%, #F5C542 100%)'
+                  : hasContent
+                  ? 'linear-gradient(to right, #FFFFFF 0%, #FDE6E6 100%)'
                   : 'linear-gradient(to right, #FFFFFF 0%, #E0E0E0 100%)',
+                boxShadow: isGeneral ? '0 2px 12px rgba(212, 160, 23, 0.35)' : undefined,
               }}
               onClick={() => navigate(`/chapter/${chapter.id}`)}
             >
