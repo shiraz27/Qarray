@@ -14,11 +14,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
+import { ResourceTypeMultiSelect } from './ResourceTypeMultiSelect';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
   description: z.string().min(10, 'Description must be at least 10 characters').max(500, 'Description must be less than 500 characters'),
-  type_id: z.string().optional(),
+  type_ids: z.array(z.number()).default([]),
   devoir_type_id: z.string().optional(),
   with_correction: z.boolean().default(false),
   school_name: z.string().max(200).optional(),
@@ -36,6 +37,7 @@ interface EditResourceFormProps {
     description: string;
     data: string[];
     type_id: number | null;
+    type_ids?: number[] | null;
     devoir_type_id: number | null;
     with_correction: boolean;
     school_name?: string | null;
@@ -73,7 +75,12 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
     defaultValues: {
       title: initialData.title,
       description: initialData.description,
-      type_id: initialData.type_id?.toString() || '',
+      type_ids:
+        initialData.type_ids && initialData.type_ids.length > 0
+          ? initialData.type_ids
+          : initialData.type_id
+            ? [initialData.type_id]
+            : [],
       devoir_type_id: initialData.devoir_type_id?.toString() || '',
       with_correction: initialData.with_correction,
       school_name: initialData.school_name || '',
@@ -106,17 +113,19 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
         return;
       }
 
-      // Auto-detect resource type based on media
-      let typeId = parseInt(data.type_id) || 1;
-      if (!data.type_id && mediaUrls.length > 0) {
+      // Auto-detect resource type based on media when none chosen
+      let typeIds: number[] = data.type_ids ?? [];
+      if (typeIds.length === 0 && mediaUrls.length > 0) {
         const firstUrl = mediaUrls[0].toLowerCase();
+        let detected = 1;
         if (firstUrl.includes('youtube') || firstUrl.includes('youtu.be')) {
-          typeId = 2; // Video type
+          detected = 6;
         } else if (firstUrl.includes('.pdf')) {
-          typeId = 3; // Document type
+          detected = 5;
         } else if (firstUrl.includes('archive.org') && firstUrl.includes('audio')) {
-          typeId = 4; // Audio type
+          detected = 4;
         }
+        typeIds = [detected];
       }
 
       // Check if any NEW media is PDF or image (only set pending if new files added)
@@ -130,7 +139,7 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
       const updateData: any = {
         title: data.title,
         description: data.description,
-        type_id: typeId,
+        type_ids: typeIds,
         devoir_type_id: data.devoir_type_id ? parseInt(data.devoir_type_id) : null,
         with_correction: data.with_correction,
         data: mediaUrls,
@@ -211,24 +220,17 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
 
         <FormField
           control={form.control}
-          name="type_id"
+          name="type_ids"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Resource Type (Optional - Auto-detected)</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select resource type (optional)" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {resourceTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id.toString()}>
-                      {type.type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormLabel>Resource Types (Optional - select one or more)</FormLabel>
+              <FormControl>
+                <ResourceTypeMultiSelect
+                  options={resourceTypes}
+                  value={(field.value as number[]) || []}
+                  onChange={field.onChange}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
