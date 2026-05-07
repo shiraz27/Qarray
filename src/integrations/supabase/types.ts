@@ -998,6 +998,12 @@ export type Database = {
           with_correction: boolean
         }[]
       }
+      search_question_books_normalized: {
+        Args: { search_query: string }
+        Returns: {
+          book: string
+        }[]
+      }
       search_question_content: {
         Args: { search_query: string; user_class_id: number }
         Returns: {
@@ -1023,6 +1029,12 @@ export type Database = {
           id: number
           subject_id: number
           subject_name: string
+        }[]
+      }
+      search_resource_books_normalized: {
+        Args: { search_query: string }
+        Returns: {
+          book: string
         }[]
       }
       search_resources_normalized: {
