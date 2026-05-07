@@ -146,7 +146,12 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
           })
         );
 
-        setChapters(chaptersWithCounts);
+        const sortedChapters = [...chaptersWithCounts].sort((a, b) => {
+          const aGen = a.name.trim().toLowerCase() === 'chapitre général' ? 0 : 1;
+          const bGen = b.name.trim().toLowerCase() === 'chapitre général' ? 0 : 1;
+          return aGen - bGen;
+        });
+        setChapters(sortedChapters);
 
         // Fetch common chapters from other Bac classes
         const currentClassId = subjectData?.class_id;
@@ -351,7 +356,12 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
           })
         );
 
-        setChapters(chaptersWithCounts);
+        const sortedChapters = [...chaptersWithCounts].sort((a, b) => {
+          const aGen = a.name.trim().toLowerCase() === 'chapitre général' ? 0 : 1;
+          const bGen = b.name.trim().toLowerCase() === 'chapitre général' ? 0 : 1;
+          return aGen - bGen;
+        });
+        setChapters(sortedChapters);
       } catch (error) {
         console.error('Error fetching chapters:', error);
       } finally {
