@@ -54,6 +54,7 @@ interface Resource {
   downvotes: number;
   userVote: 'upvote' | 'downvote' | null;
   type_id: number;
+  type_ids?: number[] | null;
   devoir_type_id: number | null;
   with_correction: boolean;
   verified: boolean;
