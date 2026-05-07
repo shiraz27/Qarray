@@ -1085,7 +1085,7 @@ export default function Chapter() {
                     setIsResourceDialogOpen(false);
                     // Refresh data
                     const fetchResources = async () => {
-                      const { data: resourcesData } = await supabase
+                      const { data: resourcesData } = await (supabase as any)
                         .from('resources')
                         .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by')
                         .eq('chapter_id', chapter.id)
@@ -1093,7 +1093,7 @@ export default function Chapter() {
                         .order('created_at', { ascending: false });
 
                       const resourcesWithVotes = await Promise.all(
-                        (resourcesData || []).map(async (resource) => {
+                        ((resourcesData || []) as any[]).map(async (resource: any) => {
                           const { count: upvotes } = await supabase
                             .from('votes')
                             .select('*', { count: 'exact', head: true })
