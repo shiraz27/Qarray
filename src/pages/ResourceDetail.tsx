@@ -30,6 +30,7 @@ interface Resource {
   description: string;
   data: string[];
   type_id: number | null;
+  type_ids?: number[] | null;
   devoir_type_id: number | null;
   with_correction: boolean;
   created_at: string;
@@ -699,6 +700,7 @@ export default function ResourceDetail() {
                       description: resource.description,
                       data: resource.data,
                       type_id: resource.type_id,
+                      type_ids: resource.type_ids ?? null,
                       devoir_type_id: resource.devoir_type_id,
                       with_correction: resource.with_correction,
                       school_name: resource.school_name,
@@ -724,6 +726,7 @@ export default function ResourceDetail() {
                           description: resourceData.description,
                           data: resourceData.data,
                           type_id: resourceData.type_id,
+                          type_ids: (resourceData as any).type_ids ?? null,
                           devoir_type_id: resourceData.devoir_type_id,
                           with_correction: resourceData.with_correction,
                           school_name: resourceData.school_name,
