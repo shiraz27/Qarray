@@ -589,6 +589,7 @@ export type Database = {
           ocr_text: string | null
           resource_id: number | null
           type_id: number | null
+          type_ids: number[] | null
           updated_at: string | null
           verified: boolean
         }
@@ -605,6 +606,7 @@ export type Database = {
           ocr_text?: string | null
           resource_id?: number | null
           type_id?: number | null
+          type_ids?: number[] | null
           updated_at?: string | null
           verified?: boolean
         }
@@ -621,6 +623,7 @@ export type Database = {
           ocr_text?: string | null
           resource_id?: number | null
           type_id?: number | null
+          type_ids?: number[] | null
           updated_at?: string | null
           verified?: boolean
         }
@@ -684,6 +687,7 @@ export type Database = {
           teacher_name: string | null
           title: string
           type_id: number | null
+          type_ids: number[] | null
           updated_at: string | null
           verified: boolean
           with_correction: boolean
@@ -708,6 +712,7 @@ export type Database = {
           teacher_name?: string | null
           title: string
           type_id?: number | null
+          type_ids?: number[] | null
           updated_at?: string | null
           verified?: boolean
           with_correction?: boolean
@@ -732,6 +737,7 @@ export type Database = {
           teacher_name?: string | null
           title?: string
           type_id?: number | null
+          type_ids?: number[] | null
           updated_at?: string | null
           verified?: boolean
           with_correction?: boolean
