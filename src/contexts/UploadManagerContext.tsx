@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getSessionByRoute, persistUrlToSessionByRoute, type FormSession } from '@/hooks/useFormPersistence';
+import { uploadFileToArchive } from '@/utils/archiveMultipartUpload';
 
 export interface UploadItem {
   id: string;
@@ -176,50 +177,43 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const uploadWithRetry = async (item: UploadItem): Promise<{ url: string }> => {
     let lastError: Error | null = null;
-    
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+
+    // The multipart helper retries each part internally; one outer retry
+    // covers full-file failure (e.g. initiate). Avoid retry storms.
+    const OUTER_RETRIES = 1;
+    for (let attempt = 0; attempt <= OUTER_RETRIES; attempt++) {
       try {
         if (attempt > 0) {
-          // Exponential backoff: 2s, 4s, 8s
           const backoffDelay = Math.pow(2, attempt) * 1000;
           await delay(backoffDelay);
-          
-          // Update retry count
           setItems(prev => prev.map(i => 
             i.id === item.id ? { ...i, retryCount: attempt } : i
           ));
         }
 
-        const formData = new FormData();
-        formData.append('file', item.file);
-        formData.append('fileName', item.fileName);
-        formData.append('fileType', item.fileType);
-        
-        if (item.chapterId) {
-          formData.append('chapterId', item.chapterId.toString());
-          if (item.contentType) formData.append('contentType', item.contentType);
-          if (item.contentId) formData.append('contentId', item.contentId);
-        }
+        const result = await uploadFileToArchive(
+          item.file,
+          {
+            fileName: item.fileName,
+            fileType: item.fileType,
+            chapterId: item.chapterId,
+            contentType: item.contentType,
+            contentId: item.contentId,
+          },
+          (p) => {
+            // Reflect real per-part progress (10..95%)
+            const pct = Math.max(10, Math.min(95, Math.round(p.ratio * 95)));
+            setItems(prev => prev.map(i =>
+              i.id === item.id ? { ...i, progress: pct } : i
+            ));
+          },
+        );
 
-        const { data, error } = await supabase.functions.invoke('upload-to-archive', {
-          body: formData,
-        });
-
-        if (error) {
-          throw new Error(error.message || 'Upload failed');
-        }
-
-        if (!data?.url) {
-          throw new Error('No URL returned from upload');
-        }
-
-        return { url: data.url };
+        return result;
         
       } catch (error: any) {
         lastError = error;
         console.warn(`Upload attempt ${attempt + 1} failed:`, error.message);
-        
-        // Don't retry on non-retryable errors
         if (error.message?.includes('credentials not configured')) {
           throw error;
         }
