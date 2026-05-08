@@ -113,7 +113,6 @@ export default function Statistics() {
   const [isProcessingQuestionBatch, setIsProcessingQuestionBatch] = useState(false);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [processingQuestionId, setProcessingQuestionId] = useState<number | null>(null);
-  const [ocrMode, setOcrMode] = useState<OcrMode>('mixed');
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedChapter, setSelectedChapter] = useState<string>('all');
@@ -136,7 +135,7 @@ export default function Statistics() {
   const [selectedResourceIds, setSelectedResourceIds] = useState<Set<number>>(new Set());
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<number>>(new Set());
   const [forceRetryConfirm, setForceRetryConfirm] = useState<
-    | { kind: 'resource' | 'question'; id: number }
+    | { kind: 'resource' | 'question'; id: number; mode: OcrMode }
     | null
   >(null);
 
