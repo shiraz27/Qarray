@@ -1999,12 +1999,12 @@ export default function Statistics() {
             <AlertDialogAction
               onClick={() => {
                 if (!forceRetryConfirm) return;
-                const { kind, id } = forceRetryConfirm;
+                const { kind, id, mode } = forceRetryConfirm;
                 setForceRetryConfirm(null);
                 if (kind === 'resource') {
-                  handleProcessSingle(id);
+                  handleProcessSingle(id, mode);
                 } else {
-                  handleProcessSingleQuestion(id);
+                  handleProcessSingleQuestion(id, mode);
                 }
               }}
             >
