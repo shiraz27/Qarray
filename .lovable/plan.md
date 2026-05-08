@@ -1,45 +1,27 @@
-# Fix: Global search "All Classes" not actually searching all classes
+## Problem
 
-## Root cause
+On `/resource/71`, clicking **Delete** in the confirmation dialog:
+- Shows no loading indicator while the slow Archive.org cleanup runs (sequential `await` per file URL via the `delete-from-archive` edge function).
+- Leaves the **Delete** button and dialog enabled, so impatient users click multiple times.
+- Each extra click re-runs `handleDelete`. The first run eventually succeeds, but the later runs (now operating on an already-deleted resource) surface `Resource not found` / failure toasts.
+- Net result: the action *did* work, but the UI looked frozen and then spammed errors.
 
-`src/components/GlobalSearch.tsx` lines 76–78:
+## Fix (UI/UX only, in `src/pages/ResourceDetail.tsx`)
 
-```ts
-const effectiveClassId = selectedClassId && selectedClassId !== 'all'
-  ? parseInt(selectedClassId)
-  : (publicMode ? null : userClassId);
-```
+1. **Add `isDeleting` state** in `ResourceDetail`.
+2. **Guard `handleDelete`**: return early if `isDeleting` is already true, set it to `true` at the start, reset in a `finally`.
+3. **Loading UI in the AlertDialog**:
+   - Disable both `AlertDialogAction` (Delete) and `AlertDialogCancel` while deleting.
+   - Replace the action label with a `Loader2` spinner + "Deleting…" text.
+   - Make the dialog non-dismissible during deletion (ignore `onOpenChange` close while `isDeleting`).
+4. **Parallelize archive cleanup**: replace the sequential `for` loop with `Promise.allSettled(...)` over the archive URLs so the user waits ~1 round-trip instead of N.
+5. **Handle already-deleted gracefully**: before the DB update, if `resource.deleted` is already true, just show the success toast and `navigate(-1)` without re-running. (Defensive — the dialog guard above is the primary fix.)
+6. **Toast/navigation order**: only show success and navigate after the DB update resolves; on error, keep the dialog open and re-enable the buttons.
 
-When the user explicitly picks **"All Classes"** (`selectedClassId === 'all'`), in private mode (dashboard) it falls into the `else` branch and uses **`userClassId`** — silently scoping every search back to the user's own class. That's why "Correction Manuel Scolaire" only returned results for "Bac sciences expérimentales" (the logged-in user's class) and nothing for Bac maths / techniques / informatique etc., even though those resources exist (verified in DB: 30+ matching rows across multiple classes).
+No backend, RLS, or schema changes. No change to the actual delete semantics — same soft-delete via `deleted = true` and same Archive.org cleanup.
 
-The "All Classes" choice is essentially a no-op on the dashboard today.
-
-Side effect of the same bug: `fetchSubjects` is keyed on `effectiveClassId`, so the subject dropdown also stays restricted to the user's class when "All Classes" is picked.
-
-## Fix
-
-Treat `selectedClassId === 'all'` as an explicit opt-out in **both** public and private mode. Only fall back to `userClassId` when `selectedClassId` is still empty (initial mount before `fetchUserClass` pre-selects it).
-
-```ts
-const effectiveClassId =
-  selectedClassId === 'all'
-    ? null                                  // explicit "All Classes" → search everywhere
-    : selectedClassId
-      ? parseInt(selectedClassId)           // explicit class id
-      : (publicMode ? null : userClassId);  // not yet initialized → user's class in private mode
-```
-
-No other changes needed:
-- `search_resources_normalized` / `search_questions_normalized` / `search_chapters_normalized` / `search_answers_normalized` already accept `NULL` for `p_class_id` and return matches across all classes (verified by direct RPC call returning 10/10 results).
-- OCR sub-searches (`search_pdf_content`, `search_question_content`) are already gated behind `effectiveClassId &&`, so they'll be skipped when "All Classes" is chosen — that's the existing intended behavior; we keep it.
-- Subject dropdown will correctly populate with all classes' subjects once `effectiveClassId` is `null`.
-
-## Files
-
-- `src/components/GlobalSearch.tsx` — single 3-line change to the `effectiveClassId` derivation.
+## Files touched
+- `src/pages/ResourceDetail.tsx` (single file, ~handleDelete + the AlertDialog block around line 743–763)
 
 ## Out of scope
-
-- No DB / RPC changes.
-- No change to OCR-content search gating.
-- No change to public landing page search behavior (already worked correctly because `publicMode` branch uses `null`).
+- The same pattern likely exists on `QuestionDetail.tsx` and other detail pages. I'll only fix ResourceDetail unless you ask me to mirror the change everywhere.
