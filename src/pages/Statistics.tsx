@@ -1602,14 +1602,26 @@ export default function Statistics() {
                         <div className="flex items-center justify-between">
                           <h4 className="font-medium">Questions OCR Stats</h4>
                           {(questionOcrStats.pending > 0 || questionOcrStats.failed > 0) && (
-                            <Button 
-                              onClick={handleProcessAllPendingQuestions} 
-                              disabled={isProcessingQuestionBatch}
-                              size="sm"
-                            >
-                              {isProcessingQuestionBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                              Process All ({questionOcrStats.pending + questionOcrStats.failed})
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" disabled={isProcessingQuestionBatch}>
+                                  {isProcessingQuestionBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  Process All ({questionOcrStats.pending + questionOcrStats.failed})
+                                  <ChevronDown className="ml-1 h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleProcessAllPendingQuestions('text')}>
+                                  <FileText className="mr-2 h-4 w-4" /> Text only — fastest
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleProcessAllPendingQuestions('image')}>
+                                  <ImageIcon className="mr-2 h-4 w-4" /> Image only — scans
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleProcessAllPendingQuestions('mixed')}>
+                                  <Layers className="mr-2 h-4 w-4" /> Mixed — thorough
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
