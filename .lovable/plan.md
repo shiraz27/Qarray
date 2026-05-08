@@ -1,132 +1,64 @@
-
 ## Goal
 
-Make large Archive.org uploads dramatically faster, show real progress from byte 0, and add pause/resume.
+Let the admin pick **how thoroughly** each OCR run should work, so they can trade speed against coverage on a per-document or per-batch basis.
 
-## Root causes (measured against current code)
+Three modes:
 
-1. **Double bandwidth.** Every 8 MB part is sent browser → edge function → archive.org. The edge function re-buffers the whole part (`await chunk.arrayBuffer()`), then re-uploads. Each part also pays a fresh boot (logs show `booted (time: ~30ms)` per call) plus Supabase request overhead.
-2. **Sequential parts.** `multipartUpload` in `archiveMultipartUpload.ts` uploads one part at a time.
-3. **Fake 10%.** `processQueue` sets `progress: 10` immediately, before any byte is sent. The next update only fires when part 1 finishes.
-4. **Per-part granularity only.** Even with multipart, progress jumps in 8 MB chunks; no in-flight bytes.
-5. **No pause/resume.** `UploadStatusIndicator` only exposes Retry / Remove (queued) / Clear.
+| Mode | What runs per page | Speed | When to use |
+|------|--------------------|-------|-------------|
+| **Text only** | `pdfjsLib` text layer extraction. No Tesseract. | Near-instant (seconds for 250 pages). | Born-digital PDFs (cours, résumés typed in Word/LaTeX). |
+| **Image only** | Render page → Tesseract `eng+ara`. No text layer. | Slow (current speed). | Pure scans where the text layer is missing or junk. |
+| **Mixed** (current behavior) | Text layer + Tesseract, combined per page. | Slowest, most thorough. | Mixed documents (typed text with figure captions, handwritten notes, photos of book pages). |
 
-## Solution
+For standalone images (PNG/JPG resources), only **Image only** and **Mixed** make sense — **Text only** is hidden / disabled there.
 
-Move the actual byte transfer **directly from the browser to archive.org**, keep credentials server-side via short-lived **presigned PUT URLs**, run parts in parallel, and wire real `xhr.upload.onprogress` events into the UI with pause/resume.
+## UX
 
-### Architecture
+In `src/pages/Statistics.tsx`:
 
-```text
-Browser                                 Edge function                Archive.org S3
-  |-- initiate ---------------------->|                              |
-  |                                   |---- POST ?uploads ---------->|
-  |<--- { uploadId, key, finalUrl }---|<--- <UploadId>... -----------|
-  |                                                                  |
-  |-- sign-part(partNumber) ------>|                                  |
-  |<--- { url, headers, expiresAt }-|                                 |
-  |                                                                  |
-  |---------- PUT chunk (XHR, onprogress) -------------------------->|
-  |<------------------------ ETag -----------------------------------|
-  |                                                                  |
-  |-- complete(parts) -------------->|---- POST ?uploadId=... ------>|
-  |<--- { url } ---------------------|<---- finalize ----------------|
-```
+1. Add a small `OcrMode` selector (Radio group or `Select`: `text` / `image` / `mixed`) next to the existing **Run OCR** / **Run Bulk OCR** buttons. Default = `mixed` (preserves today's behavior).
+2. The selector is shared across the Resources tab and Questions tab and lives in component state (`const [ocrMode, setOcrMode] = useState<OcrMode>('mixed')`).
+3. Pass `ocrMode` into every call to `processResourceOCR`, `processQuestionOCR`, `runBulkResourceOcr`, `runBulkQuestionOcr`.
+4. Show the mode briefly in the toast (`[3/12] Text-only OCR…`) so the admin sees which pipeline ran.
 
-Credentials never leave the edge function. Each presigned URL is a single-use `PUT` valid for ~1 hour, generated using archive.org's S3-compatible query-string auth (HMAC-SHA1 over the canonical string, same scheme already used implicitly via the `LOW` auth header).
+## Code changes
 
-### Edge function changes (`supabase/functions/upload-to-archive/index.ts`)
+### `src/utils/pdfOcrHelpers.ts`
 
-- Keep `single`, `initiate`, `complete`, `abort` actions as-is (they are small JSON/control calls).
-- **Remove** `upload-part` body proxying. Replace with a new action **`sign-part`**:
-  - Input: `{ key, uploadId, partNumber }`.
-  - Output: `{ url, method: "PUT", headers: { ... }, expiresAt }`.
-  - Implementation: build `https://s3.us.archive.org/<item>/<key>?partNumber=N&uploadId=...&AWSAccessKeyId=...&Expires=...&Signature=...` where Signature = `base64(HMAC-SHA1(secret, stringToSign))` and `stringToSign = "PUT\n\n\n<expires>\n/<item>/<key>?partNumber=N&uploadId=..."`. Use Web Crypto (`crypto.subtle.importKey` + `sign("HMAC", key, data)` with SHA-1) — no extra deps.
-- Keep request validation; require auth header from caller (existing `verify_jwt` setting).
+- Extend `ExtractPdfOptions` with `mode?: 'text' | 'image' | 'mixed'` (default `'mixed'`).
+- Branch inside `extractPdfTextAndOcr`:
+  - `mode === 'text'`: loop pages, call `getPageText(page)` only. Skip canvas render and Tesseract entirely. Don't spin up a worker. Concatenate per-page output. If nothing extracted, throw `No readable text layer` so caller marks `failed`.
+  - `mode === 'image'`: skip `getPageText`. Render every page to a canvas → Tesseract. Combine = OCR text only.
+  - `mode === 'mixed'`: existing path.
+- Keep the per-page progress callback semantics for all three modes.
 
-### Frontend changes (`src/utils/archiveMultipartUpload.ts`)
+### `src/utils/clientOcrProcessor.ts` and `src/utils/clientQuestionOcrProcessor.ts`
 
-Rewrite `multipartUpload` around an XHR-based per-part uploader:
+- Accept an `OcrMode` arg on `processResourceOCR(resourceId, mode, onProgress?)` (and the question equivalent).
+- For PDFs, forward `mode` to `extractPdfTextAndOcr({ mode, onPageProgress })`.
+- For images:
+  - `mode === 'text'`: skip the file, push `[Image — text-only mode skipped]`. Don't increment `ocrableFileCount` (so a resource that's only images in text mode ends up `not_applicable` with a clear message, instead of `failed`).
+  - `mode === 'image'` or `'mixed'`: run `extractImageText` (Tesseract) as today.
+- Persist the mode in the success message stored in `ocr_text` header (e.g. prepend `[Mode: text]\n…`) so admins can later see how each row was processed.
 
-```ts
-function putPartXhr(url, blob, onProgress, signal): Promise<string /* etag */>
-```
+### `src/pages/Statistics.tsx`
 
-- Uses `XMLHttpRequest` for `xhr.upload.onprogress` (fetch still has no upload progress in browsers).
-- `signal.addEventListener('abort', () => xhr.abort())` for pause/cancel.
-- Returns `ETag` from `xhr.getResponseHeader('ETag')`.
+- New `OcrMode` UI control (default `'mixed'`).
+- Wire the selected mode through every OCR call site already identified (single-row buttons, bulk buttons, retry buttons).
+- Tooltip on the selector explaining the trade-off in one line each.
 
-Orchestrator:
+### Memory
 
-- Initiate via edge function → `{ uploadId, key }`.
-- Build a part list `[{ partNumber, start, end }]`.
-- Maintain a worker pool with **`CONCURRENCY = 4`** (configurable). Each worker:
-  1. Take next un-uploaded part.
-  2. Call `sign-part` (cheap JSON).
-  3. `putPartXhr(url, file.slice(start, end), partProgress, abortSignal)` with retry/backoff (3 attempts, exponential).
-  4. Record `{ partNumber, etag, uploadedBytes }`.
-- A shared `bytesByPart: Map<number, number>` is summed on each progress tick; emit one aggregated `onProgress({ loaded, total, ratio })` from byte 0.
-- On all parts done → `complete`. On unrecoverable failure or user cancel → `abort`.
-- Threshold logic unchanged (single PUT under 16 MB), but route the single PUT through a presigned URL too, so even small files get true progress and skip the proxy.
+Update `mem://ocr/client-side-two-stage-pdf-processing.md` (or add a sibling memory) to record the three modes and that `mixed` remains the default. Add a Core line if it deserves it ("OCR has three modes: text / image / mixed; default mixed").
 
-### Pause / Resume / Cancel API
+## Out of scope
 
-Extend the helper:
+- Auto-detecting the best mode per file (could be a follow-up — render one page, sample text-layer richness, decide).
+- Backend OCR (already discarded for the reasons we covered).
+- Concurrency improvements — keep this PR focused on the mode selector. Concurrency can layer on top later without changing this API.
 
-```ts
-uploadFileToArchive(file, options, onProgress?, controls?)
-  → { url, controller: { pause(), resume(), cancel() } }
-```
+## Expected impact
 
-- Internal state: `running | paused | cancelled`.
-- `pause()`: set state, abort in-flight XHRs (parts already started lose progress for that part only — archive.org keeps completed parts).
-- `resume()`: re-arm `AbortController`, restart workers; they skip parts already in `completedParts`.
-- `cancel()`: abort + call `abort` action; reject promise.
-
-### Upload manager + UI
-
-`src/contexts/UploadManagerContext.tsx`:
-
-- Replace the fake `progress: 10` initialization with `progress: 0`. Keep `status: 'uploading'` separately.
-- Store the per-item `controller` returned by `uploadFileToArchive` in a `controllersRef: Map<id, controller>`.
-- Add `pauseUpload(id)`, `resumeUpload(id)`, `cancelUpload(id)` to context. Add `'paused'` to `UploadItem.status`.
-- Map progress callback's `ratio` directly to `Math.round(ratio * 100)` (no more 10–95 clamp).
-- Reduce/remove the outer `OUTER_RETRIES` loop (part-level retries already handle transient failures; full restart from scratch wastes parts archive.org already accepted).
-
-`src/components/UploadStatusIndicator.tsx`:
-
-- Add Pause / Resume buttons next to each `uploading`/`paused` item (Lucide `Pause` / `Play`).
-- Add Cancel button (X) for `uploading`/`paused` (currently only `queued` can be removed).
-- Header summary shows `Paused` state when applicable.
-- Optional: a global "Pause all" / "Resume all" in the expanded footer.
-
-### Performance impact (for the user's 250-page PDF case)
-
-- **Eliminating the proxy** removes one full upload of every byte (≈ halves the time).
-- **Parallelism × 4** roughly halves the remaining wall time on typical residential uplinks (until uplink saturates).
-- Cold-start cost per part disappears (parts no longer hit the edge function).
-- Realistic expectation: 15–20 min → ~3–6 min for a ~50 MB PDF over a 20 Mbps uplink.
-
-### Edge cases & details
-
-- **Signature character set.** When signing, encode the path and query string the same way archive.org expects (RFC 3986 except `/`). Sub-resources `partNumber` and `uploadId` are **part of the canonical string** — include them in `stringToSign`.
-- **CORS.** Archive.org's S3 endpoint already allows cross-origin PUT from browsers (used by the Internet Archive Uploader). If a specific header gets blocked, drop it from the signed request (we only need `Authorization` via query string, no custom headers).
-- **ETag handling unchanged** — store exactly as returned, including quotes, send back in `complete` XML.
-- **Resuming after page reload** is out of scope (would require persisting `uploadId` + per-part ETags). Pause/resume here is in-session only. Easy to add later.
-- **Single-PUT path** for files < 16 MB also switches to a signed direct PUT for consistency and real progress; metadata headers move into the signed request via `x-amz-meta-*` headers (allowed on PUT-object). Alternatively keep current proxy for small files if signing PUT-object proves brittle — flagged as a fallback.
-- `delete-from-archive`, `fetch-media`, OCR, and DB schema all unchanged.
-- `verify_jwt` setting unchanged.
-
-### Out of scope
-
-- Cross-session resumable uploads (would need persisting multipart state to DB).
-- Background uploads after closing the tab.
-- Adaptive concurrency / bandwidth probing.
-
-### Files touched
-
-- `supabase/functions/upload-to-archive/index.ts` — add `sign-part`, keep others; remove `upload-part` proxy (or keep as a deprecated fallback for one release).
-- `src/utils/archiveMultipartUpload.ts` — XHR uploader, parallel worker pool, pause/resume controller.
-- `src/contexts/UploadManagerContext.tsx` — `paused` status, controllers map, pause/resume/cancel actions, real progress.
-- `src/components/UploadStatusIndicator.tsx` — Pause / Resume / Cancel buttons, paused styling, optional global controls.
-- `mem://infrastructure/archive-multipart-uploads.md` — update documented flow.
+- Admins running 250-page typed PDFs in **Text only** mode: ~20 minutes → **a few seconds**, with full text-layer fidelity.
+- Pure scans in **Image only** mode: same speed as today, no wasted text-layer reads (small win).
+- Default **Mixed** behavior: unchanged, so existing OCR runs and stored `ocr_text` rows stay valid.
