@@ -498,7 +498,7 @@ export default function Statistics() {
             toast.loading(`[${i + 1}/${resourcesToProcess.length}] ${message}`, {
               id: 'batch-progress',
             });
-          });
+          }, ocrMode);
           
           if (result.success) {
             successCount++;
@@ -529,7 +529,7 @@ export default function Statistics() {
     try {
       const result = await processResourceOCR(resourceId, (message) => {
         toast.loading(message, { id: `processing-${resourceId}` });
-      });
+      }, ocrMode);
       
       toast.dismiss(`processing-${resourceId}`);
       
@@ -579,7 +579,7 @@ export default function Statistics() {
             toast.loading(`[${i + 1}/${questionsToProcess.length}] ${message}`, {
               id: 'question-batch-progress',
             });
-          });
+          }, ocrMode);
           
           if (result.success) {
             successCount++;
@@ -610,7 +610,7 @@ export default function Statistics() {
     try {
       const result = await processQuestionOCR(questionId, (message) => {
         toast.loading(message, { id: `processing-question-${questionId}` });
-      });
+      }, ocrMode);
       
       toast.dismiss(`processing-question-${questionId}`);
       
@@ -642,7 +642,7 @@ export default function Statistics() {
         try {
           const result = await processResourceOCR(ids[i], (message) => {
             toast.loading(`[${i + 1}/${ids.length}] ${message}`, { id: 'bulk-resource-ocr' });
-          });
+          }, ocrMode);
           if (result.success) successCount++; else failCount++;
         } catch {
           failCount++;
@@ -668,7 +668,7 @@ export default function Statistics() {
         try {
           const result = await processQuestionOCR(ids[i], (message) => {
             toast.loading(`[${i + 1}/${ids.length}] ${message}`, { id: 'bulk-question-ocr' });
-          });
+          }, ocrMode);
           if (result.success) successCount++; else failCount++;
         } catch {
           failCount++;
