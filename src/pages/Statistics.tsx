@@ -28,6 +28,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { processResourceOCR } from '@/utils/clientOcrProcessor';
+import type { OcrMode } from '@/utils/pdfOcrHelpers';
 import { isPdfUrl, isImageUrl, urlsHaveOcrable, textHasOcrableUrl } from '@/utils/mediaTypeUtils';
 import { processQuestionOCR } from '@/utils/clientQuestionOcrProcessor';
 import { extractAndUpdateResourceMetadata, applySuggestedTitle, type ExtractedMetadata } from '@/utils/metadataExtractor';
@@ -106,6 +107,7 @@ export default function Statistics() {
   const [isProcessingQuestionBatch, setIsProcessingQuestionBatch] = useState(false);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [processingQuestionId, setProcessingQuestionId] = useState<number | null>(null);
+  const [ocrMode, setOcrMode] = useState<OcrMode>('mixed');
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedChapter, setSelectedChapter] = useState<string>('all');
@@ -496,7 +498,7 @@ export default function Statistics() {
             toast.loading(`[${i + 1}/${resourcesToProcess.length}] ${message}`, {
               id: 'batch-progress',
             });
-          });
+          }, ocrMode);
           
           if (result.success) {
             successCount++;
@@ -527,7 +529,7 @@ export default function Statistics() {
     try {
       const result = await processResourceOCR(resourceId, (message) => {
         toast.loading(message, { id: `processing-${resourceId}` });
-      });
+      }, ocrMode);
       
       toast.dismiss(`processing-${resourceId}`);
       
@@ -577,7 +579,7 @@ export default function Statistics() {
             toast.loading(`[${i + 1}/${questionsToProcess.length}] ${message}`, {
               id: 'question-batch-progress',
             });
-          });
+          }, ocrMode);
           
           if (result.success) {
             successCount++;
@@ -608,7 +610,7 @@ export default function Statistics() {
     try {
       const result = await processQuestionOCR(questionId, (message) => {
         toast.loading(message, { id: `processing-question-${questionId}` });
-      });
+      }, ocrMode);
       
       toast.dismiss(`processing-question-${questionId}`);
       
@@ -640,7 +642,7 @@ export default function Statistics() {
         try {
           const result = await processResourceOCR(ids[i], (message) => {
             toast.loading(`[${i + 1}/${ids.length}] ${message}`, { id: 'bulk-resource-ocr' });
-          });
+          }, ocrMode);
           if (result.success) successCount++; else failCount++;
         } catch {
           failCount++;
@@ -666,7 +668,7 @@ export default function Statistics() {
         try {
           const result = await processQuestionOCR(ids[i], (message) => {
             toast.loading(`[${i + 1}/${ids.length}] ${message}`, { id: 'bulk-question-ocr' });
-          });
+          }, ocrMode);
           if (result.success) successCount++; else failCount++;
         } catch {
           failCount++;
@@ -1110,6 +1112,24 @@ export default function Statistics() {
                 <CardDescription>Text extraction from PDFs and images in resources and questions</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 p-3">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">OCR mode</span>
+                    <span className="text-xs text-muted-foreground">
+                      Pick how thoroughly each file is processed
+                    </span>
+                  </div>
+                  <Select value={ocrMode} onValueChange={(v) => setOcrMode(v as OcrMode)}>
+                    <SelectTrigger className="w-[220px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="text">Text only — fastest (digital PDFs)</SelectItem>
+                      <SelectItem value="image">Image only — scans / photos</SelectItem>
+                      <SelectItem value="mixed">Mixed — most thorough (default)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Tabs defaultValue="resources" className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="resources" className="gap-2">
