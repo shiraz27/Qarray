@@ -72,10 +72,14 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const navigate = useNavigate();
 
-  // Effective class ID - selected class takes priority, then user's class in private mode
-  const effectiveClassId = selectedClassId && selectedClassId !== 'all' 
-    ? parseInt(selectedClassId) 
-    : (publicMode ? null : userClassId);
+  // Effective class ID - explicit "all" means search everywhere; an explicit class id
+  // is honored; otherwise (uninitialized) fall back to the user's own class in private mode.
+  const effectiveClassId =
+    selectedClassId === 'all'
+      ? null
+      : selectedClassId
+        ? parseInt(selectedClassId)
+        : (publicMode ? null : userClassId);
 
   useEffect(() => {
     if (open) {
