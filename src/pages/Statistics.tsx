@@ -1164,14 +1164,26 @@ export default function Statistics() {
                               </Button>
                             )}
                             {(ocrStats.pending > 0 || ocrStats.failed > 0) && (
-                              <Button 
-                                onClick={handleProcessAllPending} 
-                                disabled={isProcessingBatch}
-                                size="sm"
-                              >
-                                {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Process All ({ocrStats.pending + ocrStats.failed})
-                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="sm" disabled={isProcessingBatch}>
+                                    {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Process All ({ocrStats.pending + ocrStats.failed})
+                                    <ChevronDown className="ml-1 h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleProcessAllPending('text')}>
+                                    <FileText className="mr-2 h-4 w-4" /> Text only — fastest
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleProcessAllPending('image')}>
+                                    <ImageIcon className="mr-2 h-4 w-4" /> Image only — scans
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleProcessAllPending('mixed')}>
+                                    <Layers className="mr-2 h-4 w-4" /> Mixed — thorough
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             )}
                           </div>
                         </div>
