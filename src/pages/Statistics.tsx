@@ -28,6 +28,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { processResourceOCR } from '@/utils/clientOcrProcessor';
+import type { OcrMode } from '@/utils/pdfOcrHelpers';
 import { isPdfUrl, isImageUrl, urlsHaveOcrable, textHasOcrableUrl } from '@/utils/mediaTypeUtils';
 import { processQuestionOCR } from '@/utils/clientQuestionOcrProcessor';
 import { extractAndUpdateResourceMetadata, applySuggestedTitle, type ExtractedMetadata } from '@/utils/metadataExtractor';
