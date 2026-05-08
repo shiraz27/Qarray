@@ -473,7 +473,7 @@ export default function Statistics() {
     }
   };
 
-  const handleProcessAllPending = async () => {
+  const handleProcessAllPending = async (mode: OcrMode = 'mixed') => {
     setIsProcessingBatch(true);
     try {
       const resourcesToProcess = resources.filter(r => {
@@ -500,10 +500,10 @@ export default function Statistics() {
         
         try {
           const result = await processResourceOCR(resource.id, (message) => {
-            toast.loading(`[${i + 1}/${resourcesToProcess.length}] ${message}`, {
+            toast.loading(`[${i + 1}/${resourcesToProcess.length}] (${mode}) ${message}`, {
               id: 'batch-progress',
             });
-          }, ocrMode);
+          }, mode);
           
           if (result.success) {
             successCount++;
@@ -529,12 +529,12 @@ export default function Statistics() {
     }
   };
 
-  const handleProcessSingle = async (resourceId: number) => {
+  const handleProcessSingle = async (resourceId: number, mode: OcrMode = 'mixed') => {
     setProcessingId(resourceId);
     try {
       const result = await processResourceOCR(resourceId, (message) => {
-        toast.loading(message, { id: `processing-${resourceId}` });
-      }, ocrMode);
+        toast.loading(`(${mode}) ${message}`, { id: `processing-${resourceId}` });
+      }, mode);
       
       toast.dismiss(`processing-${resourceId}`);
       
@@ -555,7 +555,7 @@ export default function Statistics() {
     }
   };
 
-  const handleProcessAllPendingQuestions = async () => {
+  const handleProcessAllPendingQuestions = async (mode: OcrMode = 'mixed') => {
     setIsProcessingQuestionBatch(true);
     try {
       const questionsToProcess = questions.filter(q => {
@@ -581,10 +581,10 @@ export default function Statistics() {
         
         try {
           const result = await processQuestionOCR(question.id, (message) => {
-            toast.loading(`[${i + 1}/${questionsToProcess.length}] ${message}`, {
+            toast.loading(`[${i + 1}/${questionsToProcess.length}] (${mode}) ${message}`, {
               id: 'question-batch-progress',
             });
-          }, ocrMode);
+          }, mode);
           
           if (result.success) {
             successCount++;
@@ -610,12 +610,12 @@ export default function Statistics() {
     }
   };
 
-  const handleProcessSingleQuestion = async (questionId: number) => {
+  const handleProcessSingleQuestion = async (questionId: number, mode: OcrMode = 'mixed') => {
     setProcessingQuestionId(questionId);
     try {
       const result = await processQuestionOCR(questionId, (message) => {
-        toast.loading(message, { id: `processing-question-${questionId}` });
-      }, ocrMode);
+        toast.loading(`(${mode}) ${message}`, { id: `processing-question-${questionId}` });
+      }, mode);
       
       toast.dismiss(`processing-question-${questionId}`);
       
@@ -637,7 +637,7 @@ export default function Statistics() {
   };
 
   // Force retry — runs OCR regardless of current status
-  const runBulkResourceOcr = async (ids: number[]) => {
+  const runBulkResourceOcr = async (ids: number[], mode: OcrMode = 'mixed') => {
     if (ids.length === 0) return;
     setIsProcessingBatch(true);
     let successCount = 0;
@@ -646,8 +646,8 @@ export default function Statistics() {
       for (let i = 0; i < ids.length; i++) {
         try {
           const result = await processResourceOCR(ids[i], (message) => {
-            toast.loading(`[${i + 1}/${ids.length}] ${message}`, { id: 'bulk-resource-ocr' });
-          }, ocrMode);
+            toast.loading(`[${i + 1}/${ids.length}] (${mode}) ${message}`, { id: 'bulk-resource-ocr' });
+          }, mode);
           if (result.success) successCount++; else failCount++;
         } catch {
           failCount++;
@@ -663,7 +663,7 @@ export default function Statistics() {
     }
   };
 
-  const runBulkQuestionOcr = async (ids: number[]) => {
+  const runBulkQuestionOcr = async (ids: number[], mode: OcrMode = 'mixed') => {
     if (ids.length === 0) return;
     setIsProcessingQuestionBatch(true);
     let successCount = 0;
@@ -672,8 +672,8 @@ export default function Statistics() {
       for (let i = 0; i < ids.length; i++) {
         try {
           const result = await processQuestionOCR(ids[i], (message) => {
-            toast.loading(`[${i + 1}/${ids.length}] ${message}`, { id: 'bulk-question-ocr' });
-          }, ocrMode);
+            toast.loading(`[${i + 1}/${ids.length}] (${mode}) ${message}`, { id: 'bulk-question-ocr' });
+          }, mode);
           if (result.success) successCount++; else failCount++;
         } catch {
           failCount++;
