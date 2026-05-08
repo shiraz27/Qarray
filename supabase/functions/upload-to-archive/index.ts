@@ -6,65 +6,352 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const ITEM = 'qarray-educational-content';
 const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY = 2000; // 2 seconds
+const INITIAL_RETRY_DELAY = 2000;
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sanitize = (s: string) => s.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+const encodeForHeader = (s: string) => encodeURIComponent(s).replace(/%20/g, ' ');
 
-async function uploadWithRetry(
-  uploadUrl: string,
-  headers: Record<string, string>,
-  body: ArrayBuffer,
-  retries = MAX_RETRIES
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+function authHeader() {
+  const accessKey = Deno.env.get('ARCHIVE_ORG_ACCESS_KEY');
+  const secretKey = Deno.env.get('ARCHIVE_ORG_SECRET_KEY');
+  if (!accessKey || !secretKey) throw new Error('Archive.org credentials not configured');
+  return `LOW ${accessKey}:${secretKey}`;
+}
+
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  retries = MAX_RETRIES,
 ): Promise<Response> {
   let lastError: Error | null = null;
-  
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       if (attempt > 0) {
-        // Exponential backoff
-        const backoffDelay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1);
-        console.log(`Retry attempt ${attempt}, waiting ${backoffDelay}ms`);
-        await delay(backoffDelay);
+        const wait = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1);
+        console.log(`Retry ${attempt}, waiting ${wait}ms`);
+        await delay(wait);
       }
-
-      const response = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers,
-        body: new Blob([body]),
-      });
-
-      // Check for rate limiting (503 SlowDown)
-      if (response.status === 503) {
-        const errorText = await response.text();
-        console.warn(`Archive.org returned 503 (attempt ${attempt + 1}):`, errorText);
-        
-        if (attempt < retries) {
-          continue; // Retry
-        }
-        
-        throw new Error(`Rate limited after ${retries + 1} attempts: ${errorText}`);
-      }
-
-      // Check for other retryable errors
-      if (response.status >= 500 && attempt < retries) {
-        console.warn(`Server error ${response.status} (attempt ${attempt + 1}), retrying...`);
+      const res = await fetch(url, init);
+      if (res.status === 503 && attempt < retries) {
+        console.warn(`503 SlowDown (attempt ${attempt + 1})`);
         continue;
       }
-
-      return response;
-      
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      console.error(`Upload attempt ${attempt + 1} failed:`, lastError.message);
-      
-      if (attempt >= retries) {
-        throw lastError;
+      if (res.status >= 500 && attempt < retries) {
+        console.warn(`Server error ${res.status} (attempt ${attempt + 1})`);
+        continue;
       }
+      return res;
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      console.error(`Attempt ${attempt + 1} failed:`, lastError.message);
+      if (attempt >= retries) throw lastError;
     }
   }
+  throw lastError || new Error('Request failed after retries');
+}
 
-  throw lastError || new Error('Upload failed after retries');
+interface PathContext {
+  folderPath: string;
+  metadataHeaders: Record<string, string>;
+}
+
+async function buildPathAndMetadata(opts: {
+  fileName: string;
+  fileType: string;
+  chapterId?: string | null;
+  contentType?: string | null;
+  contentId?: string | null;
+}): Promise<PathContext> {
+  const { fileName, fileType, chapterId, contentType, contentId } = opts;
+  const mediatype =
+    fileType === 'audio' ? 'audio' : fileType === 'image' ? 'image' : 'texts';
+
+  const baseHeaders: Record<string, string> = {
+    'x-archive-meta-mediatype': mediatype,
+    'x-archive-meta-collection': 'opensource',
+  };
+
+  if (chapterId) {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+
+    const { data: chapter, error: chapterError } = await supabase
+      .from('chapters')
+      .select('id, name, subject_id, class_id')
+      .eq('id', parseInt(chapterId))
+      .single();
+    if (chapterError || !chapter) throw new Error('Chapter not found');
+
+    const { data: subject, error: subjectError } = await supabase
+      .from('subjects')
+      .select('id, name')
+      .eq('id', chapter.subject_id)
+      .single();
+    if (subjectError || !subject) throw new Error('Subject not found');
+
+    const { data: classData, error: classError } = await supabase
+      .from('classes')
+      .select('id, name')
+      .eq('id', chapter.class_id)
+      .single();
+    if (classError || !classData) throw new Error('Class not found');
+
+    const className = sanitize(classData.name);
+    const subjectName = sanitize(subject.name);
+    const chapterName = sanitize(chapter.name);
+
+    const folderPath =
+      contentType && contentId
+        ? `${className}/${subjectName}/${chapterName}/${contentType}/${contentId}/${fileName}`
+        : `${className}/${subjectName}/${chapterName}/${fileName}`;
+
+    return {
+      folderPath,
+      metadataHeaders: {
+        ...baseHeaders,
+        'x-archive-meta-title': encodeForHeader(
+          `${classData.name} - ${subject.name} - ${chapter.name}`,
+        ),
+        'x-archive-meta-class': encodeForHeader(classData.name),
+        'x-archive-meta-subject': encodeForHeader(subject.name),
+        'x-archive-meta-chapter': encodeForHeader(chapter.name),
+        ...(contentType ? { 'x-archive-meta-content-type': encodeForHeader(contentType) } : {}),
+        ...(contentId ? { 'x-archive-meta-content-id': encodeForHeader(contentId) } : {}),
+      },
+    };
+  }
+
+  const timestamp = Date.now();
+  return {
+    folderPath: `uploads/${timestamp}-${sanitize(fileName)}`,
+    metadataHeaders: {
+      ...baseHeaders,
+      'x-archive-meta-title': encodeForHeader(`Upload - ${fileName}`),
+    },
+  };
+}
+
+function archiveDownloadUrl(folderPath: string) {
+  return `https://archive.org/download/${ITEM}/${folderPath}`;
+}
+
+function archiveS3Url(folderPath: string) {
+  return `https://s3.us.archive.org/${ITEM}/${folderPath}`;
+}
+
+// ---------- Single-shot upload (legacy + small files) ----------
+async function handleSingle(req: Request): Promise<Response> {
+  const formData = await req.formData();
+  const file = formData.get('file') as File;
+  const fileName = formData.get('fileName') as string;
+  const fileType = formData.get('fileType') as string;
+  const chapterId = formData.get('chapterId') as string | null;
+  const contentType = formData.get('contentType') as string | null;
+  const contentId = formData.get('contentId') as string | null;
+
+  if (!file || !fileName) throw new Error('File and fileName are required');
+
+  const { folderPath, metadataHeaders } = await buildPathAndMetadata({
+    fileName,
+    fileType,
+    chapterId,
+    contentType,
+    contentId,
+  });
+
+  const buffer = await file.arrayBuffer();
+  const res = await fetchWithRetry(archiveS3Url(folderPath), {
+    method: 'PUT',
+    headers: {
+      Authorization: authHeader(),
+      'x-amz-auto-make-bucket': '1',
+      ...metadataHeaders,
+      'Content-Type': file.type || 'application/octet-stream',
+    },
+    body: new Blob([buffer]),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('Single upload failed:', errorText);
+    const status = res.status === 503 ? 429 : 500;
+    return jsonResponse(
+      { error: `Upload failed: ${res.status} - ${errorText}`, retryable: res.status >= 500 },
+      status,
+    );
+  }
+
+  return jsonResponse({ url: archiveDownloadUrl(folderPath), itemIdentifier: ITEM, fileName });
+}
+
+// ---------- Multipart: initiate ----------
+async function handleInitiate(req: Request): Promise<Response> {
+  const body = await req.json();
+  const { fileName, fileType, chapterId, contentType, contentId, mimeType } = body;
+  if (!fileName) throw new Error('fileName is required');
+
+  const { folderPath, metadataHeaders } = await buildPathAndMetadata({
+    fileName,
+    fileType,
+    chapterId,
+    contentType,
+    contentId,
+  });
+
+  const url = `${archiveS3Url(folderPath)}?uploads`;
+  const res = await fetchWithRetry(url, {
+    method: 'POST',
+    headers: {
+      Authorization: authHeader(),
+      'x-amz-auto-make-bucket': '1',
+      ...metadataHeaders,
+      'Content-Type': mimeType || 'application/octet-stream',
+    },
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('Initiate failed:', errorText);
+    return jsonResponse(
+      { error: `Initiate failed: ${res.status} - ${errorText}`, retryable: res.status >= 500 },
+      res.status === 503 ? 429 : 500,
+    );
+  }
+
+  const xml = await res.text();
+  const uploadIdMatch = xml.match(/<UploadId>([^<]+)<\/UploadId>/);
+  if (!uploadIdMatch) {
+    console.error('No UploadId in response:', xml);
+    return jsonResponse({ error: 'Invalid initiate response' }, 500);
+  }
+
+  return jsonResponse({
+    uploadId: uploadIdMatch[1],
+    key: folderPath,
+    finalUrl: archiveDownloadUrl(folderPath),
+  });
+}
+
+// ---------- Multipart: upload-part ----------
+async function handleUploadPart(req: Request): Promise<Response> {
+  const formData = await req.formData();
+  const key = formData.get('key') as string;
+  const uploadId = formData.get('uploadId') as string;
+  const partNumber = parseInt(formData.get('partNumber') as string);
+  const chunk = formData.get('chunk') as File;
+
+  if (!key || !uploadId || !partNumber || !chunk) {
+    throw new Error('key, uploadId, partNumber and chunk are required');
+  }
+
+  const buffer = await chunk.arrayBuffer();
+  const url = `${archiveS3Url(key)}?partNumber=${partNumber}&uploadId=${encodeURIComponent(uploadId)}`;
+
+  const res = await fetchWithRetry(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: authHeader(),
+      'Content-Type': 'application/octet-stream',
+    },
+    body: new Blob([buffer]),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error(`Part ${partNumber} failed:`, errorText);
+    return jsonResponse(
+      { error: `Part upload failed: ${res.status} - ${errorText}`, retryable: res.status >= 500 },
+      res.status === 503 ? 429 : 500,
+    );
+  }
+
+  const etag = res.headers.get('ETag') || res.headers.get('etag') || '';
+  if (!etag) {
+    return jsonResponse({ error: 'Missing ETag in part response' }, 500);
+  }
+
+  return jsonResponse({ partNumber, etag });
+}
+
+// ---------- Multipart: complete ----------
+async function handleComplete(req: Request): Promise<Response> {
+  const body = await req.json();
+  const { key, uploadId, parts } = body as {
+    key: string;
+    uploadId: string;
+    parts: Array<{ partNumber: number; etag: string }>;
+  };
+  if (!key || !uploadId || !Array.isArray(parts) || parts.length === 0) {
+    throw new Error('key, uploadId and parts are required');
+  }
+
+  const sorted = [...parts].sort((a, b) => a.partNumber - b.partNumber);
+  const xmlBody =
+    `<CompleteMultipartUpload>` +
+    sorted
+      .map(
+        (p) =>
+          `<Part><PartNumber>${p.partNumber}</PartNumber><ETag>${p.etag}</ETag></Part>`,
+      )
+      .join('') +
+    `</CompleteMultipartUpload>`;
+
+  const url = `${archiveS3Url(key)}?uploadId=${encodeURIComponent(uploadId)}`;
+  const res = await fetchWithRetry(url, {
+    method: 'POST',
+    headers: {
+      Authorization: authHeader(),
+      'Content-Type': 'application/xml',
+    },
+    body: xmlBody,
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('Complete failed:', errorText);
+    return jsonResponse(
+      { error: `Complete failed: ${res.status} - ${errorText}`, retryable: res.status >= 500 },
+      res.status === 503 ? 429 : 500,
+    );
+  }
+
+  // Drain body
+  await res.text();
+  return jsonResponse({ url: archiveDownloadUrl(key) });
+}
+
+// ---------- Multipart: abort ----------
+async function handleAbort(req: Request): Promise<Response> {
+  const body = await req.json();
+  const { key, uploadId } = body as { key: string; uploadId: string };
+  if (!key || !uploadId) throw new Error('key and uploadId are required');
+
+  const url = `${archiveS3Url(key)}?uploadId=${encodeURIComponent(uploadId)}`;
+  try {
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: { Authorization: authHeader() },
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      console.warn('Abort response not ok:', res.status, t);
+    }
+  } catch (e) {
+    console.warn('Abort error (best-effort):', e);
+  }
+  return jsonResponse({ aborted: true });
 }
 
 serve(async (req) => {
@@ -73,177 +360,51 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Upload to Archive.org initiated');
-    
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
-    const fileName = formData.get('fileName') as string;
-    const fileType = formData.get('fileType') as string;
-    const chapterId = formData.get('chapterId') as string | null;
-    const contentType = formData.get('contentType') as string;
-    const contentId = formData.get('contentId') as string;
-    
-    if (!file || !fileName) {
-      throw new Error('File and fileName are required');
-    }
+    console.log('upload-to-archive invoked');
+    const url = new URL(req.url);
+    const ct = req.headers.get('content-type') || '';
 
-    const accessKey = Deno.env.get('ARCHIVE_ORG_ACCESS_KEY');
-    const secretKey = Deno.env.get('ARCHIVE_ORG_SECRET_KEY');
+    let action: string | null = url.searchParams.get('action');
 
-    if (!accessKey || !secretKey) {
-      throw new Error('Archive.org credentials not configured');
-    }
-
-    console.log(`Uploading file: ${fileName}, type: ${fileType}`);
-
-    const itemIdentifier = 'qarray-educational-content';
-    let folderPath: string;
-    let metadataTitle: string;
-    let additionalMetadata: Record<string, string> = {};
-    
-    // Sanitize names for URL use
-    const sanitize = (str: string) => str.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    // Encode metadata values to ASCII-safe format for HTTP headers
-    const encodeForHeader = (str: string) => encodeURIComponent(str).replace(/%20/g, ' ');
-
-    // Check if chapterId is provided for organized path
-    if (chapterId) {
-      // Initialize Supabase client
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
-
-      // Fetch chapter, subject, and class information
-      const { data: chapter, error: chapterError } = await supabase
-        .from('chapters')
-        .select('id, name, subject_id, class_id')
-        .eq('id', parseInt(chapterId))
-        .single();
-
-      if (chapterError || !chapter) {
-        throw new Error('Chapter not found');
-      }
-
-      const { data: subject, error: subjectError } = await supabase
-        .from('subjects')
-        .select('id, name')
-        .eq('id', chapter.subject_id)
-        .single();
-
-      if (subjectError || !subject) {
-        throw new Error('Subject not found');
-      }
-
-      const { data: classData, error: classError } = await supabase
-        .from('classes')
-        .select('id, name')
-        .eq('id', chapter.class_id)
-        .single();
-
-      if (classError || !classData) {
-        throw new Error('Class not found');
-      }
-
-      const className = sanitize(classData.name);
-      const subjectName = sanitize(subject.name);
-      const chapterName = sanitize(chapter.name);
-      
-      // Create organized folder path within the collection
-      if (contentType && contentId) {
-        // Full organization: class/subject/chapter/content-type/content-id/filename
-        folderPath = `${className}/${subjectName}/${chapterName}/${contentType}/${contentId}/${fileName}`;
-      } else {
-        // Basic organization: class/subject/chapter/filename
-        folderPath = `${className}/${subjectName}/${chapterName}/${fileName}`;
-      }
-      console.log(`Organized path: ${folderPath}`);
-      
-      metadataTitle = encodeForHeader(`${classData.name} - ${subject.name} - ${chapter.name}`);
-      additionalMetadata = {
-        'x-archive-meta-class': encodeForHeader(classData.name),
-        'x-archive-meta-subject': encodeForHeader(subject.name),
-        'x-archive-meta-chapter': encodeForHeader(chapter.name),
-      };
-      
-      if (contentType) {
-        additionalMetadata['x-archive-meta-content-type'] = encodeForHeader(contentType);
-      }
-      if (contentId) {
-        additionalMetadata['x-archive-meta-content-id'] = encodeForHeader(contentId);
-      }
-    } else {
-      // No chapterId - use generic uploads folder with timestamp
-      const timestamp = Date.now();
-      folderPath = `uploads/${timestamp}-${sanitize(fileName)}`;
-      metadataTitle = encodeForHeader(`Upload - ${fileName}`);
-      console.log(`Generic upload path: ${folderPath}`);
-    }
-
-    // Read file as array buffer
-    const fileBuffer = await file.arrayBuffer();
-
-    // Upload to Archive.org using S3-compatible API with retry logic
-
-    // Upload to Archive.org using S3-compatible API with retry logic
-    const uploadUrl = `https://s3.us.archive.org/${itemIdentifier}/${folderPath}`;
-    
-    const uploadHeaders = {
-      'Authorization': `LOW ${accessKey}:${secretKey}`,
-      'x-amz-auto-make-bucket': '1',
-      'x-archive-meta-mediatype': fileType === 'audio' ? 'audio' : fileType === 'image' ? 'image' : 'texts',
-      'x-archive-meta-collection': 'opensource',
-      'x-archive-meta-title': metadataTitle,
-      ...additionalMetadata,
-      'Content-Type': file.type || 'application/octet-stream',
-    };
-
-    const uploadResponse = await uploadWithRetry(uploadUrl, uploadHeaders, fileBuffer);
-
-    if (!uploadResponse.ok) {
-      const errorText = await uploadResponse.text();
-      console.error('Archive.org upload failed:', errorText);
-      
-      // Return appropriate status code for frontend retry handling
-      const status = uploadResponse.status === 503 ? 429 : 500;
-      return new Response(
-        JSON.stringify({ 
-          error: `Upload failed: ${uploadResponse.status} - ${errorText}`,
-          retryable: uploadResponse.status >= 500,
-        }),
-        {
-          status,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    if (!action) {
+      if (ct.includes('multipart/form-data')) {
+        // Inspect formData for "action" field; fall back to "single"
+        const cloned = req.clone();
+        const fd = await cloned.formData();
+        action = (fd.get('action') as string | null) || 'single';
+        // We've consumed the cloned body; pass the original to handlers
+      } else if (ct.includes('application/json')) {
+        const cloned = req.clone();
+        try {
+          const j = await cloned.json();
+          action = (j && j.action) || null;
+        } catch {
+          action = null;
         }
-      );
+      }
     }
 
-    const archiveUrl = `https://archive.org/download/${itemIdentifier}/${folderPath}`;
-    console.log('Upload successful:', archiveUrl);
+    action = action || 'single';
+    console.log('action:', action);
 
-    return new Response(
-      JSON.stringify({ 
-        url: archiveUrl,
-        itemIdentifier,
-        fileName 
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    switch (action) {
+      case 'single':
+        return await handleSingle(req);
+      case 'initiate':
+        return await handleInitiate(req);
+      case 'upload-part':
+        return await handleUploadPart(req);
+      case 'complete':
+        return await handleComplete(req);
+      case 'abort':
+        return await handleAbort(req);
+      default:
+        return jsonResponse({ error: `Unknown action: ${action}` }, 400);
+    }
   } catch (error) {
-    console.error('Error uploading to Archive.org:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    const isRetryable = errorMessage.includes('503') || errorMessage.includes('Rate limited');
-    
-    return new Response(
-      JSON.stringify({ 
-        error: errorMessage,
-        retryable: isRetryable,
-      }),
-      {
-        status: isRetryable ? 429 : 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    console.error('upload-to-archive error:', error);
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    const retryable = msg.includes('503') || msg.includes('Rate limited');
+    return jsonResponse({ error: msg, retryable }, retryable ? 429 : 500);
   }
 });
