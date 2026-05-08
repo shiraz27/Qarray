@@ -1279,15 +1279,27 @@ export default function Statistics() {
                                 {selectedResourceIds.size} selected
                               </span>
                               <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => runBulkResourceOcr(Array.from(selectedResourceIds))}
-                                  disabled={isProcessingBatch}
-                                >
-                                  {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                  <RefreshCw className="mr-2 h-4 w-4" />
-                                  Retry selected
-                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button size="sm" disabled={isProcessingBatch}>
+                                      {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                      <RefreshCw className="mr-2 h-4 w-4" />
+                                      Retry selected
+                                      <ChevronDown className="ml-1 h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => runBulkResourceOcr(Array.from(selectedResourceIds), 'text')}>
+                                      <FileText className="mr-2 h-4 w-4" /> Text only
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => runBulkResourceOcr(Array.from(selectedResourceIds), 'image')}>
+                                      <ImageIcon className="mr-2 h-4 w-4" /> Image only
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => runBulkResourceOcr(Array.from(selectedResourceIds), 'mixed')}>
+                                      <Layers className="mr-2 h-4 w-4" /> Mixed
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                                 <Button
                                   size="sm"
                                   variant="ghost"
