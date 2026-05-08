@@ -2,14 +2,14 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getSessionByRoute, persistUrlToSessionByRoute, type FormSession } from '@/hooks/useFormPersistence';
-import { uploadFileToArchive } from '@/utils/archiveMultipartUpload';
+import { uploadFileToArchiveControlled, type ArchiveUploadController } from '@/utils/archiveMultipartUpload';
 
 export interface UploadItem {
   id: string;
   file: File;
   fileName: string;
   fileType: 'image' | 'audio' | 'pdf';
-  status: 'queued' | 'uploading' | 'completed' | 'failed';
+  status: 'queued' | 'uploading' | 'paused' | 'completed' | 'failed';
   progress: number;
   url?: string;
   error?: string;
@@ -34,6 +34,9 @@ interface UploadManagerContextType {
   addToQueue: (file: File, options: UploadOptions) => string;
   removeFromQueue: (id: string) => void;
   retryUpload: (id: string) => void;
+  pauseUpload: (id: string) => void;
+  resumeUpload: (id: string) => void;
+  cancelUpload: (id: string) => void;
   clearCompleted: () => void;
   getUploadsByCallback: (callbackId: string) => UploadItem[];
   onUploadComplete: (callbackId: string, callback: (url: string, fileType: string, file?: File) => void) => () => void;
@@ -66,6 +69,7 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
   const callbacksRef = useRef<Map<string, Set<(url: string, fileType: string, file?: File) => void>>>(new Map());
   const isProcessingRef = useRef(false);
   const queueRef = useRef<UploadItem[]>([]);
+  const controllersRef = useRef<Map<string, ArchiveUploadController>>(new Map());
 
   // Calculate counts
   const hasActiveUploads = items.some(item => item.status === 'queued' || item.status === 'uploading');
@@ -109,7 +113,7 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Update status to uploading
     setItems(prev => prev.map(item => 
-      item.id === nextItem.id ? { ...item, status: 'uploading' as const, progress: 10 } : item
+      item.id === nextItem.id ? { ...item, status: 'uploading' as const, progress: 0 } : item
     ));
     queueRef.current = queueRef.current.map(item =>
       item.id === nextItem.id ? { ...item, status: 'uploading' as const } : item
@@ -146,26 +150,30 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
 
     } catch (error: any) {
       console.error('Upload failed:', error);
-      
+      const isCancel = error?.name === 'AbortError';
       // Update item as failed
       setItems(prev => prev.map(item => 
         item.id === nextItem.id ? { 
           ...item, 
-          status: 'failed' as const, 
+          status: isCancel ? 'failed' as const : 'failed' as const,
           progress: 0, 
-          error: error.message || 'Upload failed' 
+          error: isCancel ? 'Cancelled' : (error.message || 'Upload failed') 
         } : item
       ));
       queueRef.current = queueRef.current.map(item =>
         item.id === nextItem.id ? { ...item, status: 'failed' as const, error: error.message } : item
       );
 
-      toast.error(`Failed to upload ${nextItem.fileName}`, {
-        action: {
-          label: 'Retry',
-          onClick: () => retryUpload(nextItem.id),
-        },
-      });
+      if (!isCancel) {
+        toast.error(`Failed to upload ${nextItem.fileName}`, {
+          action: {
+            label: 'Retry',
+            onClick: () => retryUpload(nextItem.id),
+          },
+        });
+      }
+    } finally {
+      controllersRef.current.delete(nextItem.id);
     }
 
     // Wait before processing next
@@ -176,51 +184,26 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const uploadWithRetry = async (item: UploadItem): Promise<{ url: string }> => {
-    let lastError: Error | null = null;
-
-    // The multipart helper retries each part internally; one outer retry
-    // covers full-file failure (e.g. initiate). Avoid retry storms.
-    const OUTER_RETRIES = 1;
-    for (let attempt = 0; attempt <= OUTER_RETRIES; attempt++) {
-      try {
-        if (attempt > 0) {
-          const backoffDelay = Math.pow(2, attempt) * 1000;
-          await delay(backoffDelay);
-          setItems(prev => prev.map(i => 
-            i.id === item.id ? { ...i, retryCount: attempt } : i
-          ));
-        }
-
-        const result = await uploadFileToArchive(
-          item.file,
-          {
-            fileName: item.fileName,
-            fileType: item.fileType,
-            chapterId: item.chapterId,
-            contentType: item.contentType,
-            contentId: item.contentId,
-          },
-          (p) => {
-            // Reflect real per-part progress (10..95%)
-            const pct = Math.max(10, Math.min(95, Math.round(p.ratio * 95)));
-            setItems(prev => prev.map(i =>
-              i.id === item.id ? { ...i, progress: pct } : i
-            ));
-          },
-        );
-
-        return result;
-        
-      } catch (error: any) {
-        lastError = error;
-        console.warn(`Upload attempt ${attempt + 1} failed:`, error.message);
-        if (error.message?.includes('credentials not configured')) {
-          throw error;
-        }
-      }
-    }
-
-    throw lastError || new Error('Upload failed after retries');
+    // Part-level retries are handled inside uploadFileToArchiveControlled.
+    // No outer retry: full restart wastes parts archive.org already accepted.
+    const handle = uploadFileToArchiveControlled(
+      item.file,
+      {
+        fileName: item.fileName,
+        fileType: item.fileType,
+        chapterId: item.chapterId,
+        contentType: item.contentType,
+        contentId: item.contentId,
+      },
+      (p) => {
+        const pct = Math.min(99, Math.max(0, Math.round(p.ratio * 100)));
+        setItems(prev => prev.map(i =>
+          i.id === item.id ? { ...i, progress: pct } : i
+        ));
+      },
+    );
+    controllersRef.current.set(item.id, handle.controller);
+    return handle.promise;
   };
 
   const addToQueue = useCallback((file: File, options: UploadOptions): string => {
@@ -273,6 +256,36 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
       return item;
     }));
   }, [processQueue]);
+
+  const pauseUpload = useCallback((id: string) => {
+    const ctrl = controllersRef.current.get(id);
+    if (!ctrl) return;
+    ctrl.pause();
+    setItems(prev => prev.map(item =>
+      item.id === id && item.status === 'uploading' ? { ...item, status: 'paused' as const } : item,
+    ));
+  }, []);
+
+  const resumeUpload = useCallback((id: string) => {
+    const ctrl = controllersRef.current.get(id);
+    if (!ctrl) return;
+    ctrl.resume();
+    setItems(prev => prev.map(item =>
+      item.id === id && item.status === 'paused' ? { ...item, status: 'uploading' as const } : item,
+    ));
+  }, []);
+
+  const cancelUpload = useCallback((id: string) => {
+    const ctrl = controllersRef.current.get(id);
+    if (ctrl) {
+      ctrl.cancel();
+      // status will transition to 'failed' via the catch handler
+    } else {
+      // Not yet started: just remove from queue
+      setItems(prev => prev.filter(i => i.id !== id));
+      queueRef.current = queueRef.current.filter(i => i.id !== id);
+    }
+  }, []);
 
   const getUploadsByCallback = useCallback((callbackId: string): UploadItem[] => {
     return items.filter(item => item.callbackId === callbackId);
@@ -332,6 +345,9 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
       addToQueue,
       removeFromQueue,
       retryUpload,
+      pauseUpload,
+      resumeUpload,
+      cancelUpload,
       clearCompleted,
       getUploadsByCallback,
       onUploadComplete,
