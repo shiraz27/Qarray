@@ -9,9 +9,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { BarChart3, BookOpen, MessageCircle, Brain, FileText, CheckCircle2, Clock, Play, Loader2, Search, HelpCircle, Sparkles, Building2, User, FileEdit, Check, RefreshCw, X } from 'lucide-react';
+import { BarChart3, BookOpen, MessageCircle, Brain, FileText, CheckCircle2, Clock, Play, Loader2, Search, HelpCircle, Sparkles, Building2, User, FileEdit, Check, RefreshCw, X, Image as ImageIcon, Layers, ChevronDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
