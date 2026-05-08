@@ -359,7 +359,7 @@ export default function ResourceDetail() {
     setIsDeleting(true);
     try {
       // Already soft-deleted? skip work.
-      if (resource?.deleted) {
+      if ((resource as any)?.deleted) {
         toast({ title: 'Success', description: 'Resource deleted successfully' });
         setIsDeleteDialogOpen(false);
         navigate(-1);
