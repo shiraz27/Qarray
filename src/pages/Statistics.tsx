@@ -1851,35 +1851,71 @@ export default function Statistics() {
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
                                               {canProcess && (
-                                                <Button
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  onClick={() => handleProcessSingleQuestion(question.id)}
-                                                  disabled={processingQuestionId === question.id}
-                                                  title={question.ocr_status === 'not_applicable' ? 'Retry OCR' : 'Process OCR'}
-                                                >
-                                                  {processingQuestionId === question.id ? (
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                  ) : (
-                                                    <Play className="h-4 w-4" />
-                                                  )}
-                                                </Button>
+                                                <>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => handleProcessSingleQuestion(question.id, 'text')}
+                                                    disabled={processingQuestionId === question.id}
+                                                    title="Run OCR — Text only"
+                                                  >
+                                                    {processingQuestionId === question.id ? (
+                                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                      <FileText className="h-4 w-4" />
+                                                    )}
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => handleProcessSingleQuestion(question.id, 'image')}
+                                                    disabled={processingQuestionId === question.id}
+                                                    title="Run OCR — Image only"
+                                                  >
+                                                    <ImageIcon className="h-4 w-4" />
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => handleProcessSingleQuestion(question.id, 'mixed')}
+                                                    disabled={processingQuestionId === question.id}
+                                                    title="Run OCR — Mixed"
+                                                  >
+                                                    <Layers className="h-4 w-4" />
+                                                  </Button>
+                                                </>
                                               )}
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                  if (question.ocr_status === 'completed') {
-                                                    setForceRetryConfirm({ kind: 'question', id: question.id });
-                                                  } else {
-                                                    handleProcessSingleQuestion(question.id);
-                                                  }
-                                                }}
-                                                disabled={processingQuestionId === question.id}
-                                                title="Force retry OCR (any status)"
-                                              >
-                                                <RefreshCw className="h-4 w-4" />
-                                              </Button>
+                                              <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={processingQuestionId === question.id}
+                                                    title="Force retry OCR (any status)"
+                                                  >
+                                                    <RefreshCw className="h-4 w-4" />
+                                                  </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                  {(['text', 'image', 'mixed'] as OcrMode[]).map((m) => (
+                                                    <DropdownMenuItem
+                                                      key={m}
+                                                      onClick={() => {
+                                                        if (question.ocr_status === 'completed') {
+                                                          setForceRetryConfirm({ kind: 'question', id: question.id, mode: m });
+                                                        } else {
+                                                          handleProcessSingleQuestion(question.id, m);
+                                                        }
+                                                      }}
+                                                    >
+                                                      {m === 'text' && <FileText className="mr-2 h-4 w-4" />}
+                                                      {m === 'image' && <ImageIcon className="mr-2 h-4 w-4" />}
+                                                      {m === 'mixed' && <Layers className="mr-2 h-4 w-4" />}
+                                                      Force retry — {m}
+                                                    </DropdownMenuItem>
+                                                  ))}
+                                                </DropdownMenuContent>
+                                              </DropdownMenu>
                                             </div>
                                           </TableCell>
                                         </TableRow>
