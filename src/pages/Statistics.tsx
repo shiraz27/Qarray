@@ -1112,6 +1112,24 @@ export default function Statistics() {
                 <CardDescription>Text extraction from PDFs and images in resources and questions</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 p-3">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">OCR mode</span>
+                    <span className="text-xs text-muted-foreground">
+                      Pick how thoroughly each file is processed
+                    </span>
+                  </div>
+                  <Select value={ocrMode} onValueChange={(v) => setOcrMode(v as OcrMode)}>
+                    <SelectTrigger className="w-[220px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="text">Text only — fastest (digital PDFs)</SelectItem>
+                      <SelectItem value="image">Image only — scans / photos</SelectItem>
+                      <SelectItem value="mixed">Mixed — most thorough (default)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Tabs defaultValue="resources" className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="resources" className="gap-2">
