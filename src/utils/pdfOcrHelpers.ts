@@ -12,7 +12,16 @@ export interface ExtractPdfOptions {
    */
   onPageProgress?: (pageIndex: number, totalPages: number, subRatio: number) => void;
   signal?: AbortSignal;
+  /**
+   * OCR pipeline:
+   *  - 'text'  : text-layer extraction only (no Tesseract). Fastest.
+   *  - 'image' : render each page → Tesseract only (no text layer).
+   *  - 'mixed' : both, combined per-page (default; most thorough).
+   */
+  mode?: OcrMode;
 }
+
+export type OcrMode = 'text' | 'image' | 'mixed';
 
 /** Whitespace-collapsed lowercase form, used to compare text-layer vs OCR. */
 function normalize(s: string): string {
@@ -79,7 +88,7 @@ export async function extractPdfTextAndOcr(
   blob: Blob,
   opts: ExtractPdfOptions = {}
 ): Promise<string> {
-  const { onPageProgress, signal } = opts;
+  const { onPageProgress, signal, mode = 'mixed' } = opts;
 
   const arrayBuffer = await blob.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -118,19 +127,19 @@ export async function extractPdfTextAndOcr(
         continue;
       }
 
-      const textLayer = await getPageText(page);
+      const textLayer = mode === 'image' ? '' : await getPageText(page);
 
-      // Always OCR every page so embedded images are textified, regardless
-      // of how rich the text layer is. The combine step dedupes overlap.
       let ocrText = '';
-      try {
-        const imageBlob = await renderPageToBlob(page);
-        const w = await ensureWorker();
-        const { data } = await w.recognize(imageBlob);
-        ocrText = (data.text || '').trim();
-      } catch (err: any) {
-        console.warn(`[pdf-ocr] page ${i} OCR failed:`, err);
-        ocrText = `[ocr failed: ${err?.message || err}]`;
+      if (mode === 'image' || mode === 'mixed') {
+        try {
+          const imageBlob = await renderPageToBlob(page);
+          const w = await ensureWorker();
+          const { data } = await w.recognize(imageBlob);
+          ocrText = (data.text || '').trim();
+        } catch (err: any) {
+          console.warn(`[pdf-ocr] page ${i} OCR failed:`, err);
+          ocrText = `[ocr failed: ${err?.message || err}]`;
+        }
       }
 
       const combined = combinePageOutput(textLayer, ocrText);
@@ -140,8 +149,11 @@ export async function extractPdfTextAndOcr(
     }
 
     if (!anyContent) {
-      // Surface as an explicit error so caller marks status='failed' (retryable).
-      throw new Error('No readable content extracted from any page');
+      const reason =
+        mode === 'text'
+          ? 'No readable text layer (try Image or Mixed mode for scanned PDFs)'
+          : 'No readable content extracted from any page';
+      throw new Error(reason);
     }
 
     return pageOutputs.join('\n\n');
