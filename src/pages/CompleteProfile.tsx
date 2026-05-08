@@ -248,19 +248,13 @@ const CompleteProfile: React.FC = () => {
 
     setUploadingDoc(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('fileName', file.name);
-      formData.append('fileType', 'pdf');
-      // Use a placeholder chapter ID for teacher documents
-      formData.append('chapterId', '1');
-      formData.append('contentType', 'teacher-verification');
-
-      const { data, error } = await supabase.functions.invoke('upload-to-archive', {
-        body: formData,
+      const { uploadFileToArchive } = await import('@/utils/archiveMultipartUpload');
+      const data = await uploadFileToArchive(file, {
+        fileName: file.name,
+        fileType: 'pdf',
+        chapterId: '1',
+        contentType: 'teacher-verification',
       });
-
-      if (error) throw error;
 
       setTeacherDocuments([...teacherDocuments, data.url]);
       toast({
