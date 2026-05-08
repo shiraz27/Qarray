@@ -1,67 +1,132 @@
+
 ## Goal
 
-Switch Archive.org uploads from a single PUT to S3-style multipart uploads so large files upload more reliably (better resume on transient 503s, no single huge edge-function request).
+Make large Archive.org uploads dramatically faster, show real progress from byte 0, and add pause/resume.
 
-## Approach
+## Root causes (measured against current code)
 
-Archive.org's S3 endpoint supports the standard AWS S3 multipart protocol with `LOW <access>:<secret>` auth:
+1. **Double bandwidth.** Every 8 MB part is sent browser → edge function → archive.org. The edge function re-buffers the whole part (`await chunk.arrayBuffer()`), then re-uploads. Each part also pays a fresh boot (logs show `booted (time: ~30ms)` per call) plus Supabase request overhead.
+2. **Sequential parts.** `multipartUpload` in `archiveMultipartUpload.ts` uploads one part at a time.
+3. **Fake 10%.** `processQueue` sets `progress: 10` immediately, before any byte is sent. The next update only fires when part 1 finishes.
+4. **Per-part granularity only.** Even with multipart, progress jumps in 8 MB chunks; no in-flight bytes.
+5. **No pause/resume.** `UploadStatusIndicator` only exposes Retry / Remove (queued) / Clear.
 
-- Initiate: `POST /<item>/<key>?uploads` → returns XML with `<UploadId>`
-- Upload part: `PUT /<item>/<key>?partNumber=N&uploadId=...` → returns `ETag`
-- Complete: `POST /<item>/<key>?uploadId=...` with XML body listing parts → final URL
-- Abort: `DELETE /<item>/<key>?uploadId=...`
+## Solution
 
-Archive.org's minimum part size is 5 MB (last part can be smaller). We'll use **8 MB parts** and apply multipart to any file **≥ 16 MB**; smaller files keep the existing single-PUT path (no benefit, more round-trips).
+Move the actual byte transfer **directly from the browser to archive.org**, keep credentials server-side via short-lived **presigned PUT URLs**, run parts in parallel, and wire real `xhr.upload.onprogress` events into the UI with pause/resume.
 
-Because the edge function still has request size + timeout limits, the browser does the slicing and orchestration; the edge function only proxies signed credentials per call. We refactor `upload-to-archive` into a single function with an `action` discriminator so we don't multiply functions or `verify_jwt` config.
+### Architecture
 
-## Edge function changes (`supabase/functions/upload-to-archive/index.ts`)
+```text
+Browser                                 Edge function                Archive.org S3
+  |-- initiate ---------------------->|                              |
+  |                                   |---- POST ?uploads ---------->|
+  |<--- { uploadId, key, finalUrl }---|<--- <UploadId>... -----------|
+  |                                                                  |
+  |-- sign-part(partNumber) ------>|                                  |
+  |<--- { url, headers, expiresAt }-|                                 |
+  |                                                                  |
+  |---------- PUT chunk (XHR, onprogress) -------------------------->|
+  |<------------------------ ETag -----------------------------------|
+  |                                                                  |
+  |-- complete(parts) -------------->|---- POST ?uploadId=... ------>|
+  |<--- { url } ---------------------|<---- finalize ----------------|
+```
 
-Add an `action` field on the request. Existing single-shot upload stays the default for backwards compatibility.
+Credentials never leave the edge function. Each presigned URL is a single-use `PUT` valid for ~1 hour, generated using archive.org's S3-compatible query-string auth (HMAC-SHA1 over the canonical string, same scheme already used implicitly via the `LOW` auth header).
 
-Actions:
-1. `single` (default, current behavior) — multipart formData with `file`, used for small files.
-2. `initiate` — JSON body `{ fileName, fileType, chapterId?, contentType?, contentId? }`. Resolves the same folder path / metadata as today, calls `POST ...?uploads` with `x-amz-auto-make-bucket:1` and metadata headers. Returns `{ uploadId, key, finalUrl }`.
-3. `upload-part` — multipart formData `{ key, uploadId, partNumber, chunk }`. Forwards `PUT ...?partNumber=N&uploadId=...` to archive.org with the chunk bytes, returns `{ partNumber, etag }`. Wraps the existing retry/backoff logic on 503/5xx.
-4. `complete` — JSON `{ key, uploadId, parts: [{ partNumber, etag }] }`. Sends `POST ...?uploadId=...` with the parts XML. Returns `{ url }`.
-5. `abort` — JSON `{ key, uploadId }`. Sends `DELETE ...?uploadId=...`. Best-effort.
+### Edge function changes (`supabase/functions/upload-to-archive/index.ts`)
 
-The chapter/subject/class lookup currently in the function moves into `initiate` only (other steps don't need it). Path-building, sanitization, and metadata header logic are factored into a small helper shared with `single`.
+- Keep `single`, `initiate`, `complete`, `abort` actions as-is (they are small JSON/control calls).
+- **Remove** `upload-part` body proxying. Replace with a new action **`sign-part`**:
+  - Input: `{ key, uploadId, partNumber }`.
+  - Output: `{ url, method: "PUT", headers: { ... }, expiresAt }`.
+  - Implementation: build `https://s3.us.archive.org/<item>/<key>?partNumber=N&uploadId=...&AWSAccessKeyId=...&Expires=...&Signature=...` where Signature = `base64(HMAC-SHA1(secret, stringToSign))` and `stringToSign = "PUT\n\n\n<expires>\n/<item>/<key>?partNumber=N&uploadId=..."`. Use Web Crypto (`crypto.subtle.importKey` + `sign("HMAC", key, data)` with SHA-1) — no extra deps.
+- Keep request validation; require auth header from caller (existing `verify_jwt` setting).
 
-## Frontend changes
+### Frontend changes (`src/utils/archiveMultipartUpload.ts`)
 
-### New helper: `src/utils/archiveMultipartUpload.ts`
+Rewrite `multipartUpload` around an XHR-based per-part uploader:
 
-Single entry: `uploadFileToArchive(file, options, onProgress?) → { url }`.
+```ts
+function putPartXhr(url, blob, onProgress, signal): Promise<string /* etag */>
+```
 
-- If `file.size < 16 MB` → call existing `action: 'single'` path (formData), unchanged behavior.
-- Else:
-  1. `initiate` → `{ uploadId, key }`.
-  2. Slice file into 8 MB chunks; for each part, call `upload-part` with retry/backoff (reuse the same exponential backoff logic that's currently in `UploadManagerContext`). Report progress as `(completedBytes / totalBytes)`.
-  3. On success → `complete` with the collected `{ partNumber, etag }` array → final URL.
-  4. On unrecoverable failure → `abort` and surface error to caller.
-- Parts upload **sequentially** (matches current "one upload at a time" queue and avoids hammering archive.org). Configurable concurrency = 1 for now.
+- Uses `XMLHttpRequest` for `xhr.upload.onprogress` (fetch still has no upload progress in browsers).
+- `signal.addEventListener('abort', () => xhr.abort())` for pause/cancel.
+- Returns `ETag` from `xhr.getResponseHeader('ETag')`.
 
-### Call sites
+Orchestrator:
 
-Replace direct `supabase.functions.invoke('upload-to-archive', { body: formData })` with `uploadFileToArchive(...)` in:
+- Initiate via edge function → `{ uploadId, key }`.
+- Build a part list `[{ partNumber, start, end }]`.
+- Maintain a worker pool with **`CONCURRENCY = 4`** (configurable). Each worker:
+  1. Take next un-uploaded part.
+  2. Call `sign-part` (cheap JSON).
+  3. `putPartXhr(url, file.slice(start, end), partProgress, abortSignal)` with retry/backoff (3 attempts, exponential).
+  4. Record `{ partNumber, etag, uploadedBytes }`.
+- A shared `bytesByPart: Map<number, number>` is summed on each progress tick; emit one aggregated `onProgress({ loaded, total, ratio })` from byte 0.
+- On all parts done → `complete`. On unrecoverable failure or user cancel → `abort`.
+- Threshold logic unchanged (single PUT under 16 MB), but route the single PUT through a presigned URL too, so even small files get true progress and skip the proxy.
 
-- `src/contexts/UploadManagerContext.tsx` — `uploadWithRetry` becomes a thin wrapper calling the helper, forwarding per-part progress to `setItems(... progress ...)` so the existing `UploadStatusIndicator` shows real progress instead of just queued/uploading.
-- `src/pages/Profile.tsx` — teacher document upload.
-- `src/pages/CompleteProfile.tsx` — same pattern.
+### Pause / Resume / Cancel API
 
-Outer retry in `UploadManagerContext` stays (covers full-file retry) but inner part-level retries handled inside the helper, so we drop the outer retry count to 1–2 to avoid 3×3 retry storms.
+Extend the helper:
 
-## Edge cases & details
+```ts
+uploadFileToArchive(file, options, onProgress?, controls?)
+  → { url, controller: { pause(), resume(), cancel() } }
+```
 
-- ETag must be captured exactly as returned (with quotes) and sent back in the complete XML — archive.org validates this.
-- Metadata headers (`x-archive-meta-*`) are only allowed on `initiate`, not on part uploads or complete.
-- If a part upload fails after all retries, run `abort` so we don't leave dangling multipart sessions on archive.org.
-- Keep the existing `encodeForHeader` / `sanitize` helpers; nothing changes about folder layout or final URL format (`https://archive.org/download/<item>/<folderPath>`), so existing DB rows and `fetch-media` proxy continue to work.
-- `verify_jwt` setting in `supabase/config.toml` for `upload-to-archive` is unchanged.
+- Internal state: `running | paused | cancelled`.
+- `pause()`: set state, abort in-flight XHRs (parts already started lose progress for that part only — archive.org keeps completed parts).
+- `resume()`: re-arm `AbortController`, restart workers; they skip parts already in `completedParts`.
+- `cancel()`: abort + call `abort` action; reject promise.
 
-## Out of scope
+### Upload manager + UI
 
-- No DB schema changes.
-- No change to `fetch-media`, OCR pipeline, or how URLs are stored.
-- No parallel part uploads (can be added later if needed).
+`src/contexts/UploadManagerContext.tsx`:
+
+- Replace the fake `progress: 10` initialization with `progress: 0`. Keep `status: 'uploading'` separately.
+- Store the per-item `controller` returned by `uploadFileToArchive` in a `controllersRef: Map<id, controller>`.
+- Add `pauseUpload(id)`, `resumeUpload(id)`, `cancelUpload(id)` to context. Add `'paused'` to `UploadItem.status`.
+- Map progress callback's `ratio` directly to `Math.round(ratio * 100)` (no more 10–95 clamp).
+- Reduce/remove the outer `OUTER_RETRIES` loop (part-level retries already handle transient failures; full restart from scratch wastes parts archive.org already accepted).
+
+`src/components/UploadStatusIndicator.tsx`:
+
+- Add Pause / Resume buttons next to each `uploading`/`paused` item (Lucide `Pause` / `Play`).
+- Add Cancel button (X) for `uploading`/`paused` (currently only `queued` can be removed).
+- Header summary shows `Paused` state when applicable.
+- Optional: a global "Pause all" / "Resume all" in the expanded footer.
+
+### Performance impact (for the user's 250-page PDF case)
+
+- **Eliminating the proxy** removes one full upload of every byte (≈ halves the time).
+- **Parallelism × 4** roughly halves the remaining wall time on typical residential uplinks (until uplink saturates).
+- Cold-start cost per part disappears (parts no longer hit the edge function).
+- Realistic expectation: 15–20 min → ~3–6 min for a ~50 MB PDF over a 20 Mbps uplink.
+
+### Edge cases & details
+
+- **Signature character set.** When signing, encode the path and query string the same way archive.org expects (RFC 3986 except `/`). Sub-resources `partNumber` and `uploadId` are **part of the canonical string** — include them in `stringToSign`.
+- **CORS.** Archive.org's S3 endpoint already allows cross-origin PUT from browsers (used by the Internet Archive Uploader). If a specific header gets blocked, drop it from the signed request (we only need `Authorization` via query string, no custom headers).
+- **ETag handling unchanged** — store exactly as returned, including quotes, send back in `complete` XML.
+- **Resuming after page reload** is out of scope (would require persisting `uploadId` + per-part ETags). Pause/resume here is in-session only. Easy to add later.
+- **Single-PUT path** for files < 16 MB also switches to a signed direct PUT for consistency and real progress; metadata headers move into the signed request via `x-amz-meta-*` headers (allowed on PUT-object). Alternatively keep current proxy for small files if signing PUT-object proves brittle — flagged as a fallback.
+- `delete-from-archive`, `fetch-media`, OCR, and DB schema all unchanged.
+- `verify_jwt` setting unchanged.
+
+### Out of scope
+
+- Cross-session resumable uploads (would need persisting multipart state to DB).
+- Background uploads after closing the tab.
+- Adaptive concurrency / bandwidth probing.
+
+### Files touched
+
+- `supabase/functions/upload-to-archive/index.ts` — add `sign-part`, keep others; remove `upload-part` proxy (or keep as a deprecated fallback for one release).
+- `src/utils/archiveMultipartUpload.ts` — XHR uploader, parallel worker pool, pause/resume controller.
+- `src/contexts/UploadManagerContext.tsx` — `paused` status, controllers map, pause/resume/cancel actions, real progress.
+- `src/components/UploadStatusIndicator.tsx` — Pause / Resume / Cancel buttons, paused styling, optional global controls.
+- `mem://infrastructure/archive-multipart-uploads.md` — update documented flow.

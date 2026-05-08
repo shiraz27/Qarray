@@ -17,7 +17,9 @@ import {
   FileText,
   CloudUpload,
   ArrowLeft,
-  Trash2
+  Trash2,
+  Pause,
+  Play
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +32,9 @@ export const UploadStatusIndicator: React.FC = () => {
     failedCount, 
     retryUpload, 
     removeFromQueue,
+    pauseUpload,
+    resumeUpload,
+    cancelUpload,
     clearCompleted,
     activeSourceRoutes
   } = useUploadManager();
@@ -64,6 +69,8 @@ export const UploadStatusIndicator: React.FC = () => {
     switch (status) {
       case 'uploading':
         return <Loader2 className="h-4 w-4 animate-spin text-primary" />;
+      case 'paused':
+        return <Pause className="h-4 w-4 text-amber-500" />;
       case 'completed':
         return <Check className="h-4 w-4 text-green-500" />;
       case 'failed':
@@ -213,6 +220,12 @@ export const UploadStatusIndicator: React.FC = () => {
                         <span className="text-[10px] text-muted-foreground">{item.progress}%</span>
                       </div>
                     )}
+                    {item.status === 'paused' && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <Progress value={item.progress} className="h-1 flex-1 opacity-60" />
+                        <span className="text-[10px] text-amber-600 font-medium">Paused {item.progress}%</span>
+                      </div>
+                    )}
                     {item.status === 'queued' && (
                       <p className="text-[10px] text-muted-foreground">Waiting...</p>
                     )}
@@ -227,6 +240,51 @@ export const UploadStatusIndicator: React.FC = () => {
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {getStatusIcon(item.status)}
                     
+                    {item.status === 'uploading' && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6"
+                        title="Pause"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          pauseUpload(item.id);
+                        }}
+                      >
+                        <Pause className="h-3 w-3" />
+                      </Button>
+                    )}
+
+                    {item.status === 'paused' && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6"
+                        title="Resume"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          resumeUpload(item.id);
+                        }}
+                      >
+                        <Play className="h-3 w-3" />
+                      </Button>
+                    )}
+
+                    {(item.status === 'uploading' || item.status === 'paused') && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6"
+                        title="Cancel"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          cancelUpload(item.id);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+
                     {item.status === 'failed' && (
                       <Button 
                         variant="ghost" 

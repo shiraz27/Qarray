@@ -9,6 +9,7 @@ const corsHeaders = {
 const ITEM = 'qarray-educational-content';
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 2000;
+const PRESIGN_EXPIRY_SECONDS = 60 * 60; // 1 hour
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const sanitize = (s: string) => s.replace(/[^a-z0-9]/gi, '-').toLowerCase();
@@ -26,6 +27,65 @@ function authHeader() {
   const secretKey = Deno.env.get('ARCHIVE_ORG_SECRET_KEY');
   if (!accessKey || !secretKey) throw new Error('Archive.org credentials not configured');
   return `LOW ${accessKey}:${secretKey}`;
+}
+
+function archiveCreds() {
+  const accessKey = Deno.env.get('ARCHIVE_ORG_ACCESS_KEY');
+  const secretKey = Deno.env.get('ARCHIVE_ORG_SECRET_KEY');
+  if (!accessKey || !secretKey) throw new Error('Archive.org credentials not configured');
+  return { accessKey, secretKey };
+}
+
+// AWS S3 v2 query-string auth (HMAC-SHA1).
+// stringToSign = METHOD\n\n\nEXPIRES\n/<bucket>/<key>?<sub-resources>
+// Only specific sub-resources are part of the canonical resource. For multipart
+// uploads we need `uploadId` and `partNumber`.
+async function signS3V2QueryUrl(opts: {
+  method: 'PUT' | 'GET' | 'DELETE' | 'POST';
+  key: string; // path inside bucket (no leading slash)
+  subResources?: Record<string, string>;
+  expiresInSeconds?: number;
+}): Promise<string> {
+  const { accessKey, secretKey } = archiveCreds();
+  const expires = Math.floor(Date.now() / 1000) + (opts.expiresInSeconds ?? PRESIGN_EXPIRY_SECONDS);
+
+  // Build sub-resource string in canonical (alphabetical) order
+  const subEntries = Object.entries(opts.subResources ?? {}).sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  );
+  const subString = subEntries.length
+    ? '?' + subEntries.map(([k, v]) => (v === '' ? k : `${k}=${v}`)).join('&')
+    : '';
+
+  const canonicalResource = `/${ITEM}/${opts.key}${subString}`;
+  const stringToSign = `${opts.method}\n\n\n${expires}\n${canonicalResource}`;
+
+  const enc = new TextEncoder();
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secretKey),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign'],
+  );
+  const sigBuf = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(stringToSign));
+  const signature = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
+
+  // Encode the path segments for the URL but keep slashes
+  const encodedKey = opts.key
+    .split('/')
+    .map((seg) => encodeURIComponent(seg))
+    .join('/');
+
+  const queryParams = new URLSearchParams();
+  for (const [k, v] of subEntries) {
+    queryParams.set(k, v);
+  }
+  queryParams.set('AWSAccessKeyId', accessKey);
+  queryParams.set('Expires', String(expires));
+  queryParams.set('Signature', signature);
+
+  return `https://s3.us.archive.org/${ITEM}/${encodedKey}?${queryParams.toString()}`;
 }
 
 async function fetchWithRetry(
@@ -285,6 +345,34 @@ async function handleUploadPart(req: Request): Promise<Response> {
   return jsonResponse({ partNumber, etag });
 }
 
+// ---------- Multipart: sign-part (presigned URL for direct browser PUT) ----------
+async function handleSignPart(req: Request): Promise<Response> {
+  const body = await req.json();
+  const { key, uploadId, partNumber } = body as {
+    key: string;
+    uploadId: string;
+    partNumber: number;
+  };
+  if (!key || !uploadId || !partNumber) {
+    throw new Error('key, uploadId and partNumber are required');
+  }
+
+  const url = await signS3V2QueryUrl({
+    method: 'PUT',
+    key,
+    subResources: {
+      partNumber: String(partNumber),
+      uploadId,
+    },
+  });
+
+  return jsonResponse({
+    url,
+    method: 'PUT',
+    expiresAt: Math.floor(Date.now() / 1000) + PRESIGN_EXPIRY_SECONDS,
+  });
+}
+
 // ---------- Multipart: complete ----------
 async function handleComplete(req: Request): Promise<Response> {
   const body = await req.json();
@@ -394,6 +482,8 @@ serve(async (req) => {
         return await handleInitiate(req);
       case 'upload-part':
         return await handleUploadPart(req);
+      case 'sign-part':
+        return await handleSignPart(req);
       case 'complete':
         return await handleComplete(req);
       case 'abort':
