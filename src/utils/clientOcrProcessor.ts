@@ -2,7 +2,9 @@ import { createWorker } from 'tesseract.js';
 import { supabase } from '@/integrations/supabase/client';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { detectMediaType, mediaTypeFromMime, type MediaType } from '@/utils/mediaTypeUtils';
-import { extractPdfTextAndOcr } from '@/utils/pdfOcrHelpers';
+import { extractPdfTextAndOcr, type OcrMode } from '@/utils/pdfOcrHelpers';
+
+export type { OcrMode };
 
 type FileType = MediaType;
 
@@ -64,7 +66,8 @@ async function extractImageText(blob: Blob): Promise<string> {
  */
 export async function processResourceOCR(
   resourceId: number,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
+  mode: OcrMode = 'mixed'
 ): Promise<{ success: boolean; message: string }> {
   try {
     onProgress?.(`Fetching resource #${resourceId}...`);
@@ -104,6 +107,7 @@ export async function processResourceOCR(
     let fetchFailedCount = 0;
     let processableFileCount = 0;
     let hadFetchFailure = false;
+    let imagesSkippedTextMode = 0;
 
     for (let i = 0; i < mediaFiles.length; i++) {
       const mediaFile = mediaFiles[i];
@@ -159,11 +163,15 @@ export async function processResourceOCR(
         let text = '';
 
         if (fileType === 'pdf') {
-          // Per-page hybrid: text-layer + Tesseract combined for every page
-          text = await extractPdfTextAndOcr(blob);
+          text = await extractPdfTextAndOcr(blob, { mode });
           ocrableFileCount++;
         } else if (fileType === 'image') {
-          // Direct OCR for images
+          if (mode === 'text') {
+            // Standalone images have no text layer — skip in text-only mode
+            imagesSkippedTextMode++;
+            extractedTexts.push('[Image — skipped in text-only mode]');
+            continue;
+          }
           text = await extractImageText(blob);
           ocrableFileCount++;
         }
@@ -178,7 +186,8 @@ export async function processResourceOCR(
     }
 
     // Combine all extracted text
-    const combinedText = extractedTexts.join('\n\n---\n\n');
+    const header = `[OCR mode: ${mode}]`;
+    const combinedText = [header, extractedTexts.join('\n\n---\n\n')].join('\n\n');
 
     // Determine OCR status based on file types
     let ocrStatus: 'completed' | 'not_applicable' | 'failed';
@@ -196,6 +205,10 @@ export async function processResourceOCR(
         // All PDF/image fetches failed (e.g. Archive.org not yet propagated) — retryable
         ocrStatus = 'failed';
         ocrText = `All file fetches failed — please retry.\n\n${combinedText}`;
+      } else if (imagesSkippedTextMode > 0 && unknownFileCount === 0 && nonOcrableFileCount === 0) {
+        // Text-only mode on an image-only resource: nothing to do, but not an error.
+        ocrStatus = 'not_applicable';
+        ocrText = `Image-only resource — text-only mode skipped all files.\n\n${combinedText}`;
       } else if (unknownFileCount > 0 && nonOcrableFileCount === 0) {
         // Could not detect any file type — mark failed so it's retryable
         ocrStatus = 'failed';
