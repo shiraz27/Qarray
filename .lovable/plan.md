@@ -1,64 +1,52 @@
-## Goal
+## Problem
 
-Let the admin pick **how thoroughly** each OCR run should work, so they can trade speed against coverage on a per-document or per-batch basis.
+Today the Statistics page has **one global "OCR mode" dropdown** at the top of the OCR card, and each row only has a single generic "Process OCR" play button (plus a force-retry button) that uses whatever mode is selected globally. You expected **three distinct actions per resource/question row** — Text only, Image only, Mixed — visible directly in the row.
 
-Three modes:
+## Proposed change
 
-| Mode | What runs per page | Speed | When to use |
-|------|--------------------|-------|-------------|
-| **Text only** | `pdfjsLib` text layer extraction. No Tesseract. | Near-instant (seconds for 250 pages). | Born-digital PDFs (cours, résumés typed in Word/LaTeX). |
-| **Image only** | Render page → Tesseract `eng+ara`. No text layer. | Slow (current speed). | Pure scans where the text layer is missing or junk. |
-| **Mixed** (current behavior) | Text layer + Tesseract, combined per page. | Slowest, most thorough. | Mixed documents (typed text with figure captions, handwritten notes, photos of book pages). |
+Replace the single play button per row with **three small icon buttons**, one per mode, in both the Resources and Questions tables. Bulk actions get the same treatment.
 
-For standalone images (PNG/JPG resources), only **Image only** and **Mixed** make sense — **Text only** is hidden / disabled there.
+### Per-row (Resources tab + Questions tab)
 
-## UX
+Replace the current single `Play` button with a compact group of 3:
 
-In `src/pages/Statistics.tsx`:
+| Button | Icon | Tooltip | Calls |
+|---|---|---|---|
+| Text | `FileText` | "Run OCR — Text only (fast, digital PDFs)" | `processResourceOCR(id, …, 'text')` |
+| Image | `Image` | "Run OCR — Image only (scans/photos)" | `processResourceOCR(id, …, 'image')` |
+| Mixed | `Layers` | "Run OCR — Mixed (most thorough)" | `processResourceOCR(id, …, 'mixed')` |
 
-1. Add a small `OcrMode` selector (Radio group or `Select`: `text` / `image` / `mixed`) next to the existing **Run OCR** / **Run Bulk OCR** buttons. Default = `mixed` (preserves today's behavior).
-2. The selector is shared across the Resources tab and Questions tab and lives in component state (`const [ocrMode, setOcrMode] = useState<OcrMode>('mixed')`).
-3. Pass `ocrMode` into every call to `processResourceOCR`, `processQuestionOCR`, `runBulkResourceOcr`, `runBulkQuestionOcr`.
-4. Show the mode briefly in the toast (`[3/12] Text-only OCR…`) so the admin sees which pipeline ran.
+Same trio for questions via `processQuestionOCR`.
 
-## Code changes
+The existing `RefreshCw` "force retry" button stays, but it gains the same 3-mode split via a small dropdown menu (`DropdownMenu` with 3 items: Force retry — Text / Image / Mixed). This avoids cluttering the row with 6 buttons.
 
-### `src/utils/pdfOcrHelpers.ts`
+While any of the three is running for that row, all three (and the retry menu) show a spinner / are disabled — driven by the existing `processingId === resource.id` check.
 
-- Extend `ExtractPdfOptions` with `mode?: 'text' | 'image' | 'mixed'` (default `'mixed'`).
-- Branch inside `extractPdfTextAndOcr`:
-  - `mode === 'text'`: loop pages, call `getPageText(page)` only. Skip canvas render and Tesseract entirely. Don't spin up a worker. Concatenate per-page output. If nothing extracted, throw `No readable text layer` so caller marks `failed`.
-  - `mode === 'image'`: skip `getPageText`. Render every page to a canvas → Tesseract. Combine = OCR text only.
-  - `mode === 'mixed'`: existing path.
-- Keep the per-page progress callback semantics for all three modes.
+### Bulk actions
 
-### `src/utils/clientOcrProcessor.ts` and `src/utils/clientQuestionOcrProcessor.ts`
+The current single "Run Bulk OCR" / "Retry selected" buttons are replaced by a **split button**: the main label runs Mixed (current default), and a chevron opens a menu with "Run as Text only" and "Run as Image only". Same pattern for the Questions tab. This keeps the toolbar compact while exposing all three modes.
 
-- Accept an `OcrMode` arg on `processResourceOCR(resourceId, mode, onProgress?)` (and the question equivalent).
-- For PDFs, forward `mode` to `extractPdfTextAndOcr({ mode, onPageProgress })`.
-- For images:
-  - `mode === 'text'`: skip the file, push `[Image — text-only mode skipped]`. Don't increment `ocrableFileCount` (so a resource that's only images in text mode ends up `not_applicable` with a clear message, instead of `failed`).
-  - `mode === 'image'` or `'mixed'`: run `extractImageText` (Tesseract) as today.
-- Persist the mode in the success message stored in `ocr_text` header (e.g. prepend `[Mode: text]\n…`) so admins can later see how each row was processed.
+### Global selector
 
-### `src/pages/Statistics.tsx`
+The big "OCR mode" Select at the top of the card is **removed** — it's now redundant, and removing it makes it obvious that the choice is per-action. The `ocrMode` state and `OcrMode` import in `Statistics.tsx` go away; mode is passed inline at each call site.
 
-- New `OcrMode` UI control (default `'mixed'`).
-- Wire the selected mode through every OCR call site already identified (single-row buttons, bulk buttons, retry buttons).
-- Tooltip on the selector explaining the trade-off in one line each.
+### Files touched
+
+- `src/pages/Statistics.tsx` — UI only:
+  - Delete the global `OcrMode` Select panel (lines ~1115–1132).
+  - In Resources table row (~1450–1480): swap single play button for 3 mode buttons + retry dropdown.
+  - In Questions table row (~1773–1800): same swap.
+  - Bulk toolbar in both tabs: split-button with mode menu.
+  - Update `handleProcessSingle`, bulk handlers, retry handlers to take an explicit `mode: OcrMode` argument instead of reading `ocrMode` state.
+
+No changes to `pdfOcrHelpers.ts`, `clientOcrProcessor.ts`, `clientQuestionOcrProcessor.ts`, or any backend — they already accept `mode`.
 
 ### Memory
 
-Update `mem://ocr/client-side-two-stage-pdf-processing.md` (or add a sibling memory) to record the three modes and that `mixed` remains the default. Add a Core line if it deserves it ("OCR has three modes: text / image / mixed; default mixed").
+Update `mem://ocr/ocr-mode-selector` to reflect that mode is chosen per-action (per-row + per-bulk split button), not from a global selector.
 
 ## Out of scope
 
-- Auto-detecting the best mode per file (could be a follow-up — render one page, sample text-layer richness, decide).
-- Backend OCR (already discarded for the reasons we covered).
-- Concurrency improvements — keep this PR focused on the mode selector. Concurrency can layer on top later without changing this API.
-
-## Expected impact
-
-- Admins running 250-page typed PDFs in **Text only** mode: ~20 minutes → **a few seconds**, with full text-layer fidelity.
-- Pure scans in **Image only** mode: same speed as today, no wasted text-layer reads (small win).
-- Default **Mixed** behavior: unchanged, so existing OCR runs and stored `ocr_text` rows stay valid.
+- Changing OCR pipelines, processors, or speed.
+- Persisting a "preferred default" per admin (can be added later via localStorage if needed).
+- Showing which mode was used historically in the row (already prepended to `ocr_text`).

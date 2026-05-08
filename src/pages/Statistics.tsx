@@ -9,9 +9,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { BarChart3, BookOpen, MessageCircle, Brain, FileText, CheckCircle2, Clock, Play, Loader2, Search, HelpCircle, Sparkles, Building2, User, FileEdit, Check, RefreshCw, X } from 'lucide-react';
+import { BarChart3, BookOpen, MessageCircle, Brain, FileText, CheckCircle2, Clock, Play, Loader2, Search, HelpCircle, Sparkles, Building2, User, FileEdit, Check, RefreshCw, X, Image as ImageIcon, Layers, ChevronDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -107,7 +113,6 @@ export default function Statistics() {
   const [isProcessingQuestionBatch, setIsProcessingQuestionBatch] = useState(false);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [processingQuestionId, setProcessingQuestionId] = useState<number | null>(null);
-  const [ocrMode, setOcrMode] = useState<OcrMode>('mixed');
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedChapter, setSelectedChapter] = useState<string>('all');
@@ -130,7 +135,7 @@ export default function Statistics() {
   const [selectedResourceIds, setSelectedResourceIds] = useState<Set<number>>(new Set());
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<number>>(new Set());
   const [forceRetryConfirm, setForceRetryConfirm] = useState<
-    | { kind: 'resource' | 'question'; id: number }
+    | { kind: 'resource' | 'question'; id: number; mode: OcrMode }
     | null
   >(null);
 
@@ -468,7 +473,7 @@ export default function Statistics() {
     }
   };
 
-  const handleProcessAllPending = async () => {
+  const handleProcessAllPending = async (mode: OcrMode = 'mixed') => {
     setIsProcessingBatch(true);
     try {
       const resourcesToProcess = resources.filter(r => {
@@ -495,10 +500,10 @@ export default function Statistics() {
         
         try {
           const result = await processResourceOCR(resource.id, (message) => {
-            toast.loading(`[${i + 1}/${resourcesToProcess.length}] ${message}`, {
+            toast.loading(`[${i + 1}/${resourcesToProcess.length}] (${mode}) ${message}`, {
               id: 'batch-progress',
             });
-          }, ocrMode);
+          }, mode);
           
           if (result.success) {
             successCount++;
@@ -524,12 +529,12 @@ export default function Statistics() {
     }
   };
 
-  const handleProcessSingle = async (resourceId: number) => {
+  const handleProcessSingle = async (resourceId: number, mode: OcrMode = 'mixed') => {
     setProcessingId(resourceId);
     try {
       const result = await processResourceOCR(resourceId, (message) => {
-        toast.loading(message, { id: `processing-${resourceId}` });
-      }, ocrMode);
+        toast.loading(`(${mode}) ${message}`, { id: `processing-${resourceId}` });
+      }, mode);
       
       toast.dismiss(`processing-${resourceId}`);
       
@@ -550,7 +555,7 @@ export default function Statistics() {
     }
   };
 
-  const handleProcessAllPendingQuestions = async () => {
+  const handleProcessAllPendingQuestions = async (mode: OcrMode = 'mixed') => {
     setIsProcessingQuestionBatch(true);
     try {
       const questionsToProcess = questions.filter(q => {
@@ -576,10 +581,10 @@ export default function Statistics() {
         
         try {
           const result = await processQuestionOCR(question.id, (message) => {
-            toast.loading(`[${i + 1}/${questionsToProcess.length}] ${message}`, {
+            toast.loading(`[${i + 1}/${questionsToProcess.length}] (${mode}) ${message}`, {
               id: 'question-batch-progress',
             });
-          }, ocrMode);
+          }, mode);
           
           if (result.success) {
             successCount++;
@@ -605,12 +610,12 @@ export default function Statistics() {
     }
   };
 
-  const handleProcessSingleQuestion = async (questionId: number) => {
+  const handleProcessSingleQuestion = async (questionId: number, mode: OcrMode = 'mixed') => {
     setProcessingQuestionId(questionId);
     try {
       const result = await processQuestionOCR(questionId, (message) => {
-        toast.loading(message, { id: `processing-question-${questionId}` });
-      }, ocrMode);
+        toast.loading(`(${mode}) ${message}`, { id: `processing-question-${questionId}` });
+      }, mode);
       
       toast.dismiss(`processing-question-${questionId}`);
       
@@ -632,7 +637,7 @@ export default function Statistics() {
   };
 
   // Force retry — runs OCR regardless of current status
-  const runBulkResourceOcr = async (ids: number[]) => {
+  const runBulkResourceOcr = async (ids: number[], mode: OcrMode = 'mixed') => {
     if (ids.length === 0) return;
     setIsProcessingBatch(true);
     let successCount = 0;
@@ -641,8 +646,8 @@ export default function Statistics() {
       for (let i = 0; i < ids.length; i++) {
         try {
           const result = await processResourceOCR(ids[i], (message) => {
-            toast.loading(`[${i + 1}/${ids.length}] ${message}`, { id: 'bulk-resource-ocr' });
-          }, ocrMode);
+            toast.loading(`[${i + 1}/${ids.length}] (${mode}) ${message}`, { id: 'bulk-resource-ocr' });
+          }, mode);
           if (result.success) successCount++; else failCount++;
         } catch {
           failCount++;
@@ -658,7 +663,7 @@ export default function Statistics() {
     }
   };
 
-  const runBulkQuestionOcr = async (ids: number[]) => {
+  const runBulkQuestionOcr = async (ids: number[], mode: OcrMode = 'mixed') => {
     if (ids.length === 0) return;
     setIsProcessingQuestionBatch(true);
     let successCount = 0;
@@ -667,8 +672,8 @@ export default function Statistics() {
       for (let i = 0; i < ids.length; i++) {
         try {
           const result = await processQuestionOCR(ids[i], (message) => {
-            toast.loading(`[${i + 1}/${ids.length}] ${message}`, { id: 'bulk-question-ocr' });
-          }, ocrMode);
+            toast.loading(`[${i + 1}/${ids.length}] (${mode}) ${message}`, { id: 'bulk-question-ocr' });
+          }, mode);
           if (result.success) successCount++; else failCount++;
         } catch {
           failCount++;
@@ -1112,23 +1117,20 @@ export default function Statistics() {
                 <CardDescription>Text extraction from PDFs and images in resources and questions</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 p-3">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">OCR mode</span>
-                    <span className="text-xs text-muted-foreground">
-                      Pick how thoroughly each file is processed
-                    </span>
-                  </div>
-                  <Select value={ocrMode} onValueChange={(v) => setOcrMode(v as OcrMode)}>
-                    <SelectTrigger className="w-[220px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="text">Text only — fastest (digital PDFs)</SelectItem>
-                      <SelectItem value="image">Image only — scans / photos</SelectItem>
-                      <SelectItem value="mixed">Mixed — most thorough (default)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="mb-4 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+                  Each row and bulk action exposes three OCR pipelines —
+                  <span className="mx-1 inline-flex items-center gap-1 font-medium text-foreground">
+                    <FileText className="h-3 w-3" /> Text
+                  </span>
+                  (fastest, digital PDFs),
+                  <span className="mx-1 inline-flex items-center gap-1 font-medium text-foreground">
+                    <ImageIcon className="h-3 w-3" /> Image
+                  </span>
+                  (scans / photos),
+                  <span className="mx-1 inline-flex items-center gap-1 font-medium text-foreground">
+                    <Layers className="h-3 w-3" /> Mixed
+                  </span>
+                  (most thorough, default).
                 </div>
                 <Tabs defaultValue="resources" className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
@@ -1162,14 +1164,26 @@ export default function Statistics() {
                               </Button>
                             )}
                             {(ocrStats.pending > 0 || ocrStats.failed > 0) && (
-                              <Button 
-                                onClick={handleProcessAllPending} 
-                                disabled={isProcessingBatch}
-                                size="sm"
-                              >
-                                {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Process All ({ocrStats.pending + ocrStats.failed})
-                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="sm" disabled={isProcessingBatch}>
+                                    {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Process All ({ocrStats.pending + ocrStats.failed})
+                                    <ChevronDown className="ml-1 h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleProcessAllPending('text')}>
+                                    <FileText className="mr-2 h-4 w-4" /> Text only — fastest
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleProcessAllPending('image')}>
+                                    <ImageIcon className="mr-2 h-4 w-4" /> Image only — scans
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleProcessAllPending('mixed')}>
+                                    <Layers className="mr-2 h-4 w-4" /> Mixed — thorough
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             )}
                           </div>
                         </div>
@@ -1265,15 +1279,27 @@ export default function Statistics() {
                                 {selectedResourceIds.size} selected
                               </span>
                               <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => runBulkResourceOcr(Array.from(selectedResourceIds))}
-                                  disabled={isProcessingBatch}
-                                >
-                                  {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                  <RefreshCw className="mr-2 h-4 w-4" />
-                                  Retry selected
-                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button size="sm" disabled={isProcessingBatch}>
+                                      {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                      <RefreshCw className="mr-2 h-4 w-4" />
+                                      Retry selected
+                                      <ChevronDown className="ml-1 h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => runBulkResourceOcr(Array.from(selectedResourceIds), 'text')}>
+                                      <FileText className="mr-2 h-4 w-4" /> Text only
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => runBulkResourceOcr(Array.from(selectedResourceIds), 'image')}>
+                                      <ImageIcon className="mr-2 h-4 w-4" /> Image only
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => runBulkResourceOcr(Array.from(selectedResourceIds), 'mixed')}>
+                                      <Layers className="mr-2 h-4 w-4" /> Mixed
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -1448,35 +1474,71 @@ export default function Statistics() {
                                                 </Button>
                                               )}
                                               {canProcess && (
-                                                <Button
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  onClick={() => handleProcessSingle(resource.id)}
-                                                  disabled={processingId === resource.id}
-                                                  title={resource.ocr_status === 'not_applicable' ? 'Retry OCR' : 'Process OCR'}
-                                                >
-                                                  {processingId === resource.id ? (
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                  ) : (
-                                                    <Play className="h-4 w-4" />
-                                                  )}
-                                                </Button>
+                                                <>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => handleProcessSingle(resource.id, 'text')}
+                                                    disabled={processingId === resource.id}
+                                                    title="Run OCR — Text only (fast, digital PDFs)"
+                                                  >
+                                                    {processingId === resource.id ? (
+                                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                      <FileText className="h-4 w-4" />
+                                                    )}
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => handleProcessSingle(resource.id, 'image')}
+                                                    disabled={processingId === resource.id}
+                                                    title="Run OCR — Image only (scans/photos)"
+                                                  >
+                                                    <ImageIcon className="h-4 w-4" />
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => handleProcessSingle(resource.id, 'mixed')}
+                                                    disabled={processingId === resource.id}
+                                                    title="Run OCR — Mixed (most thorough)"
+                                                  >
+                                                    <Layers className="h-4 w-4" />
+                                                  </Button>
+                                                </>
                                               )}
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                  if (resource.ocr_status === 'completed') {
-                                                    setForceRetryConfirm({ kind: 'resource', id: resource.id });
-                                                  } else {
-                                                    handleProcessSingle(resource.id);
-                                                  }
-                                                }}
-                                                disabled={processingId === resource.id}
-                                                title="Force retry OCR (any status)"
-                                              >
-                                                <RefreshCw className="h-4 w-4" />
-                                              </Button>
+                                              <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={processingId === resource.id}
+                                                    title="Force retry OCR (any status)"
+                                                  >
+                                                    <RefreshCw className="h-4 w-4" />
+                                                  </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                  {(['text', 'image', 'mixed'] as OcrMode[]).map((m) => (
+                                                    <DropdownMenuItem
+                                                      key={m}
+                                                      onClick={() => {
+                                                        if (resource.ocr_status === 'completed') {
+                                                          setForceRetryConfirm({ kind: 'resource', id: resource.id, mode: m });
+                                                        } else {
+                                                          handleProcessSingle(resource.id, m);
+                                                        }
+                                                      }}
+                                                    >
+                                                      {m === 'text' && <FileText className="mr-2 h-4 w-4" />}
+                                                      {m === 'image' && <ImageIcon className="mr-2 h-4 w-4" />}
+                                                      {m === 'mixed' && <Layers className="mr-2 h-4 w-4" />}
+                                                      Force retry — {m}
+                                                    </DropdownMenuItem>
+                                                  ))}
+                                                </DropdownMenuContent>
+                                              </DropdownMenu>
                                             </div>
                                           </TableCell>
                                         </TableRow>
@@ -1540,14 +1602,26 @@ export default function Statistics() {
                         <div className="flex items-center justify-between">
                           <h4 className="font-medium">Questions OCR Stats</h4>
                           {(questionOcrStats.pending > 0 || questionOcrStats.failed > 0) && (
-                            <Button 
-                              onClick={handleProcessAllPendingQuestions} 
-                              disabled={isProcessingQuestionBatch}
-                              size="sm"
-                            >
-                              {isProcessingQuestionBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                              Process All ({questionOcrStats.pending + questionOcrStats.failed})
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" disabled={isProcessingQuestionBatch}>
+                                  {isProcessingQuestionBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  Process All ({questionOcrStats.pending + questionOcrStats.failed})
+                                  <ChevronDown className="ml-1 h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleProcessAllPendingQuestions('text')}>
+                                  <FileText className="mr-2 h-4 w-4" /> Text only — fastest
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleProcessAllPendingQuestions('image')}>
+                                  <ImageIcon className="mr-2 h-4 w-4" /> Image only — scans
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleProcessAllPendingQuestions('mixed')}>
+                                  <Layers className="mr-2 h-4 w-4" /> Mixed — thorough
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1642,15 +1716,27 @@ export default function Statistics() {
                                 {selectedQuestionIds.size} selected
                               </span>
                               <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => runBulkQuestionOcr(Array.from(selectedQuestionIds))}
-                                  disabled={isProcessingQuestionBatch}
-                                >
-                                  {isProcessingQuestionBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                  <RefreshCw className="mr-2 h-4 w-4" />
-                                  Retry selected
-                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button size="sm" disabled={isProcessingQuestionBatch}>
+                                      {isProcessingQuestionBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                      <RefreshCw className="mr-2 h-4 w-4" />
+                                      Retry selected
+                                      <ChevronDown className="ml-1 h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => runBulkQuestionOcr(Array.from(selectedQuestionIds), 'text')}>
+                                      <FileText className="mr-2 h-4 w-4" /> Text only
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => runBulkQuestionOcr(Array.from(selectedQuestionIds), 'image')}>
+                                      <ImageIcon className="mr-2 h-4 w-4" /> Image only
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => runBulkQuestionOcr(Array.from(selectedQuestionIds), 'mixed')}>
+                                      <Layers className="mr-2 h-4 w-4" /> Mixed
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -1765,35 +1851,71 @@ export default function Statistics() {
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
                                               {canProcess && (
-                                                <Button
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  onClick={() => handleProcessSingleQuestion(question.id)}
-                                                  disabled={processingQuestionId === question.id}
-                                                  title={question.ocr_status === 'not_applicable' ? 'Retry OCR' : 'Process OCR'}
-                                                >
-                                                  {processingQuestionId === question.id ? (
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                  ) : (
-                                                    <Play className="h-4 w-4" />
-                                                  )}
-                                                </Button>
+                                                <>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => handleProcessSingleQuestion(question.id, 'text')}
+                                                    disabled={processingQuestionId === question.id}
+                                                    title="Run OCR — Text only"
+                                                  >
+                                                    {processingQuestionId === question.id ? (
+                                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                      <FileText className="h-4 w-4" />
+                                                    )}
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => handleProcessSingleQuestion(question.id, 'image')}
+                                                    disabled={processingQuestionId === question.id}
+                                                    title="Run OCR — Image only"
+                                                  >
+                                                    <ImageIcon className="h-4 w-4" />
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => handleProcessSingleQuestion(question.id, 'mixed')}
+                                                    disabled={processingQuestionId === question.id}
+                                                    title="Run OCR — Mixed"
+                                                  >
+                                                    <Layers className="h-4 w-4" />
+                                                  </Button>
+                                                </>
                                               )}
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                  if (question.ocr_status === 'completed') {
-                                                    setForceRetryConfirm({ kind: 'question', id: question.id });
-                                                  } else {
-                                                    handleProcessSingleQuestion(question.id);
-                                                  }
-                                                }}
-                                                disabled={processingQuestionId === question.id}
-                                                title="Force retry OCR (any status)"
-                                              >
-                                                <RefreshCw className="h-4 w-4" />
-                                              </Button>
+                                              <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={processingQuestionId === question.id}
+                                                    title="Force retry OCR (any status)"
+                                                  >
+                                                    <RefreshCw className="h-4 w-4" />
+                                                  </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                  {(['text', 'image', 'mixed'] as OcrMode[]).map((m) => (
+                                                    <DropdownMenuItem
+                                                      key={m}
+                                                      onClick={() => {
+                                                        if (question.ocr_status === 'completed') {
+                                                          setForceRetryConfirm({ kind: 'question', id: question.id, mode: m });
+                                                        } else {
+                                                          handleProcessSingleQuestion(question.id, m);
+                                                        }
+                                                      }}
+                                                    >
+                                                      {m === 'text' && <FileText className="mr-2 h-4 w-4" />}
+                                                      {m === 'image' && <ImageIcon className="mr-2 h-4 w-4" />}
+                                                      {m === 'mixed' && <Layers className="mr-2 h-4 w-4" />}
+                                                      Force retry — {m}
+                                                    </DropdownMenuItem>
+                                                  ))}
+                                                </DropdownMenuContent>
+                                              </DropdownMenu>
                                             </div>
                                           </TableCell>
                                         </TableRow>
@@ -1877,12 +1999,12 @@ export default function Statistics() {
             <AlertDialogAction
               onClick={() => {
                 if (!forceRetryConfirm) return;
-                const { kind, id } = forceRetryConfirm;
+                const { kind, id, mode } = forceRetryConfirm;
                 setForceRetryConfirm(null);
                 if (kind === 'resource') {
-                  handleProcessSingle(id);
+                  handleProcessSingle(id, mode);
                 } else {
-                  handleProcessSingleQuestion(id);
+                  handleProcessSingleQuestion(id, mode);
                 }
               }}
             >
