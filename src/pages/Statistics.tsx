@@ -1716,15 +1716,27 @@ export default function Statistics() {
                                 {selectedQuestionIds.size} selected
                               </span>
                               <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => runBulkQuestionOcr(Array.from(selectedQuestionIds))}
-                                  disabled={isProcessingQuestionBatch}
-                                >
-                                  {isProcessingQuestionBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                  <RefreshCw className="mr-2 h-4 w-4" />
-                                  Retry selected
-                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button size="sm" disabled={isProcessingQuestionBatch}>
+                                      {isProcessingQuestionBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                      <RefreshCw className="mr-2 h-4 w-4" />
+                                      Retry selected
+                                      <ChevronDown className="ml-1 h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => runBulkQuestionOcr(Array.from(selectedQuestionIds), 'text')}>
+                                      <FileText className="mr-2 h-4 w-4" /> Text only
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => runBulkQuestionOcr(Array.from(selectedQuestionIds), 'image')}>
+                                      <ImageIcon className="mr-2 h-4 w-4" /> Image only
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => runBulkQuestionOcr(Array.from(selectedQuestionIds), 'mixed')}>
+                                      <Layers className="mr-2 h-4 w-4" /> Mixed
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                                 <Button
                                   size="sm"
                                   variant="ghost"
