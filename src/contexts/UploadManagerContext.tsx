@@ -72,15 +72,15 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
   const controllersRef = useRef<Map<string, ArchiveUploadController>>(new Map());
 
   // Calculate counts
-  const hasActiveUploads = items.some(item => item.status === 'queued' || item.status === 'uploading');
-  const pendingCount = items.filter(item => item.status === 'queued' || item.status === 'uploading').length;
+  const hasActiveUploads = items.some(item => item.status === 'queued' || item.status === 'uploading' || item.status === 'paused');
+  const pendingCount = items.filter(item => item.status === 'queued' || item.status === 'uploading' || item.status === 'paused').length;
   const completedCount = items.filter(item => item.status === 'completed').length;
   const failedCount = items.filter(item => item.status === 'failed').length;
   
   // Get unique source routes from active/pending uploads
   const activeSourceRoutes = [...new Set(
     items
-      .filter(item => item.status === 'queued' || item.status === 'uploading' || item.status === 'completed')
+      .filter(item => item.status === 'queued' || item.status === 'uploading' || item.status === 'paused' || item.status === 'completed')
       .map(item => item.sourceRoute)
       .filter((route): route is string => !!route)
   )];
