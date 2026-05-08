@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, ThumbsUp, ThumbsDown, FileText, Edit, Trash2, AlertCircle, Share2, Bookmark, MessageSquare, Building2, User } from 'lucide-react';
+import { ArrowLeft, ThumbsUp, ThumbsDown, FileText, Edit, Trash2, AlertCircle, Share2, Bookmark, MessageSquare, Building2, User, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { ContentSkeleton } from '@/components/LoadingSkeleton';
@@ -79,6 +79,7 @@ export default function ResourceDetail() {
   const [activeTab, setActiveTab] = useState('subjects');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isAskQuestionDialogOpen, setIsAskQuestionDialogOpen] = useState(false);
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
   const [devoirTypes, setDevoirTypes] = useState<Array<{ id: number; devoir_type: string }>>([]);
@@ -351,44 +352,53 @@ export default function ResourceDetail() {
   };
 
   const handleDelete = async () => {
+    if (isDeleting) return;
     const resourceId = Number(id);
     if (isNaN(resourceId)) return;
 
-    // Delete associated files from Archive.org first
-    if (resource?.data && Array.isArray(resource.data)) {
-      for (const fileUrl of resource.data) {
-        if (fileUrl.includes('archive.org')) {
-          try {
-            await supabase.functions.invoke('delete-from-archive', {
-              body: { fileUrl }
-            });
-          } catch (err) {
-            console.error('Error deleting file from archive:', err);
-          }
-        }
+    setIsDeleting(true);
+    try {
+      // Already soft-deleted? skip work.
+      if ((resource as any)?.deleted) {
+        toast({ title: 'Success', description: 'Resource deleted successfully' });
+        setIsDeleteDialogOpen(false);
+        navigate(-1);
+        return;
       }
-    }
 
-    const { error } = await supabase
-      .from('resources')
-      .update({ deleted: true })
-      .eq('id', resourceId);
+      // Delete associated files from Archive.org in parallel
+      if (resource?.data && Array.isArray(resource.data)) {
+        const archiveUrls = resource.data.filter((u: string) => u && u.includes('archive.org'));
+        await Promise.allSettled(
+          archiveUrls.map((fileUrl: string) =>
+            supabase.functions.invoke('delete-from-archive', { body: { fileUrl } })
+          )
+        );
+      }
 
-    if (error) {
+      const { error } = await supabase
+        .from('resources')
+        .update({ deleted: true })
+        .eq('id', resourceId);
+
+      if (error) {
+        toast({
+          title: 'Error',
+          description: 'Failed to delete resource',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       toast({
-        title: 'Error',
-        description: 'Failed to delete resource',
-        variant: 'destructive',
+        title: 'Success',
+        description: 'Resource deleted successfully',
       });
-      return;
+      setIsDeleteDialogOpen(false);
+      navigate(-1);
+    } finally {
+      setIsDeleting(false);
     }
-
-    toast({
-      title: 'Success',
-      description: 'Resource deleted successfully',
-    });
-
-    navigate(-1);
   };
 
   const handleTabChange = (tab: string) => {
@@ -740,7 +750,13 @@ export default function ResourceDetail() {
                 </DialogContent>
               </Dialog>
 
-              <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <AlertDialog
+                open={isDeleteDialogOpen}
+                onOpenChange={(open) => {
+                  if (isDeleting) return;
+                  setIsDeleteDialogOpen(open);
+                }}
+              >
                 <Button
                   variant="outline"
                   size="sm"
@@ -757,8 +773,23 @@ export default function ResourceDetail() {
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleDelete();
+                      }}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? (
+                        <>
+                          <Loader2 size={16} className="mr-1 animate-spin" />
+                          Deleting…
+                        </>
+                      ) : (
+                        'Delete'
+                      )}
+                    </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
