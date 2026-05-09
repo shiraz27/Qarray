@@ -1214,6 +1214,89 @@ export default function Statistics() {
     return <Navigate to="/" replace />;
   }
 
+  // Per-row AI suggestion cache so multiple cells on the same row share one call.
+  const suggestionCache = new Map<string, Promise<ExtractedMetadata>>();
+  const suggestForRow = (kind: 'resource' | 'question', id: number, ocrText: string | null) => {
+    const key = `${kind}:${id}`;
+    if (!ocrText) return Promise.resolve<ExtractedMetadata>({
+      school_name: null, teacher_name: null, suggested_title: null,
+      suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null,
+      teacher_names: [], school_names: [], books: [],
+    });
+    let p = suggestionCache.get(key);
+    if (!p) {
+      p = extractMetadataFromOCR(ocrText, kind === 'resource' ? { resourceId: id } : { questionId: id })
+        .then((r) => r.metadata);
+      suggestionCache.set(key, p);
+    }
+    return p;
+  };
+
+  type CellField = 'teachers' | 'schools' | 'books' | 'types' | 'pages';
+  const suggestCellValue = async (
+    kind: 'resource' | 'question',
+    row: { id: number; ocr_text: string | null },
+    field: CellField,
+  ): Promise<CellValue | null> => {
+    if (field === 'pages') return null; // No AI for page count; user edits manually.
+    const m = await suggestForRow(kind, row.id, row.ocr_text);
+    if (field === 'teachers') return m.teacher_names ?? [];
+    if (field === 'schools') return m.school_names ?? [];
+    if (field === 'books') return m.books ?? [];
+    if (field === 'types') {
+      const ids: number[] = [];
+      if (m.suggested_type_id) ids.push(m.suggested_type_id);
+      return ids;
+    }
+    return null;
+  };
+
+  const saveResourceCell = async (row: ResourceRow, field: CellField, next: CellValue) => {
+    const updates: Record<string, any> = {};
+    if (field === 'teachers') {
+      const arr = (next as string[]) ?? [];
+      updates.teacher_names = arr;
+      updates.teacher_name = arr[0] ?? null;
+    } else if (field === 'schools') {
+      const arr = (next as string[]) ?? [];
+      updates.school_names = arr;
+      updates.school_name = arr[0] ?? null;
+    } else if (field === 'books') {
+      const arr = (next as string[]) ?? [];
+      updates.books = arr;
+      updates.book = arr[0] ?? null;
+    } else if (field === 'types') {
+      const arr = (next as number[]) ?? [];
+      updates.type_ids = arr;
+      updates.type_id = arr[0] ?? null;
+    } else if (field === 'pages') {
+      updates.page_count = next == null ? null : (next as number);
+    }
+    const { error } = await supabase.from('resources').update(updates).eq('id', row.id);
+    if (error) throw error;
+    setResources((prev) => prev.map((r) => (r.id === row.id ? { ...r, ...updates } : r)));
+  };
+
+  const saveQuestionCell = async (row: QuestionRow, field: CellField, next: CellValue) => {
+    const updates: Record<string, any> = {};
+    if (field === 'teachers') updates.teacher_names = (next as string[]) ?? [];
+    else if (field === 'schools') updates.school_names = (next as string[]) ?? [];
+    else if (field === 'books') {
+      const arr = (next as string[]) ?? [];
+      updates.books = arr;
+      updates.book = arr[0] ?? null;
+    } else if (field === 'types') {
+      const arr = (next as number[]) ?? [];
+      updates.type_ids = arr;
+      updates.type_id = arr[0] ?? null;
+    } else if (field === 'pages') {
+      updates.page_count = next == null ? null : (next as number);
+    }
+    const { error } = await supabase.from('questions').update(updates).eq('id', row.id);
+    if (error) throw error;
+    setQuestions((prev) => prev.map((q) => (q.id === row.id ? { ...q, ...updates } : q)));
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <SEO
