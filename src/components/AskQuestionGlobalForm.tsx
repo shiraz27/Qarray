@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { BookAutocomplete } from "@/components/BookAutocomplete";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,6 +14,7 @@ import { computePageCountFromUrls } from '@/utils/pageCountHelpers';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
+import { useFormPersistence } from '@/hooks/useFormPersistence';
 
 const questionSchema = z.object({
   question: z.string().min(10, 'Question must be at least 10 characters').max(500, 'Question must be less than 500 characters'),
@@ -40,12 +41,14 @@ interface AskQuestionGlobalFormProps {
   resourceTypes: Array<{ id: number; type: string }>;
   onSuccess: () => void;
   onCancel: () => void;
+  restoreSession?: boolean;
 }
 
 export const AskQuestionGlobalForm: React.FC<AskQuestionGlobalFormProps> = ({ 
   resourceTypes,
   onSuccess, 
-  onCancel
+  onCancel,
+  restoreSession = false,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
@@ -53,7 +56,17 @@ export const AskQuestionGlobalForm: React.FC<AskQuestionGlobalFormProps> = ({
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [userClassId, setUserClassId] = useState<number | null>(null);
-  const { getUploadsByCallback } = useUploadManager();
+  const { getUploadsByCallback, items: uploadManagerItems } = useUploadManager();
+  const hasRestoredRef = useRef(false);
+
+  // Form persistence
+  const {
+    isRestored,
+    restoredData,
+    saveFormData,
+    clearFormSession,
+    removeUploadedUrl,
+  } = useFormPersistence('askQuestionGlobal', '/dashboard');
   
   // Generate stable callback ID for tracking uploads
   const callbackId = useMemo(() => `ask-question-global-${Date.now()}`, []);
@@ -71,6 +84,72 @@ export const AskQuestionGlobalForm: React.FC<AskQuestionGlobalFormProps> = ({
       book: '',
     },
   });
+
+  // One-shot restore for form values (don't clobber user input).
+  useEffect(() => {
+    if (!isRestored || !restoredData || hasRestoredRef.current) return;
+    const sessionUrls = restoredData.uploadedUrls || [];
+    if (!restoreSession && sessionUrls.length === 0) return;
+
+    hasRestoredRef.current = true;
+    if (restoredData.data) {
+      const { formValues, selectedSubject: savedSubject } = restoredData.data;
+      if (savedSubject) setSelectedSubject(savedSubject);
+      if (formValues) {
+        Object.entries(formValues).forEach(([key, value]) => {
+          if (value !== undefined && value !== '') {
+            form.setValue(key as keyof QuestionFormData, value as any);
+          }
+        });
+      }
+    }
+  }, [restoreSession, isRestored, restoredData, form]);
+
+  // Continuous URL reconciliation across late-completing background uploads.
+  useEffect(() => {
+    if (!isRestored) return;
+    const sessionUrls = restoredData?.uploadedUrls || [];
+    const managerUrls = uploadManagerItems
+      .filter(item => item.sourceRoute === '/dashboard' && item.status === 'completed' && item.url)
+      .map(item => item.url as string);
+    if (sessionUrls.length === 0 && managerUrls.length === 0) return;
+
+    setMediaUrls(prev => {
+      const merged: string[] = [...prev];
+      let added = 0;
+      for (const u of [...sessionUrls, ...managerUrls]) {
+        if (!merged.includes(u)) {
+          merged.push(u);
+          added++;
+        }
+      }
+      if (added > 0) {
+        if (prev.length === 0) {
+          toast.success(`Restored ${merged.length} uploaded file(s)`);
+        } else {
+          toast.success(`Added ${added} new uploaded file(s)`);
+        }
+      }
+      return merged;
+    });
+  }, [isRestored, restoredData, uploadManagerItems]);
+
+  // Debounced save of form state.
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!isRestored) return;
+    if (mediaUrls.length === 0 && !form.getValues().question && !selectedSubject) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveFormData(
+        { formValues: form.getValues(), selectedSubject },
+        mediaUrls,
+      );
+    }, 150);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [isRestored, mediaUrls, selectedSubject, saveFormData, form]);
 
   useEffect(() => {
     fetchUserClass();
@@ -141,12 +220,14 @@ export const AskQuestionGlobalForm: React.FC<AskQuestionGlobalFormProps> = ({
   };
 
   const handleMediaUploaded = (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => {
-    setMediaUrls(prev => [...prev, url]);
+    setMediaUrls(prev => prev.includes(url) ? prev : [...prev, url]);
     toast.success('Media added successfully');
   };
 
   const removeMedia = (index: number) => {
+    const urlToRemove = mediaUrls[index];
     setMediaUrls(prev => prev.filter((_, i) => i !== index));
+    if (urlToRemove) removeUploadedUrl(urlToRemove);
   };
 
   const onSubmit = async (data: QuestionFormData) => {
@@ -196,6 +277,7 @@ export const AskQuestionGlobalForm: React.FC<AskQuestionGlobalFormProps> = ({
       form.reset();
       setMediaUrls([]);
       setSelectedSubject('');
+      clearFormSession();
       onSuccess();
     } catch (error) {
       console.error('Error submitting question:', error);

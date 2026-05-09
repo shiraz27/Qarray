@@ -6,6 +6,7 @@ import { AskQuestionGlobalForm } from './AskQuestionGlobalForm';
 import { AddResourceGlobalForm } from './AddResourceGlobalForm';
 import { supabase } from '@/integrations/supabase/client';
 import { MemorizeButton } from './MemorizeButton';
+import { getActivePendingFormType } from '@/hooks/useFormPersistence';
 
 export const ActionButtons: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -15,23 +16,40 @@ export const ActionButtons: React.FC = () => {
   const [devoirTypes, setDevoirTypes] = useState<Array<{ id: number; devoir_type: string }>>([]);
   const [shouldRestoreForm, setShouldRestoreForm] = useState(false);
 
-  // Auto-open dialog when restoreForm=true is in URL
+  // Auto-open the correct dialog when restoreForm is in URL.
+  // Accepts: ?restoreForm=true (legacy, picks based on session formType),
+  //          ?restoreForm=resource, or ?restoreForm=question.
   useEffect(() => {
-    if (searchParams.get('restoreForm') === 'true') {
-      setShouldRestoreForm(true);
-      setIsAddResourceDialogOpen(true);
-      // Clear the query param
-      searchParams.delete('restoreForm');
-      setSearchParams(searchParams, { replace: true });
+    const flag = searchParams.get('restoreForm');
+    if (!flag) return;
+
+    let target: 'resource' | 'question' = 'resource';
+    if (flag === 'question') {
+      target = 'question';
+    } else if (flag === 'resource') {
+      target = 'resource';
+    } else {
+      // legacy 'true' — infer from active session
+      const formType = getActivePendingFormType();
+      target = formType === 'askQuestionGlobal' ? 'question' : 'resource';
     }
+
+    setShouldRestoreForm(true);
+    if (target === 'question') {
+      setIsAskDialogOpen(true);
+    } else {
+      setIsAddResourceDialogOpen(true);
+    }
+    searchParams.delete('restoreForm');
+    setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  // Reset restore flag when dialog closes
+  // Reset restore flag when both dialogs are closed
   useEffect(() => {
-    if (!isAddResourceDialogOpen) {
+    if (!isAddResourceDialogOpen && !isAskDialogOpen) {
       setShouldRestoreForm(false);
     }
-  }, [isAddResourceDialogOpen]);
+  }, [isAddResourceDialogOpen, isAskDialogOpen]);
 
   useEffect(() => {
     fetchTypes();
@@ -91,6 +109,7 @@ export const ActionButtons: React.FC = () => {
             resourceTypes={resourceTypes}
             onSuccess={() => setIsAskDialogOpen(false)}
             onCancel={() => setIsAskDialogOpen(false)}
+            restoreSession={shouldRestoreForm}
           />
         </DialogContent>
       </Dialog>

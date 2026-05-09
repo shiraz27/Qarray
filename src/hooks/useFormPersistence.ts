@@ -188,3 +188,14 @@ export const hasPendingGlobalFormSession = (): boolean => {
     s => s.formType.includes('Global') && s.uploadedUrls.length > 0
   );
 };
+
+// Get the formType of the most-recently-updated pending global session.
+// Used by the upload indicator + ActionButtons to route the "Open Form"
+// button to the correct dialog (Add Resource vs Ask Question).
+export const getActivePendingFormType = (): string | null => {
+  const sessions = getSessions();
+  const pending = Object.values(sessions)
+    .filter(s => s.uploadedUrls.length > 0)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+  return pending[0]?.formType ?? null;
+};

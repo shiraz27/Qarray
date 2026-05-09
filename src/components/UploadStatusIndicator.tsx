@@ -22,6 +22,7 @@ import {
   Play
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getActivePendingFormType } from '@/hooks/useFormPersistence';
 
 export const UploadStatusIndicator: React.FC = () => {
   const { 
@@ -99,14 +100,16 @@ export const UploadStatusIndicator: React.FC = () => {
 
   const handleNavigateToForm = () => {
     if (activeSourceRoutes[0]) {
-      // Navigate to form with restore flag
-      navigate(`${activeSourceRoutes[0]}?restoreForm=true`);
+      const formType = getActivePendingFormType();
+      const target = formType === 'askQuestionGlobal' ? 'question' : 'resource';
+      navigate(`${activeSourceRoutes[0]}?restoreForm=${target}`);
     }
   };
 
   const handleOpenFormOnSamePage = () => {
-    // Re-navigate to current path with restoreForm flag to trigger dialog open
-    navigate(`${location.pathname}?restoreForm=true`);
+    const formType = getActivePendingFormType();
+    const target = formType === 'askQuestionGlobal' ? 'question' : 'resource';
+    navigate(`${location.pathname}?restoreForm=${target}`);
   };
 
   // Show "Open Form" when on form page with completed uploads
