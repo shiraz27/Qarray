@@ -563,6 +563,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
                       {chapter.resourceCount} {t('resources') || 'Resources'}
                     </span>
                   </div>
+                  <PageCountBadge pageCount={chapter.pageCount} />
                 </div>
               </div>
             </Card>
@@ -720,6 +721,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
                               {ch.resourceCount} {t('resources') || 'Resources'}
                             </span>
                           </div>
+                          <PageCountBadge pageCount={ch.pageCount} />
                         </div>
                       </div>
                     </Card>
