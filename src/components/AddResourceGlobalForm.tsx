@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { computePageCountFromUrls } from '@/utils/pageCountHelpers';
 import { Progress } from '@/components/ui/progress';
 import { Loader2, Bot, Edit3, Clock, Zap, AlertTriangle, Sparkles, ArrowLeft, Check, ArrowRight, X } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
@@ -450,6 +451,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
           teacher_name: data.teacher_name || null,
           institute_id: selectedInstituteId || null,
           book: data.book || null,
+          page_count: await computePageCountFromUrls(mediaUrls).catch(() => null),
         });
 
       if (error) throw error;
