@@ -785,7 +785,7 @@ export default function Chapter() {
             {chapter.name.toUpperCase()}
           </h2>
           
-          <div className="grid grid-cols-3 gap-4">
+          <div className={`grid ${chapter.totalPages > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-4`}>
             <div className="flex items-center gap-2">
               <MessageSquare size={16} className="text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
@@ -807,6 +807,15 @@ export default function Chapter() {
                 <p className="text-base font-semibold text-foreground">{chapter.resourceCount}</p>
               </div>
             </div>
+            {chapter.totalPages > 0 && (
+              <div className="flex items-center gap-2">
+                <FileText size={16} className="text-muted-foreground flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">Pages</p>
+                  <p className="text-base font-semibold text-foreground">{chapter.totalPages}</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </Card>
