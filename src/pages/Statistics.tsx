@@ -1784,6 +1784,11 @@ export default function Statistics() {
                                       <TableHead>Title</TableHead>
                                       <TableHead>Type</TableHead>
                                       <TableHead>Chapter</TableHead>
+                                      <TableHead>Teachers</TableHead>
+                                      <TableHead>Schools</TableHead>
+                                      <TableHead>Books</TableHead>
+                                      <TableHead>Types</TableHead>
+                                      <TableHead>Pages</TableHead>
                                       <TableHead>OCR Status</TableHead>
                                       <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
