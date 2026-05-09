@@ -1,26 +1,75 @@
-## Problem
+## Goal
 
-On `/statistics`, the per-field AI buttons (Title, Description, Teachers, Schools, Books, Types) already exist but are hidden inside a single "AI fill ▾" dropdown menu. That's why it looks like the UI you asked for isn't there — it only appears after clicking the dropdown.
+On `/statistics`, surface metadata directly in the resources/questions tables (Title, Teachers, Schools, Books, Types, Pages) with per-row and batch actions. Move the page-count backfill into the same selection toolbar so it works on selected rows like the AI fields.
 
-`Types` is already wired up (it sets `type_id` and `devoir_type_id` for resources, and `type_id` for questions), so nothing missing there — it just needs to be visible.
+## Changes
 
-## Fix — flatten the dropdown into a visible chip row
+### 1. Fetch the missing columns
 
-In `src/pages/Statistics.tsx`, replace the `AI fill ▾` dropdown in both batch toolbars (resources toolbar around line 1593, questions toolbar around line 2043) with a flat row of small buttons directly in the toolbar:
+`fetchResources` currently selects only `school_name, teacher_name` (legacy scalars). Add the array columns and page count:
 
 ```
-[N selected]   [✨ All]  [Title] [Description] [Teachers] [Schools] [Books] [Types]   [Retry ▾] [Clear]
+id, title, description, data, ocr_status, ocr_text, chapter_id,
+chapters(name), resource_types(type),
+school_name, teacher_name,
+teacher_names, school_names, books, type_ids, page_count
 ```
 
-- Each chip calls `runAiMetadataBatch(kind, ids, [field])` (already implemented).
-- `All` calls it with `fields` undefined.
-- For the questions toolbar, hide `Title` and `Description` chips (questions don't have those AI updates today — matches current dropdown behavior).
-- Wrap the chips in `flex flex-wrap gap-1` so they reflow nicely on smaller widths; the toolbar stays one row on desktop (1008px viewport you're on).
-- Keep the existing `isExtractingBatch` disabled state and spinner on the `All` chip.
-- Delete the `aiBatchMenuItems` helper and the two `DropdownMenu` wrappers that hosted it (the `Retry selected` dropdown stays as-is — it has 3 OCR modes that make sense as a menu).
+For `fetchQuestions`, add: `book, teacher_names, school_names, books, type_ids, page_count`.
 
-## Files touched
+Also load `resourceTypes` (already loaded for selectors) so we can render type chips by id.
 
-- `src/pages/Statistics.tsx` — replace both AI-fill dropdowns with inline chip rows; remove now-unused `aiBatchMenuItems`.
+### 2. Add visible columns in the resources table
 
-No backend, schema, or extractor changes — everything per-field already works, this is purely making it visible.
+Insert columns between `Title` and `Type`:
+
+```
+ID | ☐ | Title | Teachers | Schools | Books | Types | Pages | Chapter | OCR | OCR Text | Actions
+```
+
+- `Teachers` / `Schools` / `Books`: render `text[]` as small chips (max 2 visible + "+N"); empty cell when array is empty. Click chip → no-op (display only). Cell has small `✏️` icon → opens existing `EditResourceForm` (same as current row Edit action).
+- `Types`: render `type_ids` as chips using `resourceTypes` lookup; falls back to scalar `type_id` if `type_ids` is empty.
+- `Pages`: render `page_count` as a number; empty `—` when null.
+- Keep existing `Title`, `Type` (scalar resource_type), `Chapter`, `OCR Status`, `OCR Text`, `Actions` columns. (The existing scalar `Type` column can stay as-is; the new `Types` column shows the multi-select. We can drop the scalar one later if redundant.)
+
+For questions: same idea but only `Teachers | Schools | Books | Types | Pages` (questions have no title/description).
+
+### 3. Per-row inline AI buttons
+
+In each row's `Actions` cell, alongside existing buttons, add a small `Sparkles ▾` dropdown that calls `runAiMetadataBatch(kind, [row.id], [field])` for each field individually plus an "All fields" entry. This already works — just exposes the per-row variant.
+
+### 4. Page-count backfill — selection-aware
+
+Currently `runPageCountBackfill` scans all NULL rows globally. Refactor to accept a scope:
+
+```ts
+runPageCountBackfill(opts?: {
+  scope?: 'all-null' | 'selected-resources' | 'selected-questions',
+  ids?: number[],
+  skipPreviouslyFailed?: boolean,
+})
+```
+
+- `all-null` (default): existing behavior — kept for the global "Backfill all" button at the top of the page.
+- `selected-*`: fetch `id, data` only for the given ids (no `page_count IS NULL` filter, so it can recompute), run the same pool, and write `page_count`.
+
+In both batch toolbars (resources at line 1616, questions at line 2054), add a new chip next to the AI chips:
+
+```
+[📄 Pages] — recomputes page_count for selected rows
+```
+
+Disabled while `pageBackfillStatus.running`. Reuses the existing progress toast/UI.
+
+### 5. Files touched
+
+- `src/pages/Statistics.tsx` — only file. No backend, no schema, no new components.
+
+```text
+fetch columns ──► table headers ──► table cells ──► row-level AI menu
+                                                  ──► batch "Pages" chip → runPageCountBackfill({scope:'selected-…'})
+```
+
+### Open question
+
+Is the existing scalar `Type` column (showing `resource_types.type` from `type_id`) still useful once the new `Types` chip column shows the full `type_ids` set? My default is to keep both for now; tell me if you'd rather drop the scalar one.
