@@ -147,6 +147,9 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
         school_name: data.school_name || null,
         teacher_name: data.teacher_name || null,
         book: data.book || null,
+          school_names: data.school_name ? [data.school_name] : [],
+          teacher_names: data.teacher_name ? [data.teacher_name] : [],
+          books: data.book ? [data.book] : [],
         page_count: await computePageCountFromUrls(mediaUrls).then(r => r.complete ? r.count : null).catch(() => null),
       };
 
