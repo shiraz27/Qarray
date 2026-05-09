@@ -1,5 +1,6 @@
 import React from 'react';
 import { MediaPreview } from './MediaPreview';
+import { PdfInlinePreview } from './PdfInlinePreview';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
 
@@ -26,7 +27,11 @@ export function MediaList({ data, showText = true, capitalizeText = false }: Med
           <div className="grid grid-cols-1 gap-4">
             {media.map((file, index) => (
               <div key={index} className="w-full">
-                <MediaPreview url={file.url} className="w-full" />
+                {file.type === 'pdf' ? (
+                  <PdfInlinePreview url={file.url} className="w-full" />
+                ) : (
+                  <MediaPreview url={file.url} className="w-full" />
+                )}
               </div>
             ))}
           </div>
