@@ -1,48 +1,38 @@
-## Goal
+Plan:
 
-On the resource details page, show PDFs inline (no popup, no Google Viewer, no archive.org top-level navigation) and add a clear **Download** button. Bypasses ad-blockers blocking `*.archive.org` because the file is fetched through our same-origin `fetch-media` edge function.
+1. Fix the PDF proxy response handling
+- Replace `supabase.functions.invoke('fetch-media')` for PDF blobs with a direct `fetch()` call to the Lovable Cloud function URL.
+- Reason: `functions.invoke()` is currently returning an unexpected object for large/binary responses, which causes `Unexpected response from media proxy` and leaves Download disabled even when the backend successfully fetched the PDF.
 
-## Implementation
+2. Add a reusable PDF fetch helper
+- Create a small shared helper that:
+  - calls `fetch-media` directly with the publishable key,
+  - accepts `application/pdf` and `application/octet-stream` blobs,
+  - detects JSON `{ unavailable: true }` responses,
+  - rejects HTML/error pages clearly,
+  - supports retry for flaky Archive.org responses.
+- Use it in both `PdfInlinePreview` and `MediaPreview` so preview and Download behave the same.
 
-### 1. New component: `src/components/PdfInlinePreview.tsx`
+3. Keep Download usable even if preview fails
+- In `PdfInlinePreview`, store the fetched blob for download as soon as the proxy fetch succeeds.
+- If pdf.js rendering fails after the blob is fetched, keep Download enabled and show a clearer preview-only error.
+- Add a fallback Download action that fetches the blob on click if the preview never loaded.
 
-Reusable inline PDF viewer rendered directly in the page (not a dialog).
+4. Stop relying on archive.org “Open” clicks as the primary path
+- Change the “Open” button label/behavior to make it explicit that it opens the original Archive.org URL and may be blocked by Chrome/ad blockers/referrer behavior.
+- Add `referrerPolicy="no-referrer"` to the original link to reduce cases where opening the exact same URL from the website is blocked while manual address-bar entry works.
+- Keep direct Download as the recommended action.
 
-- Props: `url: string`, `className?: string`.
-- On mount: `supabase.functions.invoke('fetch-media', { body: { url } })` → returns blob/ArrayBuffer.
-- Renders pages with `pdfjs-dist` (already installed; reuse worker setup from `src/utils/clientOcrProcessor.ts`).
-- Vertical scroll list of `<canvas>` pages, lazy-rendered with `IntersectionObserver` (only render canvases when visible to keep memory low for big PDFs).
-- Toolbar (sticky top of preview): page indicator (`3 / 42`), zoom – / + buttons, **Download** button, **Open original** link (escape hatch).
-- Download button: builds an object URL from the already-fetched ArrayBuffer (`new Blob([buf], { type: 'application/pdf' })`) and triggers an `<a download="filename.pdf">` click. Filename derived from URL's last path segment, with the dash-extension convention reversed (`-pdf` → `.pdf`).
-- States: loading spinner, "file unavailable" error (when proxy returns `unavailable: true`), generic error with retry.
-- Cleanup on unmount: destroy pdf doc, revoke object URLs.
+5. Show PDF inline preview on questions too
+- Update `MediaList` so PDF attachments render with `PdfInlinePreview`, not just the compact `MediaPreview` card.
+- This covers question detail and answer attachments, since they use `MediaList`.
 
-### 2. Wire it into `src/pages/ResourceDetail.tsx`
+6. Improve the red warning text
+- Make the warning more accurate: preview/download use the app proxy, while “Open original” depends on Archive.org and browser blocking rules.
+- Avoid saying Download won’t work because the current goal is to make Download work even when the original link is blocked.
 
-- For each media URL in the resource that is a PDF (same detection as `MediaPreview`), render `<PdfInlinePreview url={url} />` instead of (or in addition to) the existing `<MediaPreview>` card.
-- Non-PDF media keeps using the existing `MediaPreview` component.
-
-### 3. Update `src/components/MediaPreview.tsx` PDF branch
-
-- Keep the small card preview for places where inline rendering is too heavy (lists, etc.) but replace the failing direct-link behavior:
-  - Primary action: **Download** (same blob-from-proxy approach, no preview).
-  - Secondary text link: "Open original" pointing to the raw archive.org URL for users without blockers.
-- Remove the broken Google Viewer link.
-
-## Technical notes
-
-- `fetch-media` already streams the blob with proper CORS and retries — no edge function changes.
-- pdfjs worker: import the worker URL the same way `clientOcrProcessor.ts` does to avoid CSP / version mismatch issues.
-- For very large PDFs (>50 MB), the proxy fetch can take a while; show progress text "Loading PDF…" and a cancel button that aborts the invocation.
-- No DB changes, no upload-pipeline changes, no auth changes.
-
-## Files
-
-- New: `src/components/PdfInlinePreview.tsx`
-- Edit: `src/pages/ResourceDetail.tsx` (use new component for PDFs)
-- Edit: `src/components/MediaPreview.tsx` (replace broken link with Download + Open original)
-
-## Out of scope
-
-- Inline preview for question detail pages (can be added later by reusing the same component).
-- Text search inside PDF, thumbnails sidebar, annotations.
+Technical files to change:
+- `src/utils/pdfMediaFetch.ts` (new helper)
+- `src/components/PdfInlinePreview.tsx`
+- `src/components/MediaPreview.tsx`
+- `src/components/MediaList.tsx`
