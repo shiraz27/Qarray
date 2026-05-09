@@ -1908,8 +1908,16 @@ export default function Statistics() {
                                               )}
                                             </div>
                                           </TableCell>
+                                          <TableCell>{renderArrayChips(resource.teacher_names)}</TableCell>
+                                          <TableCell>{renderArrayChips(resource.school_names)}</TableCell>
+                                          <TableCell>{renderArrayChips(resource.books)}</TableCell>
+                                          <TableCell>{renderTypeChips(resource.type_ids, resource.resource_types?.type)}</TableCell>
                                           <TableCell>
-                                            <Badge variant="outline">{resource.resource_types?.type || 'Unknown'}</Badge>
+                                            {resource.page_count != null ? (
+                                              <span className="text-xs font-medium">{resource.page_count}</span>
+                                            ) : (
+                                              <span className="text-xs text-muted-foreground">—</span>
+                                            )}
                                           </TableCell>
                                           <TableCell>
                                             {resource.chapters?.name || 'N/A'}
