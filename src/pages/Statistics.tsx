@@ -1598,6 +1598,19 @@ export default function Statistics() {
                               <div className="flex items-center gap-2">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
+                                    <Button size="sm" variant="outline" disabled={isExtractingBatch}>
+                                      {isExtractingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                      <Sparkles className="mr-2 h-4 w-4" />
+                                      AI fill
+                                      <ChevronDown className="ml-1 h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {aiBatchMenuItems('resource', () => Array.from(selectedResourceIds))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
                                     <Button size="sm" disabled={isProcessingBatch}>
                                       {isProcessingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                       <RefreshCw className="mr-2 h-4 w-4" />
@@ -2033,6 +2046,19 @@ export default function Statistics() {
                                 {selectedQuestionIds.size} selected
                               </span>
                               <div className="flex items-center gap-2">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button size="sm" variant="outline" disabled={isExtractingBatch}>
+                                      {isExtractingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                      <Sparkles className="mr-2 h-4 w-4" />
+                                      AI fill
+                                      <ChevronDown className="ml-1 h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {aiBatchMenuItems('question', () => Array.from(selectedQuestionIds))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button size="sm" disabled={isProcessingQuestionBatch}>
