@@ -326,6 +326,10 @@ export default function Statistics() {
   useEffect(() => {
     if (!roleLoading && (isModerator || isAdmin)) {
       fetchClasses();
+      (async () => {
+        const { data } = await supabase.from('resource_types').select('id, type').order('id');
+        setResourceTypes(data || []);
+      })();
       fetchStats(selectedClass, selectedSubject, selectedChapter);
       fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
       fetchQuestionOcrStats(selectedClass, selectedSubject, selectedChapter);
