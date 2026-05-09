@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { AudioPlayer } from '@/components/AudioPlayer';
-import { Volume2, Loader2, Clock, RefreshCw, Download, ExternalLink } from 'lucide-react';
+import { Volume2, Loader2, Clock, RefreshCw, Download, ExternalLink, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { AudioPlayerModal } from '@/components/AudioPlayerModal';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -168,6 +168,12 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
               </a>
             </Button>
           </div>
+        </div>
+        <div className="mt-3 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          <p className="leading-snug">
+            If you have an ad blocker enabled, the "Open" link may not work. Disable it for this site or use the Download button.
+          </p>
         </div>
       </Card>
     );
