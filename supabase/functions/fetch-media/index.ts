@@ -10,13 +10,22 @@ type FetchResult =
   | { ok: false; status: number; message: string };
 
 // Retry with exponential backoff for Archive.org files that need processing time
-async function fetchWithRetry(url: string, maxRetries = 5, initialDelayMs = 2000): Promise<FetchResult> {
+async function fetchWithRetry(url: string, maxRetries = 3, initialDelayMs = 1500): Promise<FetchResult> {
   let lastStatus = 0;
   let lastMessage = 'Unknown error';
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const response = await fetch(url);
+      // Per-attempt timeout so a single hanging upstream cannot exhaust
+      // the edge function's 150s idle limit.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30_000);
+      let response: Response;
+      try {
+        response = await fetch(url, { signal: controller.signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
       
       if (response.ok) {
         return { ok: true, response };
