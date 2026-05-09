@@ -611,7 +611,10 @@ export default function ResourceDetail() {
           
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-foreground mb-2">{capitalizeEveryWord(resource.title)}</h2>
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <h2 className="text-xl font-bold text-foreground">{capitalizeEveryWord(resource.title)}</h2>
+                <PageCountBadge pageCount={(resource as any).page_count} />
+              </div>
               <p className="text-sm text-muted-foreground mb-3">{resource.description}</p>
               
               {/* School and Teacher Info */}
