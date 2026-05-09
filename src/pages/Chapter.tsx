@@ -63,6 +63,7 @@ interface Resource {
   published_by: string | null;
   isBookmarked?: boolean;
   book?: string | null;
+  page_count?: number | null;
 }
 
 interface ResourceType {
