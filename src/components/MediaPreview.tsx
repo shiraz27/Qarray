@@ -1,11 +1,13 @@
 import { Card } from '@/components/ui/card';
 import { AudioPlayer } from '@/components/AudioPlayer';
-import { Volume2, Loader2, Clock, RefreshCw } from 'lucide-react';
+import { Volume2, Loader2, Clock, RefreshCw, Download, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { AudioPlayerModal } from '@/components/AudioPlayerModal';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface MediaPreviewProps {
   url: string;
@@ -22,6 +24,8 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const { toast } = useToast();
   
   // Ensure URL has encoded spaces for proper loading
   const encodedUrl = url.replace(/ /g, '%20');
@@ -82,29 +86,89 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   }
 
   if (isPdf) {
+    const filename = (() => {
+      try {
+        const last = new URL(url).pathname.split('/').filter(Boolean).pop() || 'document.pdf';
+        const decoded = decodeURIComponent(last);
+        if (/-pdf$/i.test(decoded)) return decoded.replace(/-pdf$/i, '.pdf');
+        if (/\.pdf$/i.test(decoded)) return decoded;
+        return decoded + '.pdf';
+      } catch { return 'document.pdf'; }
+    })();
+    const handleDownload = async (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (downloading) return;
+      setDownloading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('fetch-media', { body: { url } });
+        if (error) throw error;
+        let blob: Blob;
+        if (data instanceof Blob) {
+          if (data.type.includes('application/json')) {
+            const text = await data.text();
+            const parsed = JSON.parse(text);
+            throw new Error(parsed?.error || 'File unavailable');
+          }
+          blob = data;
+        } else if (data instanceof ArrayBuffer) {
+          blob = new Blob([data], { type: 'application/pdf' });
+        } else {
+          throw new Error('Unexpected response');
+        }
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      } catch (err) {
+        toast({
+          title: 'Download failed',
+          description: err instanceof Error ? err.message : 'Could not download PDF',
+          variant: 'destructive',
+        });
+      } finally {
+        setDownloading(false);
+      }
+    };
     return (
-      <Card className={`overflow-hidden ${className} p-4 hover:shadow-md transition-all cursor-pointer`}>
-        <a
-          href={encodedUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-3 text-sm"
-        >
+      <Card className={`overflow-hidden ${className} p-4 hover:shadow-md transition-all`}>
+        <div className="flex items-center gap-3 text-sm">
           <div className="text-3xl">📄</div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium">PDF Document</p>
-            <p className="text-xs text-muted-foreground">Click to view</p>
-            <a
-              href={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="text-xs text-primary hover:underline"
-            >
-              Open in Google Viewer
-            </a>
+            <p className="font-medium truncate">{filename}</p>
+            <p className="text-xs text-muted-foreground">PDF document</p>
           </div>
-        </a>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="gap-1"
+            >
+              {downloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">Download</span>
+            </Button>
+            <Button variant="ghost" size="sm" asChild className="gap-1">
+              <a
+                href={encodedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="h-4 w-4" />
+                <span className="hidden sm:inline">Open</span>
+              </a>
+            </Button>
+          </div>
+        </div>
       </Card>
     );
   }
