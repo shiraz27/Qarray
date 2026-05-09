@@ -116,6 +116,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
           contributors: [user.id],
           verified: isModerator || isAdmin,
           book: data.book || null,
+          books: data.book ? [data.book] : [],
           page_count: await computePageCountFromUrls(mediaUrls).then(r => r.complete ? r.count : null).catch(() => null),
         })
         .select();
