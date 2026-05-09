@@ -186,7 +186,7 @@ export const AskQuestionGlobalForm: React.FC<AskQuestionGlobalFormProps> = ({
           type_id: typeId,
           contributors: [user.id],
           book: data.book || null,
-          page_count: await computePageCountFromUrls(mediaUrls).catch(() => null),
+          page_count: await computePageCountFromUrls(mediaUrls).then(r => r.complete ? r.count : null).catch(() => null),
         });
 
       if (error) throw error;

@@ -300,7 +300,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
       // Compute page count (PDF pages + 1 per image). Don't block on failure.
       let pageCount: number | null = null;
       try {
-        pageCount = await computePageCountFromUrls(mediaUrls);
+        const _pc = await computePageCountFromUrls(mediaUrls); pageCount = _pc.complete ? _pc.count : (_pc.count > 0 ? _pc.count : null);
       } catch (e) {
         console.warn('[page-count] resource compute failed:', e);
       }
