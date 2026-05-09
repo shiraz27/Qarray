@@ -13,6 +13,7 @@ import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
+import { computePageCountFromUrls } from '@/utils/pageCountHelpers';
 
 const questionSchema = z.object({
   question: z.string().min(10, 'Question must be at least 10 characters').max(500, 'Question must be less than 500 characters'),
@@ -115,6 +116,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
           contributors: [user.id],
           verified: isModerator || isAdmin,
           book: data.book || null,
+          page_count: await computePageCountFromUrls(mediaUrls).catch(() => null),
         })
         .select();
 

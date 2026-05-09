@@ -1,27 +1,75 @@
-## Problem
+# Page count for resources & questions
 
-On `/resource/71`, clicking **Delete** in the confirmation dialog:
-- Shows no loading indicator while the slow Archive.org cleanup runs (sequential `await` per file URL via the `delete-from-archive` edge function).
-- Leaves the **Delete** button and dialog enabled, so impatient users click multiple times.
-- Each extra click re-runs `handleDelete`. The first run eventually succeeds, but the later runs (now operating on an already-deleted resource) surface `Resource not found` / failure toasts.
-- Net result: the action *did* work, but the UI looked frozen and then spammed errors.
+Display a "pages" indicator (PDF pages + 1 per image, videos/audio ignored) on resource and question cards, on their detail pages, and as an aggregated total on the chapter page.
 
-## Fix (UI/UX only, in `src/pages/ResourceDetail.tsx`)
+## 1. Database (migration)
 
-1. **Add `isDeleting` state** in `ResourceDetail`.
-2. **Guard `handleDelete`**: return early if `isDeleting` is already true, set it to `true` at the start, reset in a `finally`.
-3. **Loading UI in the AlertDialog**:
-   - Disable both `AlertDialogAction` (Delete) and `AlertDialogCancel` while deleting.
-   - Replace the action label with a `Loader2` spinner + "Deleting…" text.
-   - Make the dialog non-dismissible during deletion (ignore `onOpenChange` close while `isDeleting`).
-4. **Parallelize archive cleanup**: replace the sequential `for` loop with `Promise.allSettled(...)` over the archive URLs so the user waits ~1 round-trip instead of N.
-5. **Handle already-deleted gracefully**: before the DB update, if `resource.deleted` is already true, just show the success toast and `navigate(-1)` without re-running. (Defensive — the dialog guard above is the primary fix.)
-6. **Toast/navigation order**: only show success and navigate after the DB update resolves; on error, keep the dialog open and re-enable the buttons.
+Add a nullable `page_count INTEGER` column to:
+- `resources`
+- `questions`
 
-No backend, RLS, or schema changes. No change to the actual delete semantics — same soft-delete via `deleted = true` and same Archive.org cleanup.
+No RLS changes (existing SELECT policies cover reads; UPDATE policies already allow contributors/moderators to write).
+
+A separate one-shot migration **fills existing rows** by parsing each row's media:
+- For `resources.data` (text[]): for every URL classified as PDF (via the same dash-extension logic as `mediaTypeUtils`), fetch via `fetch-media` proxy server-side using `pdf-lib`/`pdfjs` is not available in Postgres — so the migration only sets `page_count = (number of image URLs)` deterministically from the URL list, and leaves PDFs to be backfilled by a client-side admin tool (see §4).
+- Same logic for `questions.data` (text), extracting URLs via regex.
+
+Rows with at least one PDF stay `NULL` until backfilled; rows with only images get a final value immediately. This keeps the migration fast and deterministic.
+
+## 2. Compute on upload (client-side)
+
+In `AddResourceForm`, `AddResourceFormWithSelection`, `AddResourceGlobalForm`, `EditResourceForm`, and the three Ask/Edit Question forms:
+
+- After the user picks files but before/at insert time, compute `page_count`:
+  - For each PDF file/URL: load via `pdfjs-dist` (already in deps) and read `pdf.numPages`.
+  - For each image: +1.
+  - Skip video/audio/unknown.
+- Pass `page_count` in the `INSERT`/`UPDATE` payload alongside `data`.
+- Use a small helper `src/utils/pageCountHelpers.ts` exposing:
+  - `computePageCountFromUrls(urls: string[]): Promise<number>`
+  - `computePageCountFromText(text: string): Promise<number>` (extracts URLs from question `data`)
+
+Helper reuses `detectMediaType`, `isPdfUrl`, `isImageUrl` from `mediaTypeUtils.ts` and the existing `fetch-media` edge function for CORS-safe PDF byte fetches (same approach used by `clientOcrProcessor`).
+
+## 3. UI surfaces
+
+Pages displayed as a small badge with a `FileText` icon (e.g., `📄 12 pages`):
+
+- **Resource card** (`MainContent.tsx` resource list, `Bookmarks.tsx` resource items, search results in `GlobalSearch.tsx`): show next to the existing type/correction badges.
+- **Question card** (`MainContent.tsx` questions list, `Bookmarks.tsx`, `GlobalSearch.tsx`): same.
+- **ResourceDetail.tsx** & **QuestionDetail.tsx**: show inline near title metadata.
+- **Chapter page** (`Chapter.tsx`): aggregated header chip "X pages of content" = `SUM(resources.page_count) + SUM(questions.page_count)` for that chapter, fetched in one `select('page_count').eq('chapter_id', …)` per table (lightweight, only a single int column).
+- Hidden / not rendered when `page_count` is `NULL` or `0` — never show "0 pages" or a placeholder.
+
+## 4. Admin backfill tool (lazy, on-demand)
+
+Because PDF page counts can't be computed from a SQL migration, add an **"Backfill page counts"** button to `Statistics.tsx` (admin-only, alongside existing OCR controls):
+
+- Fetches rows where `page_count IS NULL` AND data contains a PDF, in batches of 20.
+- For each row, runs `computePageCountFromUrls` client-side (same pdfjs path as OCR).
+- Writes back `page_count` per row with progress UI mirroring the existing OCR progress.
+- Skippable / resumable like the OCR batch.
+
+This is the "expensive operation, lazy load" piece — done once by an admin per environment.
+
+## 5. Lazy on the read side
+
+For card lists, `page_count` is already on the row (cheap int), so no extra round-trip. For chapter aggregation, run the two `SUM` queries in parallel with the existing chapter data load; show a skeleton chip while pending.
 
 ## Files touched
-- `src/pages/ResourceDetail.tsx` (single file, ~handleDelete + the AlertDialog block around line 743–763)
+
+- `supabase/migrations/<new>.sql` — add columns + image-only backfill.
+- `src/utils/pageCountHelpers.ts` — new.
+- `src/components/AddResourceForm.tsx`, `AddResourceFormWithSelection.tsx`, `AddResourceGlobalForm.tsx`, `EditResourceForm.tsx`.
+- `src/components/AskQuestionForm.tsx`, `AskQuestionFormWithSelection.tsx`, `AskQuestionGlobalForm.tsx`, `EditQuestionForm.tsx`.
+- `src/components/MainContent.tsx`, `src/components/GlobalSearch.tsx`, `src/pages/Bookmarks.tsx` — card badges.
+- `src/pages/ResourceDetail.tsx`, `src/pages/QuestionDetail.tsx` — header metadata.
+- `src/pages/Chapter.tsx` — aggregate chip.
+- `src/pages/Statistics.tsx` — admin backfill button.
+- `src/integrations/supabase/types.ts` — auto-regenerated.
 
 ## Out of scope
-- The same pattern likely exists on `QuestionDetail.tsx` and other detail pages. I'll only fix ResourceDetail unless you ask me to mirror the change everywhere.
+
+- Storing per-file page counts (only a single total per row).
+- Counting frames/duration for video/audio.
+- Recomputing automatically when files change (admin can re-run backfill or edit triggers it via the same upload-time path).

@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { computePageCountFromUrls } from '@/utils/pageCountHelpers';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
@@ -185,6 +186,7 @@ export const AskQuestionGlobalForm: React.FC<AskQuestionGlobalFormProps> = ({
           type_id: typeId,
           contributors: [user.id],
           book: data.book || null,
+          page_count: await computePageCountFromUrls(mediaUrls).catch(() => null),
         });
 
       if (error) throw error;

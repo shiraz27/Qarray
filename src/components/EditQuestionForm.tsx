@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
+import { computePageCountFromUrls } from '@/utils/pageCountHelpers';
 import { MediaUploader } from './MediaUploader';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
 
@@ -109,6 +110,7 @@ export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
           data: questionData,
           type_id: typeId,
           book: data.book || null,
+          page_count: await computePageCountFromUrls(mediaUrls).catch(() => null),
         })
         .eq('id', questionId);
 

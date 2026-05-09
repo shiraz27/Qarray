@@ -17,6 +17,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { AnswerQuestionForm } from '@/components/AnswerQuestionForm';
 import { EditQuestionForm } from '@/components/EditQuestionForm';
 import { BookBadge } from '@/components/BookBadge';
+import { PageCountBadge } from '@/components/PageCountBadge';
 import { EditAnswerForm } from '@/components/EditAnswerForm';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { EmptyState } from '@/components/EmptyState';
@@ -689,11 +690,10 @@ export default function QuestionDetail() {
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 space-y-3">
               <MediaList data={question.data} showText={true} capitalizeText={true} />
-              {question.book && (
-                <div className="flex flex-wrap gap-2">
-                  <BookBadge book={question.book} size="md" />
-                </div>
-              )}
+              <div className="flex flex-wrap gap-2 items-center">
+                {question.book && <BookBadge book={question.book} size="md" />}
+                <PageCountBadge pageCount={(question as any).page_count} />
+              </div>
             </div>
             {!question.verified && (
               <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs flex-shrink-0">

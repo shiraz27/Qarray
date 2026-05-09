@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { computePageCountFromUrls, computePageCountFromText } from '@/utils/pageCountHelpers';
 import { normalizedIncludes } from '@/utils/textHelpers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -127,9 +128,63 @@ export default function Statistics() {
   const [chapters, setChapters] = useState<any[]>([]);
   const [extractingMetadataId, setExtractingMetadataId] = useState<number | null>(null);
   const [isExtractingBatch, setIsExtractingBatch] = useState(false);
+  const [pageBackfillStatus, setPageBackfillStatus] = useState<{ running: boolean; done: number; total: number; label: string } | null>(null);
   const [suggestedTitles, setSuggestedTitles] = useState<SuggestedTitleEntry[]>([]);
   const [applyingTitleId, setApplyingTitleId] = useState<number | null>(null);
   const itemsPerPage = 20;
+
+  /** Backfill page_count for resources where it's NULL. Sequential, with progress. */
+  const runPageCountBackfill = async () => {
+    setPageBackfillStatus({ running: true, done: 0, total: 0, label: 'Loading…' });
+    try {
+      // Resources
+      const { data: resRows } = await (supabase as any)
+        .from('resources')
+        .select('id, data')
+        .is('page_count', null)
+        .eq('deleted', false);
+      const { data: qRows } = await (supabase as any)
+        .from('questions')
+        .select('id, data')
+        .is('page_count', null)
+        .eq('deleted', false);
+
+      const total = (resRows?.length || 0) + (qRows?.length || 0);
+      let done = 0;
+      setPageBackfillStatus({ running: true, done, total, label: 'Resources' });
+
+      for (const r of resRows || []) {
+        try {
+          const count = await computePageCountFromUrls(r.data || []);
+          if (count !== null) {
+            await (supabase as any).from('resources').update({ page_count: count }).eq('id', r.id);
+          }
+        } catch (err) {
+          console.warn('[backfill] resource', r.id, err);
+        }
+        done += 1;
+        setPageBackfillStatus({ running: true, done, total, label: 'Resources' });
+      }
+
+      for (const q of qRows || []) {
+        try {
+          const count = await computePageCountFromText(q.data || '');
+          if (count !== null) {
+            await (supabase as any).from('questions').update({ page_count: count }).eq('id', q.id);
+          }
+        } catch (err) {
+          console.warn('[backfill] question', q.id, err);
+        }
+        done += 1;
+        setPageBackfillStatus({ running: true, done, total, label: 'Questions' });
+      }
+
+      setPageBackfillStatus({ running: false, done, total, label: 'Done' });
+    } catch (err) {
+      console.error('[backfill] failed', err);
+      setPageBackfillStatus(null);
+    }
+  };
 
   // Multi-select state
   const [selectedResourceIds, setSelectedResourceIds] = useState<Set<number>>(new Set());
@@ -1109,6 +1164,35 @@ export default function Statistics() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Page Count Backfill */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Page Count Backfill</CardTitle>
+                <CardDescription>
+                  Compute and store total page count (PDF pages + 1 per image) for items missing this value.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button
+                  onClick={runPageCountBackfill}
+                  disabled={pageBackfillStatus?.running}
+                  variant="default"
+                >
+                  {pageBackfillStatus?.running
+                    ? `Processing ${pageBackfillStatus.label} ${pageBackfillStatus.done}/${pageBackfillStatus.total}…`
+                    : 'Run page count backfill'}
+                </Button>
+                {pageBackfillStatus && !pageBackfillStatus.running && pageBackfillStatus.total > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Done. Processed {pageBackfillStatus.done} item(s).
+                  </p>
+                )}
+                {pageBackfillStatus && pageBackfillStatus.total === 0 && !pageBackfillStatus.running && (
+                  <p className="text-sm text-muted-foreground">No items needed backfilling.</p>
+                )}
+              </CardContent>
+            </Card>
 
             {/* OCR Processing Stats - Tabbed View */}
             <Card>

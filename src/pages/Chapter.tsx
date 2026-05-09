@@ -17,6 +17,7 @@ import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { AddResourceForm } from '@/components/AddResourceForm';
 import { UserAvatar } from '@/components/UserAvatar';
 import { BookBadge } from '@/components/BookBadge';
+import { PageCountBadge } from '@/components/PageCountBadge';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { SEO, createCourseSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
@@ -27,6 +28,7 @@ interface ChapterData {
   questionCount: number;
   answerCount: number;
   resourceCount: number;
+  totalPages: number;
   isBookmarked: boolean;
 }
 
@@ -42,6 +44,7 @@ interface Question {
   contributors: string[];
   isBookmarked?: boolean;
   book?: string | null;
+  page_count?: number | null;
 }
 
 interface Resource {
@@ -61,6 +64,7 @@ interface Resource {
   published_by: string | null;
   isBookmarked?: boolean;
   book?: string | null;
+  page_count?: number | null;
 }
 
 interface ResourceType {
@@ -216,6 +220,23 @@ export default function Chapter() {
           .eq('chapter_id', chapterId)
           .eq('deleted', false);
 
+        // Aggregate page count: sum of resources.page_count + questions.page_count
+        const [{ data: resPageRows }, { data: qPageRows }] = await Promise.all([
+          supabase
+            .from('resources')
+            .select('page_count')
+            .eq('chapter_id', chapterId)
+            .eq('deleted', false),
+          supabase
+            .from('questions')
+            .select('page_count')
+            .eq('chapter_id', chapterId)
+            .eq('deleted', false),
+        ]);
+        const totalPages =
+          ((resPageRows as any[] | null) || []).reduce((s, r) => s + (r.page_count || 0), 0) +
+          ((qPageRows as any[] | null) || []).reduce((s, r) => s + (r.page_count || 0), 0);
+
         // Check if bookmarked
         let isBookmarked = false;
         if (user) {
@@ -235,6 +256,7 @@ export default function Chapter() {
           questionCount: questionCount || 0,
           answerCount: answerCount || 0,
           resourceCount: resourceCount || 0,
+          totalPages,
           isBookmarked,
         });
 
@@ -267,7 +289,7 @@ export default function Chapter() {
         // Fetch questions with vote counts
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, data, created_at, type_id, verified, contributors, book')
+          .select('id, data, created_at, type_id, verified, contributors, book, page_count')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -328,7 +350,7 @@ export default function Chapter() {
         // Fetch resources with vote counts
         const { data: resourcesData } = await (supabase as any)
           .from('resources')
-          .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, book')
+          .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, book, page_count')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -550,7 +572,7 @@ export default function Chapter() {
       if (contentType === 'question') {
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, data, created_at, type_id, verified, contributors')
+          .select('id, data, created_at, type_id, verified, contributors, page_count')
           .eq('chapter_id', chapter?.id)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -592,7 +614,7 @@ export default function Chapter() {
       } else {
         const { data: resourcesData } = await (supabase as any)
           .from('resources')
-          .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by')
+          .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, page_count')
           .eq('chapter_id', chapter?.id)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -764,7 +786,7 @@ export default function Chapter() {
             {chapter.name.toUpperCase()}
           </h2>
           
-          <div className="grid grid-cols-3 gap-4">
+          <div className={`grid ${chapter.totalPages > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-4`}>
             <div className="flex items-center gap-2">
               <MessageSquare size={16} className="text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
@@ -786,6 +808,15 @@ export default function Chapter() {
                 <p className="text-base font-semibold text-foreground">{chapter.resourceCount}</p>
               </div>
             </div>
+            {chapter.totalPages > 0 && (
+              <div className="flex items-center gap-2">
+                <FileText size={16} className="text-muted-foreground flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">Pages</p>
+                  <p className="text-base font-semibold text-foreground">{chapter.totalPages}</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </Card>
@@ -819,7 +850,7 @@ export default function Chapter() {
                     const fetchChapterData = async () => {
                       const { data: questionsData } = await supabase
                         .from('questions')
-                        .select('id, data, created_at, type_id, verified, contributors')
+                        .select('id, data, created_at, type_id, verified, contributors, page_count')
                         .eq('chapter_id', chapter.id)
                         .eq('deleted', false)
                         .order('created_at', { ascending: false });
@@ -942,6 +973,7 @@ export default function Chapter() {
                           <span>PDF</span>
                         </div>
                       )}
+                      <PageCountBadge pageCount={question.page_count} />
                     </div>
                   )}
                   
@@ -1087,7 +1119,7 @@ export default function Chapter() {
                     const fetchResources = async () => {
                       const { data: resourcesData } = await (supabase as any)
                         .from('resources')
-                        .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by')
+                        .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, page_count')
                         .eq('chapter_id', chapter.id)
                         .eq('deleted', false)
                         .order('created_at', { ascending: false });
@@ -1244,6 +1276,7 @@ export default function Chapter() {
                           <span>PDF</span>
                         </div>
                       )}
+                      <PageCountBadge pageCount={resource.page_count} />
                     </div>
                   )}
                   
