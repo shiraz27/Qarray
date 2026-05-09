@@ -122,7 +122,7 @@ export async function processOcrAndExtractMetadata(
       return {
         success: false,
         ocrText: '',
-        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null },
+        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null, teacher_names: [], school_names: [], books: [] },
         message: 'No media files to process'
       };
     }
@@ -219,7 +219,7 @@ export async function processOcrAndExtractMetadata(
       return {
         success: false,
         ocrText: '',
-        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null },
+        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null, teacher_names: [], school_names: [], books: [] },
         message: 'No OCR-able files found (only video/audio)'
       };
     }
@@ -229,7 +229,7 @@ export async function processOcrAndExtractMetadata(
       return {
         success: false,
         ocrText: '',
-        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null },
+        metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null, teacher_names: [], school_names: [], books: [] },
         message: `Could not fetch ${failedFileCount} file(s). Files may still be processing on the server. Please try again in a few minutes.`
       };
     }
@@ -254,7 +254,7 @@ export async function processOcrAndExtractMetadata(
     return {
       success: false,
       ocrText: '',
-      metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null },
+      metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null, teacher_names: [], school_names: [], books: [] },
       message: error.message || 'Unknown error'
     };
   }

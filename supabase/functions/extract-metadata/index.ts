@@ -18,6 +18,9 @@ interface ExtractedMetadata {
   suggested_type_id: number | null;
   suggested_devoir_type_id: number | null;
   suggested_description: string | null;
+  teacher_names: string[];
+  school_names: string[];
+  books: string[];
 }
 
 serve(async (req) => {
@@ -38,7 +41,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_description: null },
+          metadata: { school_name: null, teacher_name: null, suggested_title: null, suggested_description: null, suggested_type_id: null, suggested_devoir_type_id: null, teacher_names: [], school_names: [], books: [] },
           message: 'No OCR text provided' 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -53,15 +56,17 @@ serve(async (req) => {
 
 Your task is to analyze OCR-extracted text from educational documents (exams, homework, lessons) and extract:
 
-1. School/Institute name - Look for patterns like:
+1. School/Institute names (one OR MORE) - Look for patterns like:
    - Arabic: ثانوية، متوسطة، ابتدائية، معهد، مدرسة، مركز، ليسي
    - French: Lycée, CEM, École, Institut, Collège, Centre
    - Usually appears in document headers
+   - A document can reference multiple institutes; return all distinct ones found.
    
-2. Teacher name - Look for patterns like:
+2. Teacher names (one OR MORE) - Look for patterns like:
    - Arabic: الأستاذ، الأستاذة، المعلم، المعلمة، إعداد، تحت إشراف
    - French: Prof., Professeur, Mr., Mme., M., Enseignant, Préparé par
    - May appear in headers or signatures at the bottom
+   - A document can list multiple teachers; return all distinct ones found.
 
 3. Document Title - Look for patterns like:
    - Arabic: عنوان، الموضوع، اختبار، امتحان، فرض، الفرض، الاختبار، تمارين، سلسلة، درس
@@ -69,6 +74,11 @@ Your task is to analyze OCR-extracted text from educational documents (exams, ho
    - Look for the main subject/topic of the document
    - Generate a concise, descriptive title in the document's primary language
    - Include the subject matter and type (e.g., "اختبار الفصل الأول في الرياضيات" or "Devoir de Mathématiques - 1er Trimestre")
+
+3b. Books / textbook references (zero, one, OR MORE):
+   - Names of textbooks, manuals, or reference books cited in the document.
+   - Examples: "Le manuel scolaire", "كتاب المدرسي", named series, publisher name + level.
+   - Return all distinct ones found.
 
 4. Resource Type - Detect the type of document:
    - ID 1 (Devoirs): الفرض، فرض، اختبار، امتحان، devoir, contrôle, examen, composition
@@ -125,13 +135,28 @@ Important notes:
                 properties: {
                   school_name: { 
                     type: "string", 
-                    description: "Name of the school, institute, or educational center. Null if not found.",
+                    description: "PRIMARY school/institute name (first one). Null if not found. (Use school_names for the full list.)",
                     nullable: true
                   },
                   teacher_name: { 
                     type: "string", 
-                    description: "Name of the teacher or professor. Null if not found.",
+                    description: "PRIMARY teacher name (first one). Null if not found. (Use teacher_names for the full list.)",
                     nullable: true
+                  },
+                  teacher_names: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "All distinct teacher names found in the document. Empty array if none."
+                  },
+                  school_names: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "All distinct school/institute names found in the document. Empty array if none."
+                  },
+                  books: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "All distinct textbook/reference book names cited. Empty array if none."
                   },
                   suggested_title: {
                     type: "string",
@@ -154,7 +179,7 @@ Important notes:
                     nullable: true
                   }
                 },
-                required: ["school_name", "teacher_name", "suggested_title", "suggested_type_id", "suggested_devoir_type_id", "suggested_description"],
+                required: ["school_name", "teacher_name", "teacher_names", "school_names", "books", "suggested_title", "suggested_type_id", "suggested_devoir_type_id", "suggested_description"],
                 additionalProperties: false
               }
             }
@@ -194,20 +219,44 @@ Important notes:
       suggested_title: null, 
       suggested_type_id: null, 
       suggested_devoir_type_id: null,
-      suggested_description: null
+      suggested_description: null,
+      teacher_names: [],
+      school_names: [],
+      books: []
     };
     
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (toolCall?.function?.arguments) {
       try {
         const args = JSON.parse(toolCall.function.arguments);
+        const dedupe = (a: unknown): string[] => {
+          if (!Array.isArray(a)) return [];
+          const seen = new Set<string>();
+          const out: string[] = [];
+          for (const v of a) {
+            if (typeof v !== 'string') continue;
+            const t = v.trim();
+            if (!t) continue;
+            const key = t.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push(t);
+          }
+          return out;
+        };
+        const teacher_names = dedupe(args.teacher_names);
+        const school_names = dedupe(args.school_names);
+        const books = dedupe(args.books);
         metadata = {
-          school_name: args.school_name || null,
-          teacher_name: args.teacher_name || null,
+          school_name: args.school_name || school_names[0] || null,
+          teacher_name: args.teacher_name || teacher_names[0] || null,
           suggested_title: args.suggested_title || null,
           suggested_type_id: args.suggested_type_id || null,
           suggested_devoir_type_id: args.suggested_devoir_type_id || null,
-          suggested_description: args.suggested_description || null
+          suggested_description: args.suggested_description || null,
+          teacher_names,
+          school_names,
+          books,
         };
       } catch (parseError) {
         console.error("Error parsing tool call arguments:", parseError);
@@ -237,7 +286,10 @@ Important notes:
           suggested_title: null, 
           suggested_type_id: null, 
           suggested_devoir_type_id: null,
-          suggested_description: null
+          suggested_description: null,
+          teacher_names: [],
+          school_names: [],
+          books: []
         }
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

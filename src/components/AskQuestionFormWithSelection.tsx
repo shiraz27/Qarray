@@ -155,6 +155,7 @@ export const AskQuestionFormWithSelection: React.FC<AskQuestionFormWithSelection
           type_id: typeId,
           contributors: [user.id],
           book: data.book || null,
+          books: data.book ? [data.book] : [],
           page_count: await computePageCountFromUrls(mediaUrls).then(r => r.complete ? r.count : null).catch(() => null),
         });
 

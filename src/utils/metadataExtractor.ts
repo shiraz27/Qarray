@@ -7,12 +7,46 @@ export interface ExtractedMetadata {
   suggested_type_id: number | null;
   suggested_devoir_type_id: number | null;
   suggested_description: string | null;
+  teacher_names: string[];
+  school_names: string[];
+  books: string[];
 }
 
 export interface MetadataExtractionResult {
   success: boolean;
   metadata: ExtractedMetadata;
   message: string;
+}
+
+const EMPTY_METADATA: ExtractedMetadata = {
+  school_name: null,
+  teacher_name: null,
+  suggested_title: null,
+  suggested_type_id: null,
+  suggested_devoir_type_id: null,
+  suggested_description: null,
+  teacher_names: [],
+  school_names: [],
+  books: [],
+};
+
+function normalizeMetadata(raw: any): ExtractedMetadata {
+  const arr = (v: any): string[] =>
+    Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim()) : [];
+  const teacher_names = arr(raw?.teacher_names);
+  const school_names = arr(raw?.school_names);
+  const books = arr(raw?.books);
+  return {
+    school_name: raw?.school_name ?? teacher_names[0] /* fallback never */ ?? null,
+    teacher_name: raw?.teacher_name ?? null,
+    suggested_title: raw?.suggested_title ?? null,
+    suggested_type_id: raw?.suggested_type_id ?? null,
+    suggested_devoir_type_id: raw?.suggested_devoir_type_id ?? null,
+    suggested_description: raw?.suggested_description ?? null,
+    teacher_names,
+    school_names,
+    books,
+  };
 }
 
 /**
@@ -26,14 +60,7 @@ export async function extractMetadataFromOCR(
     if (!ocrText || ocrText.trim().length === 0) {
       return {
         success: true,
-        metadata: { 
-          school_name: null, 
-          teacher_name: null, 
-          suggested_title: null, 
-          suggested_type_id: null, 
-          suggested_devoir_type_id: null,
-          suggested_description: null
-        },
+        metadata: { ...EMPTY_METADATA },
         message: 'No OCR text to analyze'
       };
     }
@@ -50,42 +77,21 @@ export async function extractMetadataFromOCR(
       console.error('Error calling extract-metadata function:', error);
       return {
         success: false,
-        metadata: { 
-          school_name: null, 
-          teacher_name: null, 
-          suggested_title: null, 
-          suggested_type_id: null, 
-          suggested_devoir_type_id: null,
-          suggested_description: null
-        },
+        metadata: { ...EMPTY_METADATA },
         message: error.message || 'Failed to extract metadata'
       };
     }
 
     return {
       success: data.success,
-      metadata: data.metadata || { 
-        school_name: null, 
-        teacher_name: null, 
-        suggested_title: null, 
-        suggested_type_id: null, 
-        suggested_devoir_type_id: null,
-        suggested_description: null
-      },
+      metadata: normalizeMetadata(data.metadata),
       message: data.message || 'Metadata extraction complete'
     };
   } catch (error: any) {
     console.error('Error in extractMetadataFromOCR:', error);
     return {
       success: false,
-      metadata: { 
-        school_name: null, 
-        teacher_name: null, 
-        suggested_title: null, 
-        suggested_type_id: null, 
-        suggested_devoir_type_id: null,
-        suggested_description: null
-      },
+      metadata: { ...EMPTY_METADATA },
       message: error.message || 'Unknown error during metadata extraction'
     };
   }
@@ -152,10 +158,13 @@ export function formatMetadataForDescription(
 /**
  * Extract metadata and update resource fields
  */
+export type MetadataField = 'title' | 'description' | 'teachers' | 'schools' | 'books' | 'types';
+
 export async function extractAndUpdateResourceMetadata(
   resourceId: number,
   ocrText: string,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
+  fields?: MetadataField[]
 ): Promise<MetadataExtractionResult> {
   onProgress?.('Extracting metadata with AI...');
   
@@ -164,28 +173,62 @@ export async function extractAndUpdateResourceMetadata(
   if (!result.success) {
     return result;
   }
-  
-  const { school_name, teacher_name } = result.metadata;
-  
-  // Only update if we found school or teacher name
-  // Update structured fields + merge AI block into description.
+
+  const want = (f: MetadataField) => !fields || fields.includes(f);
   onProgress?.('Updating resource with extracted metadata...');
 
-  // Fetch the existing description so we can preserve user-authored text
-  // and replace any prior AI block.
   const { data: existing } = await supabase
     .from('resources')
-    .select('description')
+    .select('description, teacher_names, school_names, books')
     .eq('id', resourceId)
     .maybeSingle();
 
-  const newDescription = mergeDescriptionWithAi(existing?.description, result.metadata);
+  const updates: Record<string, any> = {};
 
-  const updates: Record<string, any> = {
-    description: newDescription,
+  if (want('description')) {
+    updates.description = mergeDescriptionWithAi(existing?.description, result.metadata);
+  }
+
+  if (want('title') && result.metadata.suggested_title) {
+    updates.title = result.metadata.suggested_title;
+  }
+
+  const mergeArrays = (existingArr: string[] | null | undefined, incoming: string[]) => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const v of [...(existingArr || []), ...incoming]) {
+      if (!v) continue;
+      const k = v.trim().toLowerCase();
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      out.push(v.trim());
+    }
+    return out;
   };
-  if (school_name) updates.school_name = school_name;
-  if (teacher_name) updates.teacher_name = teacher_name;
+
+  if (want('teachers') && result.metadata.teacher_names.length > 0) {
+    const merged = mergeArrays(existing?.teacher_names as string[] | null, result.metadata.teacher_names);
+    updates.teacher_names = merged;
+    updates.teacher_name = merged[0] ?? null;
+  }
+  if (want('schools') && result.metadata.school_names.length > 0) {
+    const merged = mergeArrays(existing?.school_names as string[] | null, result.metadata.school_names);
+    updates.school_names = merged;
+    updates.school_name = merged[0] ?? null;
+  }
+  if (want('books') && result.metadata.books.length > 0) {
+    const merged = mergeArrays(existing?.books as string[] | null, result.metadata.books);
+    updates.books = merged;
+    updates.book = merged[0] ?? null;
+  }
+  if (want('types')) {
+    if (result.metadata.suggested_type_id) updates.type_id = result.metadata.suggested_type_id;
+    if (result.metadata.suggested_devoir_type_id) updates.devoir_type_id = result.metadata.suggested_devoir_type_id;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return { ...result, message: 'No metadata to update' };
+  }
 
   const { error } = await supabase
     .from('resources')
@@ -204,8 +247,9 @@ export async function extractAndUpdateResourceMetadata(
   // Build result message
   const foundItems: string[] = [];
   if (result.metadata.suggested_title) foundItems.push(`Title: ${result.metadata.suggested_title}`);
-  if (school_name) foundItems.push(`School: ${school_name}`);
-  if (teacher_name) foundItems.push(`Teacher: ${teacher_name}`);
+  if (result.metadata.school_names.length) foundItems.push(`Schools: ${result.metadata.school_names.length}`);
+  if (result.metadata.teacher_names.length) foundItems.push(`Teachers: ${result.metadata.teacher_names.length}`);
+  if (result.metadata.books.length) foundItems.push(`Books: ${result.metadata.books.length}`);
   if (result.metadata.suggested_type_id) foundItems.push(`Type: ${result.metadata.suggested_type_id}`);
   if (result.metadata.suggested_devoir_type_id) foundItems.push(`Devoir: ${result.metadata.suggested_devoir_type_id}`);
   if (result.metadata.suggested_description) foundItems.push(`Description generated`);
@@ -254,13 +298,62 @@ export async function applySuggestedTitle(
 export async function extractAndUpdateQuestionMetadata(
   questionId: number,
   ocrText: string,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
+  fields?: MetadataField[]
 ): Promise<MetadataExtractionResult> {
   onProgress?.('Extracting metadata with AI...');
-  
+
   const result = await extractMetadataFromOCR(ocrText, { questionId });
-  
-  // For questions, we just return the result without updating
-  // since questions don't have a description field
-  return result;
+  if (!result.success) return result;
+
+  const want = (f: MetadataField) => !fields || fields.includes(f);
+
+  const { data: existing } = await supabase
+    .from('questions')
+    .select('teacher_names, school_names, books')
+    .eq('id', questionId)
+    .maybeSingle();
+
+  const mergeArrays = (existingArr: string[] | null | undefined, incoming: string[]) => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const v of [...(existingArr || []), ...incoming]) {
+      if (!v) continue;
+      const k = v.trim().toLowerCase();
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      out.push(v.trim());
+    }
+    return out;
+  };
+
+  const updates: Record<string, any> = {};
+  if (want('teachers') && result.metadata.teacher_names.length > 0) {
+    updates.teacher_names = mergeArrays(existing?.teacher_names as string[] | null, result.metadata.teacher_names);
+  }
+  if (want('schools') && result.metadata.school_names.length > 0) {
+    updates.school_names = mergeArrays(existing?.school_names as string[] | null, result.metadata.school_names);
+  }
+  if (want('books') && result.metadata.books.length > 0) {
+    const merged = mergeArrays(existing?.books as string[] | null, result.metadata.books);
+    updates.books = merged;
+    updates.book = merged[0] ?? null;
+  }
+  if (want('types') && result.metadata.suggested_type_id) {
+    updates.type_id = result.metadata.suggested_type_id;
+  }
+
+  if (Object.keys(updates).length === 0) return { ...result, message: 'No metadata to update' };
+
+  const { error } = await supabase.from('questions').update(updates).eq('id', questionId);
+  if (error) {
+    console.error('Error updating question metadata:', error);
+    return { ...result, success: false, message: 'Failed to update question metadata' };
+  }
+
+  const foundItems: string[] = [];
+  if (result.metadata.school_names.length) foundItems.push(`Schools: ${result.metadata.school_names.length}`);
+  if (result.metadata.teacher_names.length) foundItems.push(`Teachers: ${result.metadata.teacher_names.length}`);
+  if (result.metadata.books.length) foundItems.push(`Books: ${result.metadata.books.length}`);
+  return { ...result, message: foundItems.length ? `Found: ${foundItems.join(', ')}` : 'No metadata detected' };
 }

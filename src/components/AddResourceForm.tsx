@@ -322,8 +322,11 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           ocr_text: extractedData?.ocrText || null,
           school_name: data.school_name || null,
           teacher_name: data.teacher_name || null,
+          school_names: data.school_name ? [data.school_name] : [],
+          teacher_names: data.teacher_name ? [data.teacher_name] : [],
           institute_id: selectedInstituteId || null,
           book: data.book || null,
+          books: data.book ? [data.book] : [],
           page_count: pageCount,
         });
 
