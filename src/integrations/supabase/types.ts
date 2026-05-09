@@ -587,6 +587,7 @@ export type Database = {
           ocr_processed_at: string | null
           ocr_status: string | null
           ocr_text: string | null
+          page_count: number | null
           resource_id: number | null
           type_id: number | null
           type_ids: number[] | null
@@ -604,6 +605,7 @@ export type Database = {
           ocr_processed_at?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
+          page_count?: number | null
           resource_id?: number | null
           type_id?: number | null
           type_ids?: number[] | null
@@ -621,6 +623,7 @@ export type Database = {
           ocr_processed_at?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
+          page_count?: number | null
           resource_id?: number | null
           type_id?: number | null
           type_ids?: number[] | null
@@ -681,6 +684,7 @@ export type Database = {
           ocr_processed_at: string | null
           ocr_status: string | null
           ocr_text: string | null
+          page_count: number | null
           published_by: string | null
           school_name: string | null
           subject_id: number | null
@@ -706,6 +710,7 @@ export type Database = {
           ocr_processed_at?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
+          page_count?: number | null
           published_by?: string | null
           school_name?: string | null
           subject_id?: number | null
@@ -731,6 +736,7 @@ export type Database = {
           ocr_processed_at?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
+          page_count?: number | null
           published_by?: string | null
           school_name?: string | null
           subject_id?: number | null
