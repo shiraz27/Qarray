@@ -326,6 +326,7 @@ export default function Statistics() {
   useEffect(() => {
     if (!roleLoading && (isModerator || isAdmin)) {
       fetchClasses();
+      fetchResourceTypes();
       fetchStats(selectedClass, selectedSubject, selectedChapter);
       fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
       fetchQuestionOcrStats(selectedClass, selectedSubject, selectedChapter);
@@ -372,6 +373,15 @@ export default function Statistics() {
       setClasses(data || []);
     } catch (error) {
       console.error('Error fetching classes:', error);
+    }
+  };
+
+  const fetchResourceTypes = async () => {
+    try {
+      const { data } = await supabase.from('resource_types').select('id, type').order('id');
+      setResourceTypes(data || []);
+    } catch (error) {
+      console.error('Error fetching resource types:', error);
     }
   };
 
