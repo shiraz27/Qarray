@@ -1,34 +1,41 @@
-## Problem
+## Goal
 
-On `/chapter/:id`, clicking "Open Form" navigates to `?restoreForm=resource` but the dialog never opens.
+Show every in-progress upload (queued, uploading with %, paused, failed, completed) directly inside the form's media list — not just completed files. Mirror the controls already in the floating upload indicator (pause, resume, cancel, retry, remove).
 
-`src/pages/Chapter.tsx` (lines 107–115) only matches the literal string `'true'`:
+## Where
 
-```ts
-if (searchParams.get('restoreForm') === 'true') {
-  setIsResourceDialogOpen(true);
-  …
-}
-```
+All forms render uploads through `src/components/MediaUploader.tsx`. The "Uploaded Files" card there currently only lists completed URLs (`uploadedMedia` prop). The hint banner says "N files uploading in background" but doesn't show which ones or their progress.
 
-The previous fix updated the indicator to emit `?restoreForm=resource` / `?restoreForm=question`, so the chapter page no longer matches. The button is rendered (correctly) but navigating doesn't open the dialog.
+## Approach
 
-## Fix
+Extend `MediaUploader.tsx` to render a single combined list:
 
-Update `Chapter.tsx`'s `restoreForm` effect to accept the new values, mirroring `ActionButtons.tsx`:
+1. **Pull in-flight items from `useUploadManager`** filtered by `sourceRoute === location.pathname` and status in `{queued, uploading, paused, failed}`. This catches files queued from a previous form mount (after restore), not just from the current `callbackId`.
+2. **Render rows for each pending item** with: file-type icon, filename, status pill, progress bar with percentage, and inline action buttons:
+   - `uploading` → Pause + Cancel buttons
+   - `paused` → Resume + Cancel buttons
+   - `queued` → Cancel/Remove
+   - `failed` → Retry + Remove (also show the error message under the name)
+3. **Render completed rows** from `uploadedMedia` exactly as today (filename + Remove).
+4. **Dedup** so a file that completes mid-render doesn't appear twice (a pending row + an `uploadedMedia` row): once an item's status becomes `completed`, it drops from the pending list, and the same URL shows up in `uploadedMedia` via the existing callback path.
+5. **Heading** updates to "Files (X total · Y uploading)" so users see counts at a glance.
+6. **Replace the standalone "background uploads" alert** with the inline list. Keep one short note ("You can close this form — uploads continue in the background.") above the list when there are any in-flight items.
 
-- `?restoreForm=resource` → open `isResourceDialogOpen`.
-- `?restoreForm=question` → open `isQuestionDialogOpen`.
-- `?restoreForm=true` (legacy) → keep current behavior, default to opening the resource dialog.
+## Behavior summary
 
-After opening the appropriate dialog, delete the query param (already handled).
-
-That's the only change needed for the immediate "doesn't show up" complaint. `AddResourceForm` already restores its session on mount, so the dialog will pick up the persisted URLs and field values automatically.
+| Item state | Row content | Controls |
+| --- | --- | --- |
+| Queued | "Waiting…" | Cancel |
+| Uploading | Progress bar + "X%" | Pause, Cancel |
+| Paused | "Paused X%" (dim bar) | Resume, Cancel |
+| Failed | Error text | Retry, Remove |
+| Completed | (in `uploadedMedia`) | Remove |
 
 ## Files
 
-- `src/pages/Chapter.tsx` — extend the `restoreForm` effect.
+- `src/components/MediaUploader.tsx` — only file touched.
 
 ## Out of scope
 
-- `AskQuestionForm` (chapter-scoped) has no persistence yet, so opening the question dialog from the indicator on a chapter page won't auto-fill anything. Today the indicator's pending-formType heuristic still routes to `resource` whenever the chapter form was used, so this isn't blocking the current bug. We can add persistence to `AskQuestionForm` later if the user reports it.
+- The floating `UploadStatusIndicator` keeps working as-is.
+- No changes to upload pipeline, persistence, or other forms — they all consume `MediaUploader`, so they get the new view automatically.
