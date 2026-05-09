@@ -38,7 +38,8 @@ import { processResourceOCR } from '@/utils/clientOcrProcessor';
 import type { OcrMode } from '@/utils/pdfOcrHelpers';
 import { isPdfUrl, isImageUrl, urlsHaveOcrable, textHasOcrableUrl } from '@/utils/mediaTypeUtils';
 import { processQuestionOCR } from '@/utils/clientQuestionOcrProcessor';
-import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, applySuggestedTitle, type ExtractedMetadata, type MetadataField } from '@/utils/metadataExtractor';
+import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, applySuggestedTitle, extractMetadataFromOCR, type ExtractedMetadata, type MetadataField } from '@/utils/metadataExtractor';
+import { MetaCell, type CellValue } from '@/components/statistics/MetaCell';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
 interface Stats {
@@ -75,6 +76,11 @@ interface ResourceRow {
   school_name?: string | null;
   teacher_name?: string | null;
   suggested_title?: string | null;
+  teacher_names?: string[] | null;
+  school_names?: string[] | null;
+  books?: string[] | null;
+  type_ids?: number[] | null;
+  page_count?: number | null;
 }
 
 // Track suggested titles from AI extraction
@@ -90,6 +96,11 @@ interface QuestionRow {
   ocr_text?: string | null;
   chapter_id: number | null;
   chapters?: { name: string };
+  teacher_names?: string[] | null;
+  school_names?: string[] | null;
+  books?: string[] | null;
+  type_ids?: number[] | null;
+  page_count?: number | null;
 }
 
 interface QuestionOcrStats {
