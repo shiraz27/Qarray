@@ -112,8 +112,9 @@ export const UploadStatusIndicator: React.FC = () => {
     navigate(`${location.pathname}?restoreForm=${target}`);
   };
 
-  // Show "Open Form" when on form page with completed uploads
-  const showOpenFormButton = isOnFormPage && completedCount > 0 && !hasActiveUploads;
+  // Show "Open Form" any time we're on the form page and have a session,
+  // regardless of whether uploads are still in progress.
+  const showOpenFormButton = isOnFormPage && items.length > 0;
 
   return (
     <div className="fixed bottom-20 right-4 z-50 md:bottom-4 animate-fade-in">
@@ -182,7 +183,9 @@ export const UploadStatusIndicator: React.FC = () => {
             )}
             {showOpenFormButton && (
               <p className="text-xs text-primary font-medium">
-                Tap to open form
+                {hasActiveUploads
+                  ? `Tap to open form · ${pendingCount} uploading`
+                  : 'Tap to open form'}
               </p>
             )}
           </div>
@@ -321,7 +324,7 @@ export const UploadStatusIndicator: React.FC = () => {
             </div>
 
             {/* Action buttons */}
-            {!hasActiveUploads && (completedCount > 0 || failedCount > 0) && (
+            {(showOpenFormButton || (!hasActiveUploads && (completedCount > 0 || failedCount > 0))) && (
               <div className="p-2 border-t space-y-2">
                 {showOpenFormButton && (
                   <Button
@@ -331,18 +334,22 @@ export const UploadStatusIndicator: React.FC = () => {
                     onClick={handleOpenFormOnSamePage}
                   >
                     <ArrowLeft className="h-3 w-3 mr-2" />
-                    Open Form
+                    {hasActiveUploads
+                      ? `Open Form (${pendingCount} uploading)`
+                      : 'Open Form'}
                   </Button>
                 )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-center text-muted-foreground hover:text-foreground"
-                  onClick={clearCompleted}
-                >
-                  <Trash2 className="h-3 w-3 mr-2" />
-                  Clear list
-                </Button>
+                {!hasActiveUploads && (completedCount > 0 || failedCount > 0) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-center text-muted-foreground hover:text-foreground"
+                    onClick={clearCompleted}
+                  >
+                    <Trash2 className="h-3 w-3 mr-2" />
+                    Clear list
+                  </Button>
+                )}
               </div>
             )}
           </div>
