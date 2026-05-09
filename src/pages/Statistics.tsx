@@ -137,6 +137,7 @@ export default function Statistics() {
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [chapters, setChapters] = useState<any[]>([]);
+  const [resourceTypes, setResourceTypes] = useState<{ id: number; type: string }[]>([]);
   const [extractingMetadataId, setExtractingMetadataId] = useState<number | null>(null);
   const [isExtractingBatch, setIsExtractingBatch] = useState(false);
   const [pageBackfillStatus, setPageBackfillStatus] = useState<{
