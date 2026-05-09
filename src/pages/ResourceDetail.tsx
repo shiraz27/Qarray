@@ -18,6 +18,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
 import { BookBadge } from '@/components/BookBadge';
+import { PageCountBadge } from '@/components/PageCountBadge';
 import { EmptyState } from '@/components/EmptyState';
 import { SEO, createLearningResourceSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
