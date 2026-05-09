@@ -1232,7 +1232,7 @@ export default function Statistics() {
     return p;
   };
 
-  type CellField = 'teachers' | 'schools' | 'books' | 'types' | 'pages';
+  type CellField = 'title' | 'description' | 'teachers' | 'schools' | 'books' | 'types' | 'pages';
   const suggestCellValue = async (
     kind: 'resource' | 'question',
     row: { id: number; ocr_text: string | null },
@@ -1240,6 +1240,8 @@ export default function Statistics() {
   ): Promise<CellValue | null> => {
     if (field === 'pages') return null; // No AI for page count; user edits manually.
     const m = await suggestForRow(kind, row.id, row.ocr_text);
+    if (field === 'title') return m.suggested_title ?? null;
+    if (field === 'description') return m.suggested_description ?? null;
     if (field === 'teachers') return m.teacher_names ?? [];
     if (field === 'schools') return m.school_names ?? [];
     if (field === 'books') return m.books ?? [];
@@ -1253,7 +1255,11 @@ export default function Statistics() {
 
   const saveResourceCell = async (row: ResourceRow, field: CellField, next: CellValue) => {
     const updates: Record<string, any> = {};
-    if (field === 'teachers') {
+    if (field === 'title') {
+      updates.title = ((next as string | null) ?? '').toString();
+    } else if (field === 'description') {
+      updates.description = ((next as string | null) ?? '').toString();
+    } else if (field === 'teachers') {
       const arr = (next as string[]) ?? [];
       updates.teacher_names = arr;
       updates.teacher_name = arr[0] ?? null;
@@ -1279,7 +1285,9 @@ export default function Statistics() {
 
   const saveQuestionCell = async (row: QuestionRow, field: CellField, next: CellValue) => {
     const updates: Record<string, any> = {};
-    if (field === 'teachers') updates.teacher_names = (next as string[]) ?? [];
+    if (field === 'title') updates.data = ((next as string | null) ?? '').toString();
+    else if (field === 'description') updates.data = ((next as string | null) ?? '').toString();
+    else if (field === 'teachers') updates.teacher_names = (next as string[]) ?? [];
     else if (field === 'schools') updates.school_names = (next as string[]) ?? [];
     else if (field === 'books') {
       const arr = (next as string[]) ?? [];
