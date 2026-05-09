@@ -1790,6 +1790,7 @@ export default function Statistics() {
                                       </TableHead>
                                       <TableHead className="w-[80px]">ID</TableHead>
                                       <TableHead>Title</TableHead>
+                                      <TableHead>Description</TableHead>
                                       <TableHead>Type</TableHead>
                                       <TableHead>Chapter</TableHead>
                                       <TableHead>Teachers</TableHead>
