@@ -1276,6 +1276,7 @@ export default function Chapter() {
                           <span>PDF</span>
                         </div>
                       )}
+                      <PageCountBadge pageCount={resource.page_count} />
                     </div>
                   )}
                   
