@@ -3,6 +3,7 @@ import { BookAutocomplete } from "@/components/BookAutocomplete";
 import { useForm } from 'react-hook-form';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { computePageCountFromUrls } from '@/utils/pageCountHelpers';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -296,6 +297,14 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
       // Determine OCR status based on step
       const ocrStatus = step === 'review' ? 'completed' : (isPdfOrImage ? 'pending' : 'not_applicable');
 
+      // Compute page count (PDF pages + 1 per image). Don't block on failure.
+      let pageCount: number | null = null;
+      try {
+        pageCount = await computePageCountFromUrls(mediaUrls);
+      } catch (e) {
+        console.warn('[page-count] resource compute failed:', e);
+      }
+
       const { error } = await (supabase as any).from('resources')
         .insert({
           chapter_id: chapterId,
@@ -315,6 +324,7 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({
           teacher_name: data.teacher_name || null,
           institute_id: selectedInstituteId || null,
           book: data.book || null,
+          page_count: pageCount,
         });
 
       if (error) throw error;
