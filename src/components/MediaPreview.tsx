@@ -85,15 +85,24 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
     return (
       <Card className={`overflow-hidden ${className} p-4 hover:shadow-md transition-all cursor-pointer`}>
         <a
-          href={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
+          href={encodedUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-3 text-sm"
         >
           <div className="text-3xl">📄</div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="font-medium">PDF Document</p>
             <p className="text-xs text-muted-foreground">Click to view</p>
+            <a
+              href={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs text-primary hover:underline"
+            >
+              Open in Google Viewer
+            </a>
           </div>
         </a>
       </Card>
