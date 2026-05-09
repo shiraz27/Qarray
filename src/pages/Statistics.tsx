@@ -1141,7 +1141,149 @@ export default function Statistics() {
             {label}
           </Button>
         ))}
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pageBackfillStatus?.running}
+          onClick={() => runPageCountForSelected(kind, getIds())}
+          title="Recompute page_count for selected rows"
+        >
+          {pageBackfillStatus?.running ? (
+            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+          ) : (
+            <FileText className="mr-1 h-4 w-4" />
+          )}
+          Pages
+        </Button>
       </div>
+    );
+  };
+
+  const runPageCountForSelected = async (kind: 'resource' | 'question', ids: number[]) => {
+    if (!ids.length) return;
+    const table = kind === 'resource' ? 'resources' : 'questions';
+    setPageBackfillStatus({
+      running: true, done: 0, total: ids.length,
+      label: kind === 'resource' ? 'Resources (selected)' : 'Questions (selected)',
+      success: 0, partial: 0, failed: 0,
+    });
+    let done = 0, success = 0, partial = 0, failed = 0;
+    const update = (label: string) =>
+      setPageBackfillStatus({ running: true, done, total: ids.length, label, success, partial, failed });
+    try {
+      const { data: rows } = await (supabase as any)
+        .from(table)
+        .select('id, data')
+        .in('id', ids);
+      for (const row of (rows || [])) {
+        try {
+          const result = kind === 'resource'
+            ? await withTimeout(computePageCountFromUrls(row.data || []), PAGE_BACKFILL_ROW_TIMEOUT_MS)
+            : await withTimeout(computePageCountFromText(row.data || ''), PAGE_BACKFILL_ROW_TIMEOUT_MS);
+          if (result.complete) {
+            await (supabase as any).from(table).update({ page_count: result.count }).eq('id', row.id);
+            success += 1;
+          } else if (result.count > 0) {
+            await (supabase as any).from(table).update({ page_count: result.count }).eq('id', row.id);
+            partial += 1;
+          } else {
+            failed += 1;
+          }
+        } catch (err) {
+          console.warn('[page-count selected]', kind, row.id, err);
+          failed += 1;
+        } finally {
+          done += 1;
+          update(kind === 'resource' ? 'Resources (selected)' : 'Questions (selected)');
+        }
+      }
+      toast.success(`Pages — ${success} ok, ${partial} partial, ${failed} failed`);
+      if (kind === 'resource') {
+        fetchResources(selectedClass, selectedSubject, selectedChapter);
+      } else {
+        fetchQuestions(selectedClass, selectedSubject, selectedChapter);
+      }
+    } finally {
+      setPageBackfillStatus(prev => prev ? { ...prev, running: false } : null);
+    }
+  };
+
+  const renderArrayChips = (items?: string[] | null) => {
+    const arr = items || [];
+    if (!arr.length) return <span className="text-xs text-muted-foreground">—</span>;
+    const visible = arr.slice(0, 2);
+    const extra = arr.length - visible.length;
+    return (
+      <div className="flex flex-wrap gap-1 max-w-[180px]">
+        {visible.map((v, i) => (
+          <Badge key={i} variant="outline" className="text-xs truncate max-w-[120px]" title={v}>
+            {v}
+          </Badge>
+        ))}
+        {extra > 0 && (
+          <Badge variant="secondary" className="text-xs" title={arr.slice(2).join(', ')}>+{extra}</Badge>
+        )}
+      </div>
+    );
+  };
+
+  const renderTypeChips = (typeIds?: number[] | null, fallback?: string) => {
+    const ids = typeIds || [];
+    if (!ids.length) {
+      return fallback
+        ? <Badge variant="outline" className="text-xs">{fallback}</Badge>
+        : <span className="text-xs text-muted-foreground">—</span>;
+    }
+    const visible = ids.slice(0, 2);
+    const extra = ids.length - visible.length;
+    return (
+      <div className="flex flex-wrap gap-1">
+        {visible.map((id) => {
+          const t = resourceTypes.find((rt) => rt.id === id);
+          return (
+            <Badge key={id} variant="outline" className="text-xs">{t?.type || `#${id}`}</Badge>
+          );
+        })}
+        {extra > 0 && <Badge variant="secondary" className="text-xs">+{extra}</Badge>}
+      </div>
+    );
+  };
+
+  const aiRowMenu = (kind: 'resource' | 'question', id: number) => {
+    const fieldsList: Array<{ key: MetadataField; label: string }> =
+      kind === 'resource'
+        ? [
+            { key: 'title', label: 'Title' },
+            { key: 'description', label: 'Description' },
+            { key: 'teachers', label: 'Teachers' },
+            { key: 'schools', label: 'Schools' },
+            { key: 'books', label: 'Books' },
+            { key: 'types', label: 'Types' },
+          ]
+        : [
+            { key: 'teachers', label: 'Teachers' },
+            { key: 'schools', label: 'Schools' },
+            { key: 'books', label: 'Books' },
+            { key: 'types', label: 'Types' },
+          ];
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm" variant="ghost" disabled={isExtractingBatch} title="AI: fill fields">
+            <Sparkles className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, [id])}>
+            <Sparkles className="mr-2 h-4 w-4" /> All fields
+          </DropdownMenuItem>
+          {fieldsList.map(({ key, label }) => (
+            <DropdownMenuItem key={key} onClick={() => runAiMetadataBatch(kind, [id], [key])}>
+              {label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   };
 
