@@ -451,7 +451,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
           teacher_name: data.teacher_name || null,
           institute_id: selectedInstituteId || null,
           book: data.book || null,
-          page_count: await computePageCountFromUrls(mediaUrls).catch(() => null),
+          page_count: await computePageCountFromUrls(mediaUrls).then(r => r.complete ? r.count : null).catch(() => null),
         });
 
       if (error) throw error;

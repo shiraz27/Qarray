@@ -110,7 +110,7 @@ export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
           data: questionData,
           type_id: typeId,
           book: data.book || null,
-          page_count: await computePageCountFromUrls(mediaUrls).catch(() => null),
+          page_count: await computePageCountFromUrls(mediaUrls).then(r => r.complete ? r.count : null).catch(() => null),
         })
         .eq('id', questionId);
 

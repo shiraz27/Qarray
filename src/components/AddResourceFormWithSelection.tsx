@@ -187,7 +187,7 @@ export const AddResourceFormWithSelection: React.FC<AddResourceFormWithSelection
           school_name: data.school_name || null,
           teacher_name: data.teacher_name || null,
           book: data.book || null,
-          page_count: await computePageCountFromUrls(mediaUrls).catch(() => null),
+          page_count: await computePageCountFromUrls(mediaUrls).then(r => r.complete ? r.count : null).catch(() => null),
         })
         .select()
         .single();

@@ -29,6 +29,7 @@ interface ChapterData {
   answerCount: number;
   resourceCount: number;
   totalPages: number;
+  pendingPages: number;
   isBookmarked: boolean;
 }
 
@@ -236,6 +237,9 @@ export default function Chapter() {
         const totalPages =
           ((resPageRows as any[] | null) || []).reduce((s, r) => s + (r.page_count || 0), 0) +
           ((qPageRows as any[] | null) || []).reduce((s, r) => s + (r.page_count || 0), 0);
+        const pendingPages =
+          ((resPageRows as any[] | null) || []).filter((r) => r.page_count == null).length +
+          ((qPageRows as any[] | null) || []).filter((r) => r.page_count == null).length;
 
         // Check if bookmarked
         let isBookmarked = false;
@@ -257,6 +261,7 @@ export default function Chapter() {
           answerCount: answerCount || 0,
           resourceCount: resourceCount || 0,
           totalPages,
+          pendingPages,
           isBookmarked,
         });
 
@@ -786,7 +791,7 @@ export default function Chapter() {
             {chapter.name.toUpperCase()}
           </h2>
           
-          <div className={`grid ${chapter.totalPages > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-4`}>
+          <div className={`grid ${(chapter.totalPages > 0 || chapter.pendingPages > 0) ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-4`}>
             <div className="flex items-center gap-2">
               <MessageSquare size={16} className="text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
@@ -808,12 +813,22 @@ export default function Chapter() {
                 <p className="text-base font-semibold text-foreground">{chapter.resourceCount}</p>
               </div>
             </div>
-            {chapter.totalPages > 0 && (
-              <div className="flex items-center gap-2">
+            {(chapter.totalPages > 0 || chapter.pendingPages > 0) && (
+              <div
+                className="flex items-center gap-2"
+                title={
+                  chapter.pendingPages > 0
+                    ? `${chapter.pendingPages} item(s) pending page-count computation`
+                    : undefined
+                }
+              >
                 <FileText size={16} className="text-muted-foreground flex-shrink-0" />
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground truncate">Pages</p>
-                  <p className="text-base font-semibold text-foreground">{chapter.totalPages}</p>
+                  <p className="text-base font-semibold text-foreground">
+                    {chapter.totalPages > 0 ? chapter.totalPages : '—'}
+                    {chapter.totalPages > 0 && chapter.pendingPages > 0 ? '+' : ''}
+                  </p>
                 </div>
               </div>
             )}
