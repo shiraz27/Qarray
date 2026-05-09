@@ -1964,19 +1964,13 @@ export default function Statistics() {
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
                                               {resource.ocr_status === 'completed' && resource.ocr_text && (
-                                                <Button
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  onClick={() => handleExtractMetadata(resource.id)}
-                                                  disabled={extractingMetadataId === resource.id}
-                                                  title="Extract metadata with AI"
-                                                >
-                                                  {extractingMetadataId === resource.id ? (
+                                                extractingMetadataId === resource.id ? (
+                                                  <Button size="sm" variant="ghost" disabled>
                                                     <Loader2 className="h-4 w-4 animate-spin" />
-                                                  ) : (
-                                                    <Sparkles className="h-4 w-4" />
-                                                  )}
-                                                </Button>
+                                                  </Button>
+                                                ) : (
+                                                  aiRowMenu('resource', resource.id)
+                                                )
                                               )}
                                               {canProcess && (
                                                 <>
