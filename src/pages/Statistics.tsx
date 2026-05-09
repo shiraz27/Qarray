@@ -2279,6 +2279,11 @@ export default function Statistics() {
                                       </TableHead>
                                       <TableHead className="w-[80px]">ID</TableHead>
                                       <TableHead>Question</TableHead>
+                                      <TableHead>Teachers</TableHead>
+                                      <TableHead>Schools</TableHead>
+                                      <TableHead>Books</TableHead>
+                                      <TableHead>Types</TableHead>
+                                      <TableHead className="w-[70px]">Pages</TableHead>
                                       <TableHead>Chapter</TableHead>
                                       <TableHead>OCR Status</TableHead>
                                       <TableHead>OCR Text</TableHead>
