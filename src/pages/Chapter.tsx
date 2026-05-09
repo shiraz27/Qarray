@@ -104,14 +104,18 @@ export default function Chapter() {
   const [subjectId, setSubjectId] = useState<number | null>(null);
   const [contextData, setContextData] = useState<ContextData | null>(null);
 
-  // Auto-open resource dialog when restoreForm=true is in URL
+  // Auto-open the right dialog when restoreForm is in URL.
+  // Accepts: 'resource', 'question', or legacy 'true' (defaults to resource).
   useEffect(() => {
-    if (searchParams.get('restoreForm') === 'true') {
+    const flag = searchParams.get('restoreForm');
+    if (!flag) return;
+    if (flag === 'question') {
+      setIsQuestionDialogOpen(true);
+    } else {
       setIsResourceDialogOpen(true);
-      // Clear the query param
-      searchParams.delete('restoreForm');
-      setSearchParams(searchParams, { replace: true });
     }
+    searchParams.delete('restoreForm');
+    setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
   const handleTabChange = (tab: string) => {
