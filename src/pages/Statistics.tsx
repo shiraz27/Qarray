@@ -133,6 +133,59 @@ export default function Statistics() {
   const [applyingTitleId, setApplyingTitleId] = useState<number | null>(null);
   const itemsPerPage = 20;
 
+  /** Backfill page_count for resources where it's NULL. Sequential, with progress. */
+  const runPageCountBackfill = async () => {
+    setPageBackfillStatus({ running: true, done: 0, total: 0, label: 'Loading…' });
+    try {
+      // Resources
+      const { data: resRows } = await (supabase as any)
+        .from('resources')
+        .select('id, data')
+        .is('page_count', null)
+        .eq('deleted', false);
+      const { data: qRows } = await (supabase as any)
+        .from('questions')
+        .select('id, data')
+        .is('page_count', null)
+        .eq('deleted', false);
+
+      const total = (resRows?.length || 0) + (qRows?.length || 0);
+      let done = 0;
+      setPageBackfillStatus({ running: true, done, total, label: 'Resources' });
+
+      for (const r of resRows || []) {
+        try {
+          const count = await computePageCountFromUrls(r.data || []);
+          if (count !== null) {
+            await (supabase as any).from('resources').update({ page_count: count }).eq('id', r.id);
+          }
+        } catch (err) {
+          console.warn('[backfill] resource', r.id, err);
+        }
+        done += 1;
+        setPageBackfillStatus({ running: true, done, total, label: 'Resources' });
+      }
+
+      for (const q of qRows || []) {
+        try {
+          const count = await computePageCountFromText(q.data || '');
+          if (count !== null) {
+            await (supabase as any).from('questions').update({ page_count: count }).eq('id', q.id);
+          }
+        } catch (err) {
+          console.warn('[backfill] question', q.id, err);
+        }
+        done += 1;
+        setPageBackfillStatus({ running: true, done, total, label: 'Questions' });
+      }
+
+      setPageBackfillStatus({ running: false, done, total, label: 'Done' });
+    } catch (err) {
+      console.error('[backfill] failed', err);
+      setPageBackfillStatus(null);
+    }
+  };
+
   // Multi-select state
   const [selectedResourceIds, setSelectedResourceIds] = useState<Set<number>>(new Set());
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<number>>(new Set());
