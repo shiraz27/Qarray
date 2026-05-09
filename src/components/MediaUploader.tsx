@@ -5,14 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Camera, Upload, Mic, Youtube, FileText, Loader2, X, Image, FileAudio, Video, Clock, Info } from 'lucide-react';
+import { Camera, Upload, Mic, Youtube, FileText, Loader2, X, Image, FileAudio, Video, Clock, Info, Pause, Play, RotateCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { enhanceDocument, isMobileDevice } from '@/utils/documentScanner';
 import { MediaPreviewDialog } from './MediaPreviewDialog';
 import { Card } from '@/components/ui/card';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 interface MediaUploaderProps {
   onMediaUploaded: (url: string, type: 'image' | 'video' | 'audio' | 'pdf', file?: File) => void;
   acceptedTypes?: ('image' | 'video' | 'audio' | 'pdf')[];
@@ -51,7 +51,17 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   const audioChunksRef = useRef<Blob[]>([]);
 
   // Use global upload manager
-  const { addToQueue, onUploadComplete, getUploadsByCallback, pendingCount } = useUploadManager();
+  const {
+    addToQueue,
+    onUploadComplete,
+    getUploadsByCallback,
+    items: allUploadItems,
+    pauseUpload,
+    resumeUpload,
+    cancelUpload,
+    retryUpload,
+    removeFromQueue,
+  } = useUploadManager();
   const location = useLocation();
   
   // Generate stable callback ID for this uploader instance
@@ -66,10 +76,20 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     return unsubscribe;
   }, [callbackId, onUploadComplete, onMediaUploaded]);
 
-  // Get uploads for this specific uploader
-  const myUploads = getUploadsByCallback(callbackId);
-  const myPendingUploads = myUploads.filter(u => u.status === 'queued' || u.status === 'uploading');
-  const isUploading = myPendingUploads.length > 0;
+  // In-flight uploads scoped to this form's route (survives form re-mount/restore).
+  const routeUploads = useMemo(
+    () => allUploadItems.filter(u => u.sourceRoute === location.pathname),
+    [allUploadItems, location.pathname]
+  );
+  // Anything not yet completed shows in the inline list.
+  const pendingItems = useMemo(
+    () => routeUploads.filter(u => u.status !== 'completed'),
+    [routeUploads]
+  );
+  const activeUploadingCount = pendingItems.filter(
+    u => u.status === 'queued' || u.status === 'uploading' || u.status === 'paused'
+  ).length;
+  const isUploading = activeUploadingCount > 0;
 
   // Notify parent about upload state changes
   useEffect(() => {
@@ -283,31 +303,132 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     return 'Attachment';
   };
 
+  const renderPendingRow = (item: typeof pendingItems[number]) => {
+    const Icon =
+      item.fileType === 'pdf' ? FileText : item.fileType === 'audio' ? FileAudio : Image;
+    const iconColor =
+      item.fileType === 'pdf'
+        ? 'text-blue-500'
+        : item.fileType === 'audio'
+        ? 'text-primary'
+        : 'text-green-500';
+
+    return (
+      <div
+        key={item.id}
+        className="flex flex-col gap-1.5 p-2 bg-muted/50 rounded-md"
+      >
+        <div className="flex items-center gap-2">
+          <Icon className={`h-4 w-4 flex-shrink-0 ${iconColor}`} />
+          <span className="text-sm truncate flex-1 min-w-0">{item.fileName}</span>
+          <Badge
+            variant={item.status === 'failed' ? 'destructive' : 'secondary'}
+            className="flex-shrink-0 capitalize text-[10px] h-5"
+          >
+            {item.status === 'uploading' && (
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            )}
+            {item.status === 'paused' && <Pause className="h-3 w-3 mr-1" />}
+            {item.status === 'queued' && <Clock className="h-3 w-3 mr-1" />}
+            {item.status === 'failed' && <AlertCircle className="h-3 w-3 mr-1" />}
+            {item.status === 'uploading'
+              ? `${Math.round(item.progress)}%`
+              : item.status}
+          </Badge>
+        </div>
+
+        {(item.status === 'uploading' || item.status === 'paused') && (
+          <Progress
+            value={item.progress}
+            className={`h-1.5 ${item.status === 'paused' ? 'opacity-50' : ''}`}
+          />
+        )}
+
+        {item.status === 'failed' && item.error && (
+          <p className="text-xs text-destructive truncate">{item.error}</p>
+        )}
+
+        <div className="flex items-center gap-1 justify-end">
+          {item.status === 'uploading' && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => pauseUpload(item.id)}
+              className="h-7 px-2"
+            >
+              <Pause className="h-3.5 w-3.5 mr-1" />
+              Pause
+            </Button>
+          )}
+          {item.status === 'paused' && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => resumeUpload(item.id)}
+              className="h-7 px-2"
+            >
+              <Play className="h-3.5 w-3.5 mr-1" />
+              Resume
+            </Button>
+          )}
+          {item.status === 'failed' && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => retryUpload(item.id)}
+              className="h-7 px-2"
+            >
+              <RotateCw className="h-3.5 w-3.5 mr-1" />
+              Retry
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              item.status === 'failed' || item.status === 'queued'
+                ? removeFromQueue(item.id)
+                : cancelUpload(item.id)
+            }
+            className="h-7 w-7 p-0 flex-shrink-0"
+            title={item.status === 'failed' ? 'Remove' : 'Cancel'}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  const totalCount = uploadedMedia.length + pendingItems.length;
+
   return (
     <div className="space-y-4">
-      {/* Background Upload Hint - always show when there are pending uploads */}
-      {myPendingUploads.length > 0 && (
-        <Alert className="border-primary/50 bg-primary/5">
-          <Info className="h-4 w-4 text-primary" />
-          <AlertDescription className="flex items-center justify-between">
-            <span className="text-sm">
-              <span className="font-medium">{myPendingUploads.length} file{myPendingUploads.length !== 1 ? 's' : ''}</span> uploading in background. 
-              You can close this form and continue browsing – check the upload status in the floating indicator.
-            </span>
-            <Badge variant="secondary" className="ml-2 flex-shrink-0">
-              <Clock className="h-3 w-3 mr-1" />
-              Background
-            </Badge>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Uploaded Media List */}
-      {uploadedMedia.length > 0 && (
+      {/* Combined Files List: in-flight + completed */}
+      {totalCount > 0 && (
         <Card className="p-3">
           <div className="space-y-2">
-            <p className="text-sm font-semibold mb-2">Uploaded Files ({uploadedMedia.length})</p>
-            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold">
+                Files ({totalCount}
+                {activeUploadingCount > 0
+                  ? ` · ${activeUploadingCount} uploading`
+                  : ''}
+                )
+              </p>
+              {isUploading && (
+                <Badge variant="secondary" className="text-[10px]">
+                  <Info className="h-3 w-3 mr-1" />
+                  Continues in background
+                </Badge>
+              )}
+            </div>
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {pendingItems.map(renderPendingRow)}
               {uploadedMedia.map((media, index) => (
                 <div 
                   key={index} 
