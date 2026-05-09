@@ -216,6 +216,23 @@ export default function Chapter() {
           .eq('chapter_id', chapterId)
           .eq('deleted', false);
 
+        // Aggregate page count: sum of resources.page_count + questions.page_count
+        const [{ data: resPageRows }, { data: qPageRows }] = await Promise.all([
+          supabase
+            .from('resources')
+            .select('page_count')
+            .eq('chapter_id', chapterId)
+            .eq('deleted', false),
+          supabase
+            .from('questions')
+            .select('page_count')
+            .eq('chapter_id', chapterId)
+            .eq('deleted', false),
+        ]);
+        const totalPages =
+          ((resPageRows as any[] | null) || []).reduce((s, r) => s + (r.page_count || 0), 0) +
+          ((qPageRows as any[] | null) || []).reduce((s, r) => s + (r.page_count || 0), 0);
+
         // Check if bookmarked
         let isBookmarked = false;
         if (user) {
