@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
+import { computePageCountFromUrls } from '@/utils/pageCountHelpers';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
 import { ResourceTypeMultiSelect } from './ResourceTypeMultiSelect';
 
@@ -146,6 +147,7 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
         school_name: data.school_name || null,
         teacher_name: data.teacher_name || null,
         book: data.book || null,
+        page_count: await computePageCountFromUrls(mediaUrls).catch(() => null),
       };
 
       // Only update OCR status if new PDF/image was added
