@@ -38,7 +38,7 @@ import { processResourceOCR } from '@/utils/clientOcrProcessor';
 import type { OcrMode } from '@/utils/pdfOcrHelpers';
 import { isPdfUrl, isImageUrl, urlsHaveOcrable, textHasOcrableUrl } from '@/utils/mediaTypeUtils';
 import { processQuestionOCR } from '@/utils/clientQuestionOcrProcessor';
-import { extractAndUpdateResourceMetadata, applySuggestedTitle, type ExtractedMetadata } from '@/utils/metadataExtractor';
+import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, applySuggestedTitle, type ExtractedMetadata, type MetadataField } from '@/utils/metadataExtractor';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
 interface Stats {
