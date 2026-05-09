@@ -117,70 +117,79 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
     },
   });
 
-  // Restore session data when dialog opens with restoreSession flag
+  // One-shot restore for form values + step (don't clobber user input).
   useEffect(() => {
-    // Reset the ref when restoreSession changes to allow re-restoration
-    if (!restoreSession) {
-      hasRestoredRef.current = false;
-      return;
-    }
-    
-    if (restoreSession && isRestored && restoredData && !hasRestoredRef.current) {
-      hasRestoredRef.current = true;
-      console.log('[AddResourceGlobalForm] Restoring session:', restoredData);
-      
-      // Get URLs from localStorage session
-      const sessionUrls = restoredData.uploadedUrls || [];
-      
-      // Get completed upload URLs from UploadManager that match our route
-      const managerUrls = uploadManagerItems
-        .filter(item => item.sourceRoute === '/dashboard' && item.status === 'completed' && item.url)
-        .map(item => item.url as string);
-      
-      // Merge and deduplicate
-      const allUrls = [...new Set([...sessionUrls, ...managerUrls])];
-      
-      if (allUrls.length > 0) {
-        setMediaUrls(allUrls);
-        toast.success(`Restored ${allUrls.length} uploaded file(s)`);
-      }
-      
-      // Restore form values
-      if (restoredData.data) {
-        const { step: savedStep, formValues, selectedSubject: savedSubject } = restoredData.data;
-        
-        if (savedStep) {
-          setStep(savedStep as Step);
-        }
-        
-        if (savedSubject) {
-          setSelectedSubject(savedSubject);
-        }
-        
-        if (formValues) {
-          Object.entries(formValues).forEach(([key, value]) => {
-            if (value !== undefined && value !== '') {
-              form.setValue(key as keyof ResourceFormData, value as any);
-            }
-          });
-        }
-      }
-    }
-  }, [restoreSession, isRestored, restoredData, form, uploadManagerItems]);
+    if (!isRestored || !restoredData || hasRestoredRef.current) return;
+    // Only auto-restore values when the caller asked us to (Open Form button)
+    // or when the form opens fresh on top of a session with uploads.
+    const sessionUrls = restoredData.uploadedUrls || [];
+    if (!restoreSession && sessionUrls.length === 0) return;
 
-  // Save form state whenever it changes
-  useEffect(() => {
-    if (mediaUrls.length > 0 || step !== 'upload') {
-      saveFormData(
-        { 
-          step, 
-          formValues: form.getValues(),
-          selectedSubject 
-        },
-        mediaUrls
-      );
+    hasRestoredRef.current = true;
+    console.log('[AddResourceGlobalForm] Restoring session values:', restoredData);
+
+    if (restoredData.data) {
+      const { step: savedStep, formValues, selectedSubject: savedSubject } = restoredData.data;
+      if (savedStep) setStep(savedStep as Step);
+      if (savedSubject) setSelectedSubject(savedSubject);
+      if (formValues) {
+        Object.entries(formValues).forEach(([key, value]) => {
+          if (value !== undefined && value !== '') {
+            form.setValue(key as keyof ResourceFormData, value as any);
+          }
+        });
+      }
     }
-  }, [mediaUrls, step, selectedSubject, saveFormData]);
+  }, [restoreSession, isRestored, restoredData, form]);
+
+  // Continuous URL reconciliation: merge URLs from the persisted session and
+  // any completed uploads in the UploadManager for our route. This re-runs
+  // whenever uploads complete so late-finishing files appear automatically.
+  useEffect(() => {
+    if (!isRestored) return;
+    const sessionUrls = restoredData?.uploadedUrls || [];
+    const managerUrls = uploadManagerItems
+      .filter(item => item.sourceRoute === '/dashboard' && item.status === 'completed' && item.url)
+      .map(item => item.url as string);
+    if (sessionUrls.length === 0 && managerUrls.length === 0) return;
+
+    setMediaUrls(prev => {
+      const merged: string[] = [...prev];
+      let added = 0;
+      for (const u of [...sessionUrls, ...managerUrls]) {
+        if (!merged.includes(u)) {
+          merged.push(u);
+          added++;
+        }
+      }
+      if (added > 0) {
+        // Notify on the very first restore only, not on every late upload.
+        if (prev.length === 0) {
+          toast.success(`Restored ${merged.length} uploaded file(s)`);
+        } else {
+          toast.success(`Added ${added} new uploaded file(s)`);
+        }
+      }
+      return merged;
+    });
+  }, [isRestored, restoredData, uploadManagerItems]);
+
+  // Save form state (debounced) whenever it changes — only after initial read.
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!isRestored) return;
+    if (mediaUrls.length === 0 && step === 'upload') return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveFormData(
+        { step, formValues: form.getValues(), selectedSubject },
+        mediaUrls,
+      );
+    }, 150);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [isRestored, mediaUrls, step, selectedSubject, saveFormData, form]);
 
   useEffect(() => {
     fetchUserClass();
