@@ -1791,7 +1791,6 @@ export default function Statistics() {
                                       <TableHead className="w-[80px]">ID</TableHead>
                                       <TableHead>Title</TableHead>
                                       <TableHead>Description</TableHead>
-                                      <TableHead>Type</TableHead>
                                       <TableHead>Chapter</TableHead>
                                       <TableHead>Teachers</TableHead>
                                       <TableHead>Schools</TableHead>
@@ -1879,9 +1878,6 @@ export default function Statistics() {
                                               onSuggest={() => suggestCellValue('resource', resource, 'description')}
                                               onSave={(v) => saveResourceCell(resource, 'description', v)}
                                             />
-                                          </TableCell>
-                                          <TableCell>
-                                            <Badge variant="outline">{resource.resource_types?.type || 'Unknown'}</Badge>
                                           </TableCell>
                                           <TableCell>
                                             {resource.chapters?.name || 'N/A'}
