@@ -128,6 +128,7 @@ export default function Statistics() {
   const [chapters, setChapters] = useState<any[]>([]);
   const [extractingMetadataId, setExtractingMetadataId] = useState<number | null>(null);
   const [isExtractingBatch, setIsExtractingBatch] = useState(false);
+  const [pageBackfillStatus, setPageBackfillStatus] = useState<{ running: boolean; done: number; total: number; label: string } | null>(null);
   const [suggestedTitles, setSuggestedTitles] = useState<SuggestedTitleEntry[]>([]);
   const [applyingTitleId, setApplyingTitleId] = useState<number | null>(null);
   const itemsPerPage = 20;
