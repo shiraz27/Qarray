@@ -1,38 +1,44 @@
-Plan:
+## Problem
 
-1. Fix the PDF proxy response handling
-- Replace `supabase.functions.invoke('fetch-media')` for PDF blobs with a direct `fetch()` call to the Lovable Cloud function URL.
-- Reason: `functions.invoke()` is currently returning an unexpected object for large/binary responses, which causes `Unexpected response from media proxy` and leaves Download disabled even when the backend successfully fetched the PDF.
+Uploading a ~13-page PDF (just above the 16 MB multipart threshold) frequently fails with `Part upload failed: 403 Forbidden`. Larger files succeed more often because they have more parts and one transient 403 is less fatal proportionally — but right now any 403 that survives 3 retries kills the whole upload.
 
-2. Add a reusable PDF fetch helper
-- Create a small shared helper that:
-  - calls `fetch-media` directly with the publishable key,
-  - accepts `application/pdf` and `application/octet-stream` blobs,
-  - detects JSON `{ unavailable: true }` responses,
-  - rejects HTML/error pages clearly,
-  - supports retry for flaky Archive.org responses.
-- Use it in both `PdfInlinePreview` and `MediaPreview` so preview and Download behave the same.
+Two real issues in the current multipart flow:
 
-3. Keep Download usable even if preview fails
-- In `PdfInlinePreview`, store the fetched blob for download as soon as the proxy fetch succeeds.
-- If pdf.js rendering fails after the blob is fetched, keep Download enabled and show a clearer preview-only error.
-- Add a fallback Download action that fetches the blob on click if the preview never loaded.
+1. When a part PUT fails (403 or otherwise), the worker retries the **same presigned URL**. If the failure is signature/clock/race-related, retrying the identical URL can't recover.
+2. There is no fallback to the proxied `upload-part` action in the edge function, even though that path uses the standard `LOW` auth header that the working single-shot upload uses.
+3. Concurrency is hard-coded to 4 parallel parts, which increases the chance of archive.org rejecting an early part because the multipart upload state hasn't fully propagated after `initiate`.
 
-4. Stop relying on archive.org “Open” clicks as the primary path
-- Change the “Open” button label/behavior to make it explicit that it opens the original Archive.org URL and may be blocked by Chrome/ad blockers/referrer behavior.
-- Add `referrerPolicy="no-referrer"` to the original link to reduce cases where opening the exact same URL from the website is blocked while manual address-bar entry works.
-- Keep direct Download as the recommended action.
+## Fix
 
-5. Show PDF inline preview on questions too
-- Update `MediaList` so PDF attachments render with `PdfInlinePreview`, not just the compact `MediaPreview` card.
-- This covers question detail and answer attachments, since they use `MediaList`.
+### 1. Re-sign on every retry (`src/utils/archiveMultipartUpload.ts`)
 
-6. Improve the red warning text
-- Make the warning more accurate: preview/download use the app proxy, while “Open original” depends on Archive.org and browser blocking rules.
-- Avoid saying Download won’t work because the current goal is to make Download work even when the original link is blocked.
+In the part worker, move the `sign-part` call inside the retry loop so each attempt gets a fresh presigned URL. This eliminates stale-signature / clock-skew failures.
 
-Technical files to change:
-- `src/utils/pdfMediaFetch.ts` (new helper)
-- `src/components/PdfInlinePreview.tsx`
-- `src/components/MediaPreview.tsx`
-- `src/components/MediaList.tsx`
+### 2. Fall back to proxied `upload-part` after a presigned 403
+
+If a presigned PUT fails with 401/403 (signature/auth class of errors) more than once, switch that part to the existing `upload-part` action via `supabase.functions.invoke('upload-to-archive')`, sending the chunk as `FormData`. This path is already implemented in the edge function (`handleUploadPart`) and uses the same `LOW <key>:<secret>` header that single-shot uploads use successfully.
+
+This gives us a guaranteed working path for parts even if presigning is flaky for a given file/region/time. Progress reporting for fallback parts will be coarser (one update per part) — acceptable.
+
+### 3. Lower default concurrency from 4 → 2
+
+Reduces archive.org race conditions immediately after `initiate`, which is the most likely root cause of the intermittent 403 specifically on small multipart uploads. Larger files still benefit from parallelism but with less contention.
+
+### 4. Treat 403 as retryable for parts
+
+Currently `putPartXhr` flags only 5xx/429 as retryable. For multipart parts on archive.org, 403 is also retryable in practice (signature races, propagation), so mark it retryable so the worker actually attempts the re-sign + fallback before giving up.
+
+## Files to change
+
+- `src/utils/archiveMultipartUpload.ts`
+  - Move `sign-part` inside per-attempt retry loop
+  - Add proxied `upload-part` fallback after first 401/403 on a part
+  - Mark 403 as retryable
+  - Drop `CONCURRENCY` from 4 to 2
+
+No changes needed to the edge function — `handleUploadPart` already exists and works.
+
+## Out of scope
+
+- The PDF preview/proxy path (already fixed in the previous turn).
+- Increasing the multipart threshold — keeping 16 MB so we still get resumable uploads for genuinely large files.
