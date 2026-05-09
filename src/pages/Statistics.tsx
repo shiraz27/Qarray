@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { computePageCountFromUrls, computePageCountFromText } from '@/utils/pageCountHelpers';
+import { computePageCountFromUrls, computePageCountFromText, withTimeout } from '@/utils/pageCountHelpers';
 import { normalizedIncludes } from '@/utils/textHelpers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -128,61 +128,178 @@ export default function Statistics() {
   const [chapters, setChapters] = useState<any[]>([]);
   const [extractingMetadataId, setExtractingMetadataId] = useState<number | null>(null);
   const [isExtractingBatch, setIsExtractingBatch] = useState(false);
-  const [pageBackfillStatus, setPageBackfillStatus] = useState<{ running: boolean; done: number; total: number; label: string } | null>(null);
+  const [pageBackfillStatus, setPageBackfillStatus] = useState<{
+    running: boolean;
+    done: number;
+    total: number;
+    label: string;
+    success: number;
+    partial: number;
+    failed: number;
+  } | null>(null);
   const [suggestedTitles, setSuggestedTitles] = useState<SuggestedTitleEntry[]>([]);
   const [applyingTitleId, setApplyingTitleId] = useState<number | null>(null);
   const itemsPerPage = 20;
 
-  /** Backfill page_count for resources where it's NULL. Sequential, with progress. */
-  const runPageCountBackfill = async () => {
-    setPageBackfillStatus({ running: true, done: 0, total: 0, label: 'Loading…' });
+  /**
+   * Backfill page_count for rows where it's NULL.
+   * - Concurrency: 4 in flight at once
+   * - Per-row timeout: 45s (so a single slow Archive.org PDF can't stall the run)
+   * - Partial PDF failures still write the partial count (better than NULL)
+   * - Skips rows that failed in this run; persists `failedIds` so subsequent runs
+   *   can opt to skip them too via the localStorage checkpoint
+   */
+  const PAGE_BACKFILL_KEY = 'pageBackfill:v1';
+  const PAGE_BACKFILL_CONCURRENCY = 4;
+  const PAGE_BACKFILL_ROW_TIMEOUT_MS = 45_000;
+
+  const loadBackfillCheckpoint = (): { failedResources: number[]; failedQuestions: number[] } => {
     try {
-      // Resources
-      const { data: resRows } = await (supabase as any)
+      const raw = localStorage.getItem(PAGE_BACKFILL_KEY);
+      if (!raw) return { failedResources: [], failedQuestions: [] };
+      const p = JSON.parse(raw);
+      return {
+        failedResources: Array.isArray(p.failedResources) ? p.failedResources : [],
+        failedQuestions: Array.isArray(p.failedQuestions) ? p.failedQuestions : [],
+      };
+    } catch {
+      return { failedResources: [], failedQuestions: [] };
+    }
+  };
+
+  const saveBackfillCheckpoint = (failedResources: number[], failedQuestions: number[]) => {
+    try {
+      localStorage.setItem(
+        PAGE_BACKFILL_KEY,
+        JSON.stringify({ failedResources, failedQuestions }),
+      );
+    } catch {}
+  };
+
+  const resetPageBackfillCheckpoint = () => {
+    try { localStorage.removeItem(PAGE_BACKFILL_KEY); } catch {}
+    setPageBackfillStatus(null);
+    toast({ title: 'Backfill checkpoint cleared' });
+  };
+
+  const runPageCountBackfill = async (opts?: { skipPreviouslyFailed?: boolean }) => {
+    const skipPrev = opts?.skipPreviouslyFailed ?? true;
+    const checkpoint = loadBackfillCheckpoint();
+    const skipResIds = new Set<number>(skipPrev ? checkpoint.failedResources : []);
+    const skipQIds = new Set<number>(skipPrev ? checkpoint.failedQuestions : []);
+
+    setPageBackfillStatus({
+      running: true, done: 0, total: 0, label: 'Loading…',
+      success: 0, partial: 0, failed: 0,
+    });
+
+    try {
+      const { data: resRowsRaw } = await (supabase as any)
         .from('resources')
         .select('id, data')
         .is('page_count', null)
         .eq('deleted', false);
-      const { data: qRows } = await (supabase as any)
+      const { data: qRowsRaw } = await (supabase as any)
         .from('questions')
         .select('id, data')
         .is('page_count', null)
         .eq('deleted', false);
 
-      const total = (resRows?.length || 0) + (qRows?.length || 0);
-      let done = 0;
-      setPageBackfillStatus({ running: true, done, total, label: 'Resources' });
+      const resRows = (resRowsRaw || []).filter((r: any) => !skipResIds.has(r.id));
+      const qRows = (qRowsRaw || []).filter((q: any) => !skipQIds.has(q.id));
+      const total = resRows.length + qRows.length;
 
-      for (const r of resRows || []) {
+      let done = 0, success = 0, partial = 0, failed = 0;
+      const newFailedRes = new Set<number>(checkpoint.failedResources);
+      const newFailedQ = new Set<number>(checkpoint.failedQuestions);
+
+      const update = (label: string) => setPageBackfillStatus({
+        running: true, done, total, label, success, partial, failed,
+      });
+      update('Resources');
+
+      const processResource = async (r: { id: number; data: string[] | null }) => {
         try {
-          const count = await computePageCountFromUrls(r.data || []);
-          if (count !== null) {
-            await (supabase as any).from('resources').update({ page_count: count }).eq('id', r.id);
+          const result = await withTimeout(
+            computePageCountFromUrls(r.data || []),
+            PAGE_BACKFILL_ROW_TIMEOUT_MS,
+          );
+          if (result.complete) {
+            await (supabase as any).from('resources').update({ page_count: result.count }).eq('id', r.id);
+            success += 1;
+            newFailedRes.delete(r.id);
+          } else if (result.count > 0) {
+            // Write partial — better than NULL — and remember we tried.
+            await (supabase as any).from('resources').update({ page_count: result.count }).eq('id', r.id);
+            partial += 1;
+            newFailedRes.add(r.id);
+          } else {
+            failed += 1;
+            newFailedRes.add(r.id);
           }
         } catch (err) {
           console.warn('[backfill] resource', r.id, err);
+          failed += 1;
+          newFailedRes.add(r.id);
+        } finally {
+          done += 1;
+          update('Resources');
         }
-        done += 1;
-        setPageBackfillStatus({ running: true, done, total, label: 'Resources' });
-      }
+      };
 
-      for (const q of qRows || []) {
+      const processQuestion = async (q: { id: number; data: string }) => {
         try {
-          const count = await computePageCountFromText(q.data || '');
-          if (count !== null) {
-            await (supabase as any).from('questions').update({ page_count: count }).eq('id', q.id);
+          const result = await withTimeout(
+            computePageCountFromText(q.data || ''),
+            PAGE_BACKFILL_ROW_TIMEOUT_MS,
+          );
+          if (result.complete) {
+            await (supabase as any).from('questions').update({ page_count: result.count }).eq('id', q.id);
+            success += 1;
+            newFailedQ.delete(q.id);
+          } else if (result.count > 0) {
+            await (supabase as any).from('questions').update({ page_count: result.count }).eq('id', q.id);
+            partial += 1;
+            newFailedQ.add(q.id);
+          } else {
+            failed += 1;
+            newFailedQ.add(q.id);
           }
         } catch (err) {
           console.warn('[backfill] question', q.id, err);
+          failed += 1;
+          newFailedQ.add(q.id);
+        } finally {
+          done += 1;
+          update('Questions');
         }
-        done += 1;
-        setPageBackfillStatus({ running: true, done, total, label: 'Questions' });
-      }
+      };
 
-      setPageBackfillStatus({ running: false, done, total, label: 'Done' });
+      // Pool runner: launches up to N tasks at once.
+      const runPool = async <T,>(items: T[], worker: (item: T) => Promise<void>) => {
+        let i = 0;
+        const launch = async (): Promise<void> => {
+          while (i < items.length) {
+            const idx = i++;
+            await worker(items[idx]);
+          }
+        };
+        await Promise.all(
+          Array.from({ length: Math.min(PAGE_BACKFILL_CONCURRENCY, items.length) }, launch),
+        );
+      };
+
+      await runPool(resRows, processResource);
+      await runPool(qRows, processQuestion);
+
+      saveBackfillCheckpoint(Array.from(newFailedRes), Array.from(newFailedQ));
+      setPageBackfillStatus({
+        running: false, done, total, label: 'Done',
+        success, partial, failed,
+      });
     } catch (err) {
-      console.error('[backfill] failed', err);
-      setPageBackfillStatus(null);
+      console.error('[backfill] fatal', err);
+      setPageBackfillStatus((s) => s ? { ...s, running: false, label: 'Error' } : null);
     }
   };
 
