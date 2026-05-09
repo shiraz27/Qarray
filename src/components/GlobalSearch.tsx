@@ -69,7 +69,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
   const [userClassId, setUserClassId] = useState<number | null>(null);
   const [classes, setClasses] = useState<Array<{ id: number; name: string }>>([]);
-  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const navigate = useNavigate();
 
   // Effective class ID - explicit "all" means search everywhere; an explicit class id
@@ -125,10 +125,6 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose, publi
 
     if (profile) {
       setUserClassId(profile.class_id);
-      // Pre-select user's class in dropdown if not already selected
-      if (!selectedClassId && profile.class_id) {
-        setSelectedClassId(profile.class_id.toString());
-      }
     }
   };
 
