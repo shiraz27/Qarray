@@ -28,7 +28,7 @@ export interface ArchiveUploadHandle {
 
 const MULTIPART_THRESHOLD = 16 * 1024 * 1024; // 16 MB
 const PART_SIZE = 8 * 1024 * 1024; // 8 MB
-const CONCURRENCY = 4;
+const CONCURRENCY = 2;
 const MAX_PART_RETRIES = 3;
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -92,7 +92,14 @@ function putPartXhr(
       } else {
         const err: any = new Error(`Part upload failed: ${xhr.status} ${xhr.statusText}`);
         err.status = xhr.status;
-        err.retryable = xhr.status >= 500 || xhr.status === 429;
+        // Archive.org occasionally returns 401/403 transiently right after
+        // `initiate` (signature/propagation race). Treat those as retryable
+        // so we re-sign and/or fall back to the proxied upload-part path.
+        err.retryable =
+          xhr.status >= 500 ||
+          xhr.status === 429 ||
+          xhr.status === 401 ||
+          xhr.status === 403;
         reject(err);
       }
     };
@@ -188,29 +195,49 @@ async function multipartUpload(
       if (!part) return;
 
       let attempt = 0;
+      let authFailures = 0;
       while (true) {
         if (state.cancelled) return;
         await waitIfPaused();
         if (state.cancelled) return;
         try {
-          // Sign this part (cheap JSON call)
-          const signed = await invokeFn<{ url: string }>({
-            action: 'sign-part',
-            key,
-            uploadId,
-            partNumber: part.partNumber,
-          });
           const blob = file.slice(part.start, part.end);
           bytesByPart.set(part.partNumber, 0);
-          const etag = await putPartXhr(
-            signed.url,
-            blob,
-            (loaded) => {
-              bytesByPart.set(part.partNumber, loaded);
-              emitProgress();
-            },
-            state.currentSignal.signal,
-          );
+
+          let etag: string;
+          if (authFailures >= 2) {
+            // Fallback: proxy the part through the edge function, which uses
+            // the LOW <key>:<secret> auth header that single-shot uploads use.
+            // Progress is coarse (one update on completion) for fallback parts.
+            const fd = new FormData();
+            fd.append('action', 'upload-part');
+            fd.append('key', key);
+            fd.append('uploadId', uploadId);
+            fd.append('partNumber', String(part.partNumber));
+            fd.append('chunk', blob, `part-${part.partNumber}`);
+            const resp = await invokeFn<{ partNumber: number; etag: string }>(fd);
+            etag = resp.etag;
+            bytesByPart.set(part.partNumber, part.end - part.start);
+            emitProgress();
+          } else {
+            // Re-sign on every attempt so a stale/invalid signature can't
+            // poison subsequent retries.
+            const signed = await invokeFn<{ url: string }>({
+              action: 'sign-part',
+              key,
+              uploadId,
+              partNumber: part.partNumber,
+            });
+            etag = await putPartXhr(
+              signed.url,
+              blob,
+              (loaded) => {
+                bytesByPart.set(part.partNumber, loaded);
+                emitProgress();
+              },
+              state.currentSignal.signal,
+            );
+          }
           completedParts.set(part.partNumber, etag);
           bytesByPart.set(part.partNumber, part.end - part.start);
           emitProgress();
@@ -222,6 +249,9 @@ async function multipartUpload(
             if (state.cancelled) return;
             // paused: loop and wait
             continue;
+          }
+          if (err?.status === 401 || err?.status === 403) {
+            authFailures++;
           }
           attempt++;
           if (attempt > MAX_PART_RETRIES) {
