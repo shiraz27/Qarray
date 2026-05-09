@@ -2311,6 +2311,17 @@ export default function Statistics() {
                                           <TableCell>
                                             <div className="max-w-[400px] truncate">{question.data.substring(0, 100)}</div>
                                           </TableCell>
+                                          <TableCell>{renderArrayChips(question.teacher_names)}</TableCell>
+                                          <TableCell>{renderArrayChips(question.school_names)}</TableCell>
+                                          <TableCell>{renderArrayChips(question.books)}</TableCell>
+                                          <TableCell>{renderTypeChips(question.type_ids)}</TableCell>
+                                          <TableCell>
+                                            {question.page_count != null ? (
+                                              <span className="text-xs font-medium">{question.page_count}</span>
+                                            ) : (
+                                              <span className="text-xs text-muted-foreground">—</span>
+                                            )}
+                                          </TableCell>
                                           <TableCell>
                                             {question.chapters?.name || 'N/A'}
                                           </TableCell>
