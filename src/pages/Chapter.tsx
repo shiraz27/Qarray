@@ -972,6 +972,7 @@ export default function Chapter() {
                           <span>PDF</span>
                         </div>
                       )}
+                      <PageCountBadge pageCount={question.page_count} />
                     </div>
                   )}
                   
