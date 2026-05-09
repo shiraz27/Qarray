@@ -1165,6 +1165,35 @@ export default function Statistics() {
               </Card>
             </div>
 
+            {/* Page Count Backfill */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Page Count Backfill</CardTitle>
+                <CardDescription>
+                  Compute and store total page count (PDF pages + 1 per image) for items missing this value.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button
+                  onClick={runPageCountBackfill}
+                  disabled={pageBackfillStatus?.running}
+                  variant="default"
+                >
+                  {pageBackfillStatus?.running
+                    ? `Processing ${pageBackfillStatus.label} ${pageBackfillStatus.done}/${pageBackfillStatus.total}…`
+                    : 'Run page count backfill'}
+                </Button>
+                {pageBackfillStatus && !pageBackfillStatus.running && pageBackfillStatus.total > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Done. Processed {pageBackfillStatus.done} item(s).
+                  </p>
+                )}
+                {pageBackfillStatus && pageBackfillStatus.total === 0 && !pageBackfillStatus.running && (
+                  <p className="text-sm text-muted-foreground">No items needed backfilling.</p>
+                )}
+              </CardContent>
+            </Card>
+
             {/* OCR Processing Stats - Tabbed View */}
             <Card>
               <CardHeader>
