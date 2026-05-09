@@ -6,8 +6,8 @@ import { AudioPlayerModal } from '@/components/AudioPlayerModal';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { fetchPdfViaProxy, triggerBlobDownload } from '@/utils/pdfMediaFetch';
 
 interface MediaPreviewProps {
   url: string;
@@ -101,29 +101,15 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
       if (downloading) return;
       setDownloading(true);
       try {
-        const { data, error } = await supabase.functions.invoke('fetch-media', { body: { url } });
-        if (error) throw error;
-        let blob: Blob;
-        if (data instanceof Blob) {
-          if (data.type.includes('application/json')) {
-            const text = await data.text();
-            const parsed = JSON.parse(text);
-            throw new Error(parsed?.error || 'File unavailable');
-          }
-          blob = data;
-        } else if (data instanceof ArrayBuffer) {
-          blob = new Blob([data], { type: 'application/pdf' });
-        } else {
-          throw new Error('Unexpected response');
+        const result = await fetchPdfViaProxy(url);
+        if (result.kind !== 'ok') {
+          throw new Error(
+            result.kind === 'unavailable'
+              ? 'File still processing — try again in a moment.'
+              : result.message
+          );
         }
-        const objectUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = objectUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+        triggerBlobDownload(result.blob, filename);
       } catch (err) {
         toast({
           title: 'Download failed',
@@ -162,9 +148,10 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
                 href={encodedUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                referrerPolicy="no-referrer"
               >
                 <ExternalLink className="h-4 w-4" />
-                <span className="hidden sm:inline">Open</span>
+                <span className="hidden sm:inline">Open original</span>
               </a>
             </Button>
           </div>
@@ -172,7 +159,8 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
         <div className="mt-3 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
           <p className="leading-snug">
-            If you have an ad blocker enabled, the "Open" link may not work. Disable it for this site or use the Download button.
+            "Open original" goes directly to Archive.org and may be blocked by Chrome or an ad blocker.
+            Use <strong>Download</strong> — it always works through our server.
           </p>
         </div>
       </Card>
