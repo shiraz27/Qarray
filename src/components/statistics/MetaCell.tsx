@@ -38,12 +38,6 @@ function stringToArray(s: string): string[] {
     .filter((p) => p.length > 0);
 }
 
-function stringToNumberArray(s: string): number[] {
-  return stringToArray(s)
-    .map((p) => parseInt(p, 10))
-    .filter((n) => !Number.isNaN(n));
-}
-
 function ChipsDisplay({ items }: { items: string[] }) {
   if (!items.length) return <span className="text-xs text-muted-foreground">—</span>;
   return (
