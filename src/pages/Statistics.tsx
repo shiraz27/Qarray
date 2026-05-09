@@ -2307,6 +2307,52 @@ export default function Statistics() {
                                             {question.chapters?.name || 'N/A'}
                                           </TableCell>
                                           <TableCell>
+                                            <MetaCell
+                                              variant="array"
+                                              value={question.teacher_names ?? []}
+                                              canSuggest={!!question.ocr_text}
+                                              onSuggest={() => suggestCellValue('question', { id: question.id, ocr_text: question.ocr_text ?? null }, 'teachers')}
+                                              onSave={(v) => saveQuestionCell(question, 'teachers', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="array"
+                                              value={question.school_names ?? []}
+                                              canSuggest={!!question.ocr_text}
+                                              onSuggest={() => suggestCellValue('question', { id: question.id, ocr_text: question.ocr_text ?? null }, 'schools')}
+                                              onSave={(v) => saveQuestionCell(question, 'schools', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="array"
+                                              value={question.books ?? []}
+                                              canSuggest={!!question.ocr_text}
+                                              onSuggest={() => suggestCellValue('question', { id: question.id, ocr_text: question.ocr_text ?? null }, 'books')}
+                                              onSave={(v) => saveQuestionCell(question, 'books', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="typeIds"
+                                              value={question.type_ids ?? []}
+                                              resourceTypes={resourceTypes}
+                                              canSuggest={!!question.ocr_text}
+                                              onSuggest={() => suggestCellValue('question', { id: question.id, ocr_text: question.ocr_text ?? null }, 'types')}
+                                              onSave={(v) => saveQuestionCell(question, 'types', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="number"
+                                              value={question.page_count ?? null}
+                                              canSuggest={false}
+                                              onSuggest={() => suggestCellValue('question', { id: question.id, ocr_text: question.ocr_text ?? null }, 'pages')}
+                                              onSave={(v) => saveQuestionCell(question, 'pages', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
                                             <div className="space-y-1">
                                               {getOcrStatusBadge(question.ocr_status)}
                                               <div className="text-[10px] font-mono text-muted-foreground">
