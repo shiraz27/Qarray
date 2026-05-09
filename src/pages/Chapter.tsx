@@ -27,6 +27,7 @@ interface ChapterData {
   questionCount: number;
   answerCount: number;
   resourceCount: number;
+  totalPages: number;
   isBookmarked: boolean;
 }
 
@@ -42,6 +43,7 @@ interface Question {
   contributors: string[];
   isBookmarked?: boolean;
   book?: string | null;
+  page_count?: number | null;
 }
 
 interface Resource {
@@ -252,6 +254,7 @@ export default function Chapter() {
           questionCount: questionCount || 0,
           answerCount: answerCount || 0,
           resourceCount: resourceCount || 0,
+          totalPages,
           isBookmarked,
         });
 
