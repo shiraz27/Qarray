@@ -1082,35 +1082,52 @@ export default function Statistics() {
     }
   };
 
-  const aiBatchMenuItems = (kind: 'resource' | 'question', getIds: () => number[]) => (
-    <>
-      <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds())}>
-        <Sparkles className="mr-2 h-4 w-4" /> All fields
-      </DropdownMenuItem>
-      {kind === 'resource' && (
-        <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds(), ['title'])}>
-          <FileEdit className="mr-2 h-4 w-4" /> Title
-        </DropdownMenuItem>
-      )}
-      {kind === 'resource' && (
-        <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds(), ['description'])}>
-          <FileText className="mr-2 h-4 w-4" /> Description
-        </DropdownMenuItem>
-      )}
-      <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds(), ['teachers'])}>
-        <Sparkles className="mr-2 h-4 w-4" /> Teachers
-      </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds(), ['schools'])}>
-        <Sparkles className="mr-2 h-4 w-4" /> Schools
-      </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds(), ['books'])}>
-        <Sparkles className="mr-2 h-4 w-4" /> Books
-      </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds(), ['types'])}>
-        <Sparkles className="mr-2 h-4 w-4" /> Types
-      </DropdownMenuItem>
-    </>
-  );
+  const aiBatchChips = (kind: 'resource' | 'question', getIds: () => number[]) => {
+    const fieldsList: Array<{ key: MetadataField; label: string }> =
+      kind === 'resource'
+        ? [
+            { key: 'title', label: 'Title' },
+            { key: 'description', label: 'Description' },
+            { key: 'teachers', label: 'Teachers' },
+            { key: 'schools', label: 'Schools' },
+            { key: 'books', label: 'Books' },
+            { key: 'types', label: 'Types' },
+          ]
+        : [
+            { key: 'teachers', label: 'Teachers' },
+            { key: 'schools', label: 'Schools' },
+            { key: 'books', label: 'Books' },
+            { key: 'types', label: 'Types' },
+          ];
+    return (
+      <div className="flex flex-wrap items-center gap-1">
+        <Button
+          size="sm"
+          variant="default"
+          disabled={isExtractingBatch}
+          onClick={() => runAiMetadataBatch(kind, getIds())}
+        >
+          {isExtractingBatch ? (
+            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkles className="mr-1 h-4 w-4" />
+          )}
+          AI: All
+        </Button>
+        {fieldsList.map(({ key, label }) => (
+          <Button
+            key={key}
+            size="sm"
+            variant="outline"
+            disabled={isExtractingBatch}
+            onClick={() => runAiMetadataBatch(kind, getIds(), [key])}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+    );
+  };
 
   const getOcrStatusBadge = (status: string | null) => {
     switch (status) {
@@ -1591,24 +1608,12 @@ export default function Statistics() {
                             </div>
                           </div>
                           {selectedResourceIds.size > 0 && (
-                            <div className="flex items-center justify-between gap-2 mb-3 p-2 rounded-md bg-muted/40 border">
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 p-2 rounded-md bg-muted/40 border">
                               <span className="text-sm font-medium">
                                 {selectedResourceIds.size} selected
                               </span>
-                              <div className="flex items-center gap-2">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button size="sm" variant="outline" disabled={isExtractingBatch}>
-                                      {isExtractingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                      <Sparkles className="mr-2 h-4 w-4" />
-                                      AI fill
-                                      <ChevronDown className="ml-1 h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    {aiBatchMenuItems('resource', () => Array.from(selectedResourceIds))}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                              <div className="flex flex-wrap items-center gap-2">
+                                {aiBatchChips('resource', () => Array.from(selectedResourceIds))}
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button size="sm" disabled={isProcessingBatch}>
@@ -2041,24 +2046,12 @@ export default function Statistics() {
                             </div>
                           </div>
                           {selectedQuestionIds.size > 0 && (
-                            <div className="flex items-center justify-between gap-2 mb-3 p-2 rounded-md bg-muted/40 border">
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 p-2 rounded-md bg-muted/40 border">
                               <span className="text-sm font-medium">
                                 {selectedQuestionIds.size} selected
                               </span>
-                              <div className="flex items-center gap-2">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button size="sm" variant="outline" disabled={isExtractingBatch}>
-                                      {isExtractingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                      <Sparkles className="mr-2 h-4 w-4" />
-                                      AI fill
-                                      <ChevronDown className="ml-1 h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    {aiBatchMenuItems('question', () => Array.from(selectedQuestionIds))}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                              <div className="flex flex-wrap items-center gap-2">
+                                {aiBatchChips('question', () => Array.from(selectedQuestionIds))}
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button size="sm" disabled={isProcessingQuestionBatch}>
