@@ -18,6 +18,7 @@ import { ChapterSkeleton } from '@/components/LoadingSkeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { MemorizationsList } from '@/components/MemorizationsList';
 import { ManageChapterDialog } from '@/components/ManageChapterDialog';
+import { PageCountBadge } from '@/components/PageCountBadge';
 import { useUserRole } from '@/hooks/useUserRole';
 
 interface Chapter {
@@ -26,6 +27,7 @@ interface Chapter {
   questionCount: number;
   answerCount: number;
   resourceCount: number;
+  pageCount: number;
   isBookmarked: boolean;
 }
 
@@ -37,6 +39,7 @@ interface CommonChapter {
   questionCount: number;
   answerCount: number;
   resourceCount: number;
+  pageCount: number;
 }
 
 const BAC_CLASS_IDS = new Set([15, 16, 17, 18, 19, 20, 21]);
@@ -135,12 +138,30 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
               .eq('chapter_id', chapter.id)
               .eq('deleted', false);
 
+            // Sum page_count from resources + questions
+            const [{ data: resPages }, { data: qPages }] = await Promise.all([
+              supabase
+                .from('resources')
+                .select('page_count')
+                .eq('chapter_id', chapter.id)
+                .eq('deleted', false),
+              supabase
+                .from('questions')
+                .select('page_count')
+                .eq('chapter_id', chapter.id)
+                .eq('deleted', false),
+            ]);
+            const pageCount =
+              (resPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0) +
+              (qPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0);
+
             return {
               id: chapter.id,
               name: chapter.name,
               questionCount: questionCount || 0,
               answerCount: answerCount || 0,
               resourceCount: resourceCount || 0,
+              pageCount,
               isBookmarked: bookmarkedChapterIds.includes(chapter.id),
             };
           })
@@ -207,6 +228,21 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
                   .select('*', { count: 'exact', head: true })
                   .eq('chapter_id', ch.id)
                   .eq('deleted', false);
+                const [{ data: resPages }, { data: qPages }] = await Promise.all([
+                  supabase
+                    .from('resources')
+                    .select('page_count')
+                    .eq('chapter_id', ch.id)
+                    .eq('deleted', false),
+                  supabase
+                    .from('questions')
+                    .select('page_count')
+                    .eq('chapter_id', ch.id)
+                    .eq('deleted', false),
+                ]);
+                const pageCount =
+                  (resPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0) +
+                  (qPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0);
                 return {
                   id: ch.id,
                   name: ch.name,
@@ -215,6 +251,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
                   questionCount: questionCount || 0,
                   answerCount: answerCount || 0,
                   resourceCount: resourceCount || 0,
+                  pageCount,
                 };
               })
             );
@@ -345,12 +382,29 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
               .eq('chapter_id', chapter.id)
               .eq('deleted', false);
 
+            const [{ data: resPages }, { data: qPages }] = await Promise.all([
+              supabase
+                .from('resources')
+                .select('page_count')
+                .eq('chapter_id', chapter.id)
+                .eq('deleted', false),
+              supabase
+                .from('questions')
+                .select('page_count')
+                .eq('chapter_id', chapter.id)
+                .eq('deleted', false),
+            ]);
+            const pageCount =
+              (resPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0) +
+              (qPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0);
+
             return {
               id: chapter.id,
               name: chapter.name,
               questionCount: questionCount || 0,
               answerCount: answerCount || 0,
               resourceCount: resourceCount || 0,
+              pageCount,
               isBookmarked: bookmarkedChapterIds.includes(chapter.id),
             };
           })
@@ -509,6 +563,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
                       {chapter.resourceCount} {t('resources') || 'Resources'}
                     </span>
                   </div>
+                  <PageCountBadge pageCount={chapter.pageCount} />
                 </div>
               </div>
             </Card>
@@ -666,6 +721,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
                               {ch.resourceCount} {t('resources') || 'Resources'}
                             </span>
                           </div>
+                          <PageCountBadge pageCount={ch.pageCount} />
                         </div>
                       </div>
                     </Card>
