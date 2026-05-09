@@ -179,7 +179,7 @@ export default function Statistics() {
   const resetPageBackfillCheckpoint = () => {
     try { localStorage.removeItem(PAGE_BACKFILL_KEY); } catch {}
     setPageBackfillStatus(null);
-    toast({ title: 'Backfill checkpoint cleared' });
+    toast.success('Backfill checkpoint cleared');
   };
 
   const runPageCountBackfill = async (opts?: { skipPreviouslyFailed?: boolean }) => {
