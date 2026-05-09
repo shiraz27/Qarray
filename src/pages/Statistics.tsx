@@ -2046,24 +2046,12 @@ export default function Statistics() {
                             </div>
                           </div>
                           {selectedQuestionIds.size > 0 && (
-                            <div className="flex items-center justify-between gap-2 mb-3 p-2 rounded-md bg-muted/40 border">
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 p-2 rounded-md bg-muted/40 border">
                               <span className="text-sm font-medium">
                                 {selectedQuestionIds.size} selected
                               </span>
-                              <div className="flex items-center gap-2">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button size="sm" variant="outline" disabled={isExtractingBatch}>
-                                      {isExtractingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                      <Sparkles className="mr-2 h-4 w-4" />
-                                      AI fill
-                                      <ChevronDown className="ml-1 h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    {aiBatchMenuItems('question', () => Array.from(selectedQuestionIds))}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                              <div className="flex flex-wrap items-center gap-2">
+                                {aiBatchChips('question', () => Array.from(selectedQuestionIds))}
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button size="sm" disabled={isProcessingQuestionBatch}>
