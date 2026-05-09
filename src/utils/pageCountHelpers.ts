@@ -4,6 +4,8 @@ import { isPdfUrl, isImageUrl } from '@/utils/mediaTypeUtils';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
+export type PageCountResult = { count: number; complete: boolean };
+
 async function fetchViaProxy(url: string): Promise<Blob> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -36,17 +38,29 @@ export async function countPdfPages(blob: Blob): Promise<number> {
   }
 }
 
+/** Race a promise against a timeout. Rejects with `timeout` if exceeded. */
+export function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('timeout')), ms);
+    p.then(
+      (v) => { clearTimeout(t); resolve(v); },
+      (e) => { clearTimeout(t); reject(e); },
+    );
+  });
+}
+
 /**
  * Compute total page count for a list of media URLs.
  * - Each PDF URL contributes its actual `numPages`
  * - Each image URL contributes 1
  * - Other types are ignored
- * Returns null if computation fails entirely (so callers can leave the column NULL).
+ * Returns `{ count, complete }`. `complete=false` means at least one PDF
+ * fetch/parse failed; callers can decide to write a partial count or skip.
  */
-export async function computePageCountFromUrls(urls: string[]): Promise<number | null> {
-  if (!urls?.length) return 0;
+export async function computePageCountFromUrls(urls: string[]): Promise<PageCountResult> {
+  if (!urls?.length) return { count: 0, complete: true };
   let total = 0;
-  let anyPdfFailed = false;
+  let complete = true;
 
   for (const url of urls) {
     if (!url) continue;
@@ -55,45 +69,42 @@ export async function computePageCountFromUrls(urls: string[]): Promise<number |
         const blob = await fetchViaProxy(url);
         const n = await countPdfPages(blob);
         if (n > 0) total += n;
-        else anyPdfFailed = true;
+        else complete = false;
       } catch {
-        anyPdfFailed = true;
+        complete = false;
       }
     } else if (isImageUrl(url)) {
       total += 1;
     }
   }
 
-  // If a PDF couldn't be parsed, don't lie — return null so admin backfill can retry later.
-  if (anyPdfFailed && total === 0) return null;
-  return total;
+  return { count: total, complete };
 }
 
 /**
  * Compute page count from a list of locally-selected files (pre-upload).
  * PDFs are read directly (no network); images count as 1.
  */
-export async function computePageCountFromFiles(files: File[]): Promise<number | null> {
-  if (!files?.length) return 0;
+export async function computePageCountFromFiles(files: File[]): Promise<PageCountResult> {
+  if (!files?.length) return { count: 0, complete: true };
   let total = 0;
-  let anyPdfFailed = false;
+  let complete = true;
   for (const file of files) {
     const mime = (file.type || '').toLowerCase();
     if (mime === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
       const n = await countPdfPages(file);
       if (n > 0) total += n;
-      else anyPdfFailed = true;
+      else complete = false;
     } else if (mime.startsWith('image/')) {
       total += 1;
     }
   }
-  if (anyPdfFailed && total === 0) return null;
-  return total;
+  return { count: total, complete };
 }
 
 /** Extract URLs from a question's `data` text and compute page count. */
-export async function computePageCountFromText(text: string): Promise<number | null> {
-  if (!text) return 0;
+export async function computePageCountFromText(text: string): Promise<PageCountResult> {
+  if (!text) return { count: 0, complete: true };
   const urls = text.match(/(https?:\/\/[^\s\n")]+)/g) || [];
   return computePageCountFromUrls(urls);
 }
