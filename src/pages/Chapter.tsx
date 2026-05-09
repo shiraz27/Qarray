@@ -17,6 +17,7 @@ import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { AddResourceForm } from '@/components/AddResourceForm';
 import { UserAvatar } from '@/components/UserAvatar';
 import { BookBadge } from '@/components/BookBadge';
+import { PageCountBadge } from '@/components/PageCountBadge';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { SEO, createCourseSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
