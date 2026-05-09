@@ -382,12 +382,29 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
               .eq('chapter_id', chapter.id)
               .eq('deleted', false);
 
+            const [{ data: resPages }, { data: qPages }] = await Promise.all([
+              supabase
+                .from('resources')
+                .select('page_count')
+                .eq('chapter_id', chapter.id)
+                .eq('deleted', false),
+              supabase
+                .from('questions')
+                .select('page_count')
+                .eq('chapter_id', chapter.id)
+                .eq('deleted', false),
+            ]);
+            const pageCount =
+              (resPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0) +
+              (qPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0);
+
             return {
               id: chapter.id,
               name: chapter.name,
               questionCount: questionCount || 0,
               answerCount: answerCount || 0,
               resourceCount: resourceCount || 0,
+              pageCount,
               isBookmarked: bookmarkedChapterIds.includes(chapter.id),
             };
           })
