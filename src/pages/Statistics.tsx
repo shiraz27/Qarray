@@ -74,6 +74,11 @@ interface ResourceRow {
   resource_types?: { type: string };
   school_name?: string | null;
   teacher_name?: string | null;
+  teacher_names?: string[] | null;
+  school_names?: string[] | null;
+  books?: string[] | null;
+  type_ids?: number[] | null;
+  page_count?: number | null;
   suggested_title?: string | null;
 }
 
@@ -90,6 +95,12 @@ interface QuestionRow {
   ocr_text?: string | null;
   chapter_id: number | null;
   chapters?: { name: string };
+  book?: string | null;
+  teacher_names?: string[] | null;
+  school_names?: string[] | null;
+  books?: string[] | null;
+  type_ids?: number[] | null;
+  page_count?: number | null;
 }
 
 interface QuestionOcrStats {
@@ -126,6 +137,7 @@ export default function Statistics() {
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [chapters, setChapters] = useState<any[]>([]);
+  const [resourceTypes, setResourceTypes] = useState<{ id: number; type: string }[]>([]);
   const [extractingMetadataId, setExtractingMetadataId] = useState<number | null>(null);
   const [isExtractingBatch, setIsExtractingBatch] = useState(false);
   const [pageBackfillStatus, setPageBackfillStatus] = useState<{
