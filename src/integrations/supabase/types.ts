@@ -578,6 +578,7 @@ export type Database = {
       questions: {
         Row: {
           book: string | null
+          books: string[]
           chapter_id: number | null
           contributors: string[] | null
           created_at: string | null
@@ -589,6 +590,8 @@ export type Database = {
           ocr_text: string | null
           page_count: number | null
           resource_id: number | null
+          school_names: string[]
+          teacher_names: string[]
           type_id: number | null
           type_ids: number[] | null
           updated_at: string | null
@@ -596,6 +599,7 @@ export type Database = {
         }
         Insert: {
           book?: string | null
+          books?: string[]
           chapter_id?: number | null
           contributors?: string[] | null
           created_at?: string | null
@@ -607,6 +611,8 @@ export type Database = {
           ocr_text?: string | null
           page_count?: number | null
           resource_id?: number | null
+          school_names?: string[]
+          teacher_names?: string[]
           type_id?: number | null
           type_ids?: number[] | null
           updated_at?: string | null
@@ -614,6 +620,7 @@ export type Database = {
         }
         Update: {
           book?: string | null
+          books?: string[]
           chapter_id?: number | null
           contributors?: string[] | null
           created_at?: string | null
@@ -625,6 +632,8 @@ export type Database = {
           ocr_text?: string | null
           page_count?: number | null
           resource_id?: number | null
+          school_names?: string[]
+          teacher_names?: string[]
           type_id?: number | null
           type_ids?: number[] | null
           updated_at?: string | null
@@ -672,6 +681,7 @@ export type Database = {
       resources: {
         Row: {
           book: string | null
+          books: string[]
           chapter_id: number | null
           contributors: string[] | null
           created_at: string | null
@@ -687,8 +697,10 @@ export type Database = {
           page_count: number | null
           published_by: string | null
           school_name: string | null
+          school_names: string[]
           subject_id: number | null
           teacher_name: string | null
+          teacher_names: string[]
           title: string
           type_id: number | null
           type_ids: number[] | null
@@ -698,6 +710,7 @@ export type Database = {
         }
         Insert: {
           book?: string | null
+          books?: string[]
           chapter_id?: number | null
           contributors?: string[] | null
           created_at?: string | null
@@ -713,8 +726,10 @@ export type Database = {
           page_count?: number | null
           published_by?: string | null
           school_name?: string | null
+          school_names?: string[]
           subject_id?: number | null
           teacher_name?: string | null
+          teacher_names?: string[]
           title: string
           type_id?: number | null
           type_ids?: number[] | null
@@ -724,6 +739,7 @@ export type Database = {
         }
         Update: {
           book?: string | null
+          books?: string[]
           chapter_id?: number | null
           contributors?: string[] | null
           created_at?: string | null
@@ -739,8 +755,10 @@ export type Database = {
           page_count?: number | null
           published_by?: string | null
           school_name?: string | null
+          school_names?: string[]
           subject_id?: number | null
           teacher_name?: string | null
+          teacher_names?: string[]
           title?: string
           type_id?: number | null
           type_ids?: number[] | null

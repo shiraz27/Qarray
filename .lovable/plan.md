@@ -1,51 +1,126 @@
-## Diagnosis
+## Goal
 
-**Per-chapter Pages tile is hidden, not missing.** The aggregation in `Chapter.tsx` (lines 224-238) correctly SUMs `resources.page_count + questions.page_count`, and the tile renders when `totalPages > 0` (line 811). But the database currently has **37 of 60 non-deleted resources with `page_count IS NULL`** (and 0/0 questions filled), so chapters whose resources are all-NULL show no tile. The real fix is making the backfill actually finish.
+In the admin Statistics page, allow selecting rows (resources or questions) and using AI to batch-fill metadata: title, description, teachers, schools, books, type, devoir type. Support multiple teachers/schools/books per item via array columns.
 
-**Backfill issues in `Statistics.tsx` `runPageCountBackfill`:**
-1. **No per-row timeout** — a single slow PDF fetch (Archive.org has been timing out at 30s × 3 retries = up to ~90s per attempt) blocks the whole loop. With 37 rows, the user sees the UI "stuck."
-2. **Failed PDFs stay NULL forever** — `computePageCountFromUrls` returns `null` if any PDF fails, so the row is skipped *and* re-fetched on every subsequent run, never making progress. There's no way to mark a row as "tried, give up."
-3. **Not resumable across reloads** — progress is in component state only; closing the tab restarts from scratch (but at least re-queries NULL rows).
-4. **Sequential** — one row at a time, no concurrency. With ~30s per slow PDF that's hours.
-5. **Outer `catch` resets status to `null`** — one unhandled throw kills the run silently.
+## 1. Schema migration
 
-## Plan
+Add array columns and backfill from existing scalars.
 
-### 1. Backfill rewrite (`src/pages/Statistics.tsx` + `src/utils/pageCountHelpers.ts`)
+```sql
+-- resources
+ALTER TABLE resources
+  ADD COLUMN teacher_names text[] NOT NULL DEFAULT '{}',
+  ADD COLUMN school_names  text[] NOT NULL DEFAULT '{}',
+  ADD COLUMN books         text[] NOT NULL DEFAULT '{}';
 
-- **Per-row timeout wrapper**: race `computePageCountFromUrls` against a 45s `Promise.race` timeout. On timeout, treat as failure for that row.
-- **Partial-success accounting in `computePageCountFromUrls`**: return an object `{ count: number; complete: boolean }` instead of `number | null`. `complete: false` means at least one PDF failed but we still got a partial count from images/other PDFs.
-  - If `complete === true`: write `page_count = count` (final).
-  - If `complete === false` AND `count > 0`: write the partial count (better than NULL, user sees something) and mark the row as attempted via a small in-memory `failedIds` set so this run skips re-trying it.
-  - If `count === 0` AND not complete: leave NULL but add to `failedIds`; next run will retry (in case Archive.org recovers later).
-- **Concurrency**: process in parallel batches of 4 using `Promise.allSettled`. Update progress after each settled promise, not after each batch.
-- **Resumable progress**: persist `{ resourceCursor, questionCursor, failedIds }` to `localStorage` keyed `pageBackfill:v1`. On click, resume from cursor if present; add a "Reset" secondary button to clear it.
-- **Robust error boundary**: each row's work is wrapped in its own try/catch; the outer try only handles the initial fetch of NULL rows. Never reset status to `null` mid-run — surface errors in the UI as a counter (`X failed, Y succeeded, Z skipped`).
-- **UI**: show three counters (success / partial / failed) and a "Continue" button if the previous run was interrupted.
+UPDATE resources SET teacher_names = ARRAY[teacher_name] WHERE teacher_name IS NOT NULL AND teacher_name <> '';
+UPDATE resources SET school_names  = ARRAY[school_name]  WHERE school_name  IS NOT NULL AND school_name  <> '';
+UPDATE resources SET books         = ARRAY[book]         WHERE book         IS NOT NULL AND book         <> '';
 
-### 2. Helper update (`src/utils/pageCountHelpers.ts`)
+-- questions (currently only has `book`)
+ALTER TABLE questions
+  ADD COLUMN teacher_names text[] NOT NULL DEFAULT '{}',
+  ADD COLUMN school_names  text[] NOT NULL DEFAULT '{}',
+  ADD COLUMN books         text[] NOT NULL DEFAULT '{}';
 
-Change return type:
-```ts
-export type PageCountResult = { count: number; complete: boolean };
-export async function computePageCountFromUrls(urls: string[]): Promise<PageCountResult>
-export async function computePageCountFromText(text: string): Promise<PageCountResult>
+UPDATE questions SET books = ARRAY[book] WHERE book IS NOT NULL AND book <> '';
+
+CREATE INDEX idx_resources_teacher_names ON resources USING GIN (teacher_names);
+CREATE INDEX idx_resources_school_names  ON resources USING GIN (school_names);
+CREATE INDEX idx_resources_books         ON resources USING GIN (books);
+CREATE INDEX idx_questions_teacher_names ON questions USING GIN (teacher_names);
+CREATE INDEX idx_questions_school_names  ON questions USING GIN (school_names);
+CREATE INDEX idx_questions_books         ON questions USING GIN (books);
 ```
-Update the 8 form components and the 2 backfill call sites accordingly. Forms keep the previous behavior (use `result.count` if `complete` else `null` — same as today).
 
-### 3. Chapter tile visibility (`src/pages/Chapter.tsx`)
+Old scalar columns (`teacher_name`, `school_name`, `book`) are kept for backward compatibility and continue to mirror `arr[0]` on writes (handled in app code, not triggers, to keep things simple).
 
-Minor UX so users see *something* while backfill hasn't run:
-- Also count `resources.page_count IS NULL` rows; if `totalPages === 0` but `nullCount > 0`, show the tile with `—` and tooltip "Pending page-count computation". Otherwise hide as today.
-- If `totalPages > 0` and some are still NULL, show `totalPages+` (with a `+` suffix and tooltip "Some items still pending").
+## 2. Edge function — `extract-metadata`
 
-### Out of scope
-- Server-side backfill (PDF parsing isn't available in Postgres; would require a new edge function — bigger change, skip unless asked).
-- Changing per-card badges (already correct).
+Update the AI tool schema to return arrays instead of single strings:
+
+```ts
+{
+  suggested_title: string | null,
+  suggested_description: string | null,
+  suggested_type_id: number | null,
+  suggested_devoir_type_id: number | null,
+  teacher_names: string[],   // 0..N
+  school_names:  string[],   // 0..N
+  books:         string[],   // 0..N
+}
+```
+
+Prompt updated to instruct the model that a single document can list multiple teachers/schools/books and to return all distinct values it finds. Old `school_name`/`teacher_name` keys removed from the schema.
+
+## 3. `src/utils/metadataExtractor.ts`
+
+- `ExtractedMetadata` becomes:
+  ```ts
+  { suggested_title, suggested_description, suggested_type_id, suggested_devoir_type_id,
+    teacher_names: string[], school_names: string[], books: string[] }
+  ```
+- `extractAndUpdateResourceMetadata(id, ocrText, opts?)` gains an optional `fields` param to limit which DB columns get written:
+  ```ts
+  fields?: Array<'title'|'description'|'teachers'|'schools'|'books'|'types'>
+  ```
+  When omitted, all fields are written. Writes:
+  - `teacher_names` array, plus `teacher_name = arr[0] ?? null`
+  - `school_names`, `school_name = arr[0] ?? null`
+  - `books`, `book = arr[0] ?? null`
+  - `title` only if `fields` includes `'title'` (never overwritten in "all fields" unless explicitly requested — current behavior is suggest-only via `suggested_titles`; we keep that)
+  - `description` always merged via `mergeDescriptionWithAi` (existing behavior)
+  - `type_id` / `devoir_type_id` set only when `'types'` selected
+- New `extractAndUpdateQuestionMetadata(id, ocrText, opts?)` mirrors the same writes against `questions`.
+
+## 4. Statistics page UI (`src/pages/Statistics.tsx`)
+
+In the resource batch toolbar (visible when `selectedResourceIds.size > 0`), replace the single "Extract metadata" button with a split control:
+
+```
+[ AI fill all fields ▾ ]   [ Title ] [ Description ] [ Teachers ] [ Schools ] [ Books ] [ Types ]
+```
+
+- Primary button: runs all fields on selected rows.
+- Secondary chips: each runs `extractAndUpdateResourceMetadata` with `fields: [thatField]`.
+- Same toolbar added to the questions tab, calling `extractAndUpdateQuestionMetadata`.
+- Each batch:
+  - Iterates selected ids with concurrency 2 (avoid Lovable AI rate limit), 500ms delay between batches.
+  - Toast progress `[i/N] AI: <field(s)>`.
+  - Skips rows with no `ocr_text` / `ocr_status !== 'completed'` and reports `skipped` count.
+  - On finish: success/skipped/failed counters + `fetchResources` / `fetchQuestions` refresh.
+- Rows now show array values as small badge stacks (first 2 + "+N more") in a new "Metadata" column for quick verification.
+
+Existing single-row "Extract metadata" buttons keep working (call all-fields path).
+
+## 5. Resource/Question forms — minor read/write
+
+Forms still write single values today. To avoid scope creep we only:
+- On submit, when `teacher_name` / `school_name` / `book` are set, mirror them as 1-element arrays into the new columns.
+- Display reads stay scalar for now (cards/details continue to read `teacher_name` etc.). A follow-up task can switch the UI to multi-select; out of scope here.
+
+## 6. Search functions
+
+`search_resources_normalized` and `search_questions_normalized` are extended to also match against the array columns:
+
+```sql
+OR EXISTS (SELECT 1 FROM unnest(r.teacher_names) t WHERE unaccent(lower(t)) LIKE norm_query)
+OR EXISTS (SELECT 1 FROM unnest(r.school_names)  t WHERE unaccent(lower(t)) LIKE norm_query)
+OR EXISTS (SELECT 1 FROM unnest(r.books)         t WHERE unaccent(lower(t)) LIKE norm_query)
+```
+
+Same pattern in question search. Existing scalar matches stay (still works for legacy data).
 
 ## Files touched
 
-- `src/utils/pageCountHelpers.ts` — new return type, per-row timeout helper.
-- `src/pages/Statistics.tsx` — rewrite `runPageCountBackfill` with concurrency, resume, partial writes, richer UI.
-- `src/pages/Chapter.tsx` — show tile with `—` or `+` when partially filled.
-- `src/components/AddResourceForm.tsx`, `AddResourceFormWithSelection.tsx`, `AddResourceGlobalForm.tsx`, `EditResourceForm.tsx`, `AskQuestionForm.tsx`, `AskQuestionFormWithSelection.tsx`, `AskQuestionGlobalForm.tsx`, `EditQuestionForm.tsx` — adapt to new helper return shape (1-line change each: `result.complete ? result.count : null`).
+- new migration: arrays + backfill + GIN indexes + updated search functions
+- `supabase/functions/extract-metadata/index.ts` — array tool schema + prompt
+- `src/utils/metadataExtractor.ts` — types, per-field write, question variant
+- `src/pages/Statistics.tsx` — batch toolbar (resources + questions), per-field buttons, calls
+- `src/components/AddResourceForm.tsx`, `AddResourceFormWithSelection.tsx`, `AddResourceGlobalForm.tsx`, `EditResourceForm.tsx`, `AskQuestionForm.tsx`, `AskQuestionFormWithSelection.tsx`, `AskQuestionGlobalForm.tsx`, `EditQuestionForm.tsx` — write 1-element arrays alongside existing scalar fields on submit
+
+## Out of scope
+
+- Multi-select UI in the upload/edit forms (scalar stays for now; arrays still get populated as 1-element).
+- Card/detail page UI showing all teachers/schools/books — follow-up.
+- Removing legacy scalar columns — keep both until forms are migrated.
