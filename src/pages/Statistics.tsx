@@ -1022,6 +1022,96 @@ export default function Statistics() {
     }
   };
 
+  // Generic AI metadata batch runner for selected resources or questions.
+  // `fields` undefined = fill all fields.
+  const runAiMetadataBatch = async (
+    kind: 'resource' | 'question',
+    ids: number[],
+    fields?: MetadataField[]
+  ) => {
+    if (ids.length === 0) return;
+    const items = kind === 'resource'
+      ? resources.filter(r => ids.includes(r.id))
+      : questions.filter(q => ids.includes(q.id));
+    const eligible = items.filter((it: any) => it.ocr_status === 'completed' && it.ocr_text);
+    const skippedNoOcr = ids.length - eligible.length;
+    if (eligible.length === 0) {
+      toast.info('Selected items have no completed OCR yet — run OCR first');
+      return;
+    }
+    setIsExtractingBatch(true);
+    let success = 0, failed = 0;
+    const newSuggestedTitles: SuggestedTitleEntry[] = [];
+    const label = !fields ? 'all fields' : fields.join(', ');
+    try {
+      for (let i = 0; i < eligible.length; i++) {
+        const it: any = eligible[i];
+        toast.loading(`[${i + 1}/${eligible.length}] AI: ${label}…`, { id: 'ai-batch' });
+        try {
+          const result = kind === 'resource'
+            ? await extractAndUpdateResourceMetadata(it.id, it.ocr_text, undefined, fields)
+            : await extractAndUpdateQuestionMetadata(it.id, it.ocr_text, undefined, fields);
+          if (result.success) {
+            success++;
+            if (kind === 'resource' && result.metadata.suggested_title && (!fields || fields.includes('title'))) {
+              newSuggestedTitles.push({ resourceId: it.id, suggestedTitle: result.metadata.suggested_title });
+            }
+          } else {
+            failed++;
+          }
+        } catch {
+          failed++;
+        }
+        await new Promise(r => setTimeout(r, 400));
+      }
+      toast.dismiss('ai-batch');
+      toast.success(`AI done — ${success} ok, ${failed} failed${skippedNoOcr ? `, ${skippedNoOcr} skipped (no OCR)` : ''}`);
+      if (newSuggestedTitles.length) {
+        setSuggestedTitles(prev => {
+          const ids = new Set(newSuggestedTitles.map(s => s.resourceId));
+          return [...prev.filter(s => !ids.has(s.resourceId)), ...newSuggestedTitles];
+        });
+      }
+      if (kind === 'resource') {
+        fetchResources(selectedClass, selectedSubject, selectedChapter);
+      } else {
+        fetchQuestions(selectedClass, selectedSubject, selectedChapter);
+      }
+    } finally {
+      setIsExtractingBatch(false);
+    }
+  };
+
+  const aiBatchMenuItems = (kind: 'resource' | 'question', getIds: () => number[]) => (
+    <>
+      <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds())}>
+        <Sparkles className="mr-2 h-4 w-4" /> All fields
+      </DropdownMenuItem>
+      {kind === 'resource' && (
+        <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds(), ['title'])}>
+          <FileEdit className="mr-2 h-4 w-4" /> Title
+        </DropdownMenuItem>
+      )}
+      {kind === 'resource' && (
+        <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds(), ['description'])}>
+          <FileText className="mr-2 h-4 w-4" /> Description
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds(), ['teachers'])}>
+        <Sparkles className="mr-2 h-4 w-4" /> Teachers
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds(), ['schools'])}>
+        <Sparkles className="mr-2 h-4 w-4" /> Schools
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds(), ['books'])}>
+        <Sparkles className="mr-2 h-4 w-4" /> Books
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, getIds(), ['types'])}>
+        <Sparkles className="mr-2 h-4 w-4" /> Types
+      </DropdownMenuItem>
+    </>
+  );
+
   const getOcrStatusBadge = (status: string | null) => {
     switch (status) {
       case 'completed':
