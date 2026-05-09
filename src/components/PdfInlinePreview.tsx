@@ -223,6 +223,13 @@ export function PdfInlinePreview({ url, className = '' }: PdfInlinePreviewProps)
         </div>
       </div>
 
+      <div className="flex items-start gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+        <p className="leading-snug">
+          If you have an ad blocker enabled, the preview and the "Open" link may not work. Disable it for this site or use the Download button.
+        </p>
+      </div>
+
       <div className="bg-muted/30 p-3 max-h-[80vh] overflow-auto">
         {loading && (
           <div className="flex flex-col items-center justify-center gap-3 py-16">
