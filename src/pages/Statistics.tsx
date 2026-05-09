@@ -609,7 +609,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('resources')
-        .select('id, title, description, data, ocr_status, ocr_text, chapter_id, chapters(name), resource_types(type), school_name, teacher_name')
+        .select('id, title, description, data, ocr_status, ocr_text, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -637,7 +637,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('questions')
-        .select('id, data, ocr_status, ocr_text, chapter_id, chapters(name, subject_id)')
+        .select('id, data, ocr_status, ocr_text, chapter_id, chapters(name, subject_id), teacher_names, school_names, books, type_ids, page_count')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
