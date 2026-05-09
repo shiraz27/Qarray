@@ -4,7 +4,7 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, Download, ExternalLink, ZoomIn, ZoomOut, AlertCircle, RefreshCw } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { fetchPdfViaProxy, triggerBlobDownload } from '@/utils/pdfMediaFetch';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
@@ -91,7 +91,9 @@ export function PdfInlinePreview({ url, className = '' }: PdfInlinePreviewProps)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
-  const blobUrlRef = useRef<string | null>(null);
+  const [downloadReady, setDownloadReady] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const blobRef = useRef<Blob | null>(null);
   const pdfDocRef = useRef<any>(null);
   const filename = getFilenameFromUrl(url);
 
@@ -99,47 +101,25 @@ export function PdfInlinePreview({ url, className = '' }: PdfInlinePreviewProps)
     setLoading(true);
     setError(null);
     setUnavailable(false);
+    setDownloadReady(false);
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('fetch-media', {
-        body: { url },
-      });
-      if (invokeError) throw invokeError;
-
-      let arrayBuffer: ArrayBuffer;
-      if (data instanceof Blob) {
-        // Detect JSON-coded "unavailable" body (status 200, JSON content)
-        if (data.type.includes('application/json')) {
-          const text = await data.text();
-          try {
-            const parsed = JSON.parse(text);
-            if (parsed?.unavailable) {
-              setUnavailable(true);
-              setLoading(false);
-              return;
-            }
-            throw new Error(parsed?.error || 'Failed to load PDF');
-          } catch (e) {
-            throw e instanceof Error ? e : new Error('Invalid response');
-          }
-        }
-        arrayBuffer = await data.arrayBuffer();
-      } else if (data instanceof ArrayBuffer) {
-        arrayBuffer = data;
-      } else if (data && typeof data === 'object' && 'unavailable' in (data as any)) {
+      const result = await fetchPdfViaProxy(url);
+      if (result.kind === 'unavailable') {
         setUnavailable(true);
         setLoading(false);
         return;
-      } else {
-        throw new Error('Unexpected response from media proxy');
+      }
+      if (result.kind === 'error') {
+        throw new Error(result.message);
       }
 
-      // Keep a copy for download (pdfjs may transfer/detach the buffer)
-      const downloadCopy = arrayBuffer.slice(0);
-      const blob = new Blob([downloadCopy], { type: 'application/pdf' });
-      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = URL.createObjectURL(blob);
+      // Save the blob immediately so Download works even if rendering fails.
+      blobRef.current = result.blob;
+      setDownloadReady(true);
 
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const arrayBuffer = await result.blob.arrayBuffer();
+      // pdfjs may detach the buffer, so pass a copy.
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
       pdfDocRef.current = pdf;
       const pgs: any[] = [];
       for (let i = 1; i <= pdf.numPages; i++) {
@@ -157,22 +137,35 @@ export function PdfInlinePreview({ url, className = '' }: PdfInlinePreviewProps)
   useEffect(() => {
     load();
     return () => {
-      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = null;
+      blobRef.current = null;
       try { pdfDocRef.current?.destroy?.(); } catch {}
       pdfDocRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
 
-  const handleDownload = () => {
-    if (!blobUrlRef.current) return;
-    const a = document.createElement('a');
-    a.href = blobUrlRef.current;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  const handleDownload = async () => {
+    if (downloading) return;
+    if (blobRef.current) {
+      triggerBlobDownload(blobRef.current, filename);
+      return;
+    }
+    // Preview never loaded — try to fetch now just for the download.
+    setDownloading(true);
+    try {
+      const result = await fetchPdfViaProxy(url);
+      if (result.kind === 'ok') {
+        blobRef.current = result.blob;
+        setDownloadReady(true);
+        triggerBlobDownload(result.blob, filename);
+      } else {
+        setError(result.kind === 'unavailable'
+          ? 'File still processing — try again in a moment.'
+          : result.message);
+      }
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -208,16 +201,25 @@ export function PdfInlinePreview({ url, className = '' }: PdfInlinePreviewProps)
             variant="default"
             size="sm"
             onClick={handleDownload}
-            disabled={!blobUrlRef.current}
+            disabled={downloading}
             className="gap-1"
           >
-            <Download className="h-4 w-4" />
+            {downloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
             <span className="hidden sm:inline">Download</span>
           </Button>
           <Button variant="ghost" size="sm" asChild className="gap-1">
-            <a href={url.replace(/ /g, '%20')} target="_blank" rel="noopener noreferrer">
+            <a
+              href={url.replace(/ /g, '%20')}
+              target="_blank"
+              rel="noopener noreferrer"
+              referrerPolicy="no-referrer"
+            >
               <ExternalLink className="h-4 w-4" />
-              <span className="hidden sm:inline">Open</span>
+              <span className="hidden sm:inline">Open original</span>
             </a>
           </Button>
         </div>
@@ -226,7 +228,8 @@ export function PdfInlinePreview({ url, className = '' }: PdfInlinePreviewProps)
       <div className="flex items-start gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
         <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
         <p className="leading-snug">
-          If you have an ad blocker enabled, the preview and the "Open" link may not work. Disable it for this site or use the Download button.
+          The "Open original" link goes directly to Archive.org and may be blocked by Chrome or an ad blocker.
+          If preview or Open fails, use the <strong>Download</strong> button — it always works through our server.
         </p>
       </div>
 
@@ -258,8 +261,13 @@ export function PdfInlinePreview({ url, className = '' }: PdfInlinePreviewProps)
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
             <AlertCircle className="h-8 w-8 text-destructive" />
             <div>
-              <p className="text-sm font-medium">Couldn't load PDF</p>
+              <p className="text-sm font-medium">Couldn't load preview</p>
               <p className="text-xs text-muted-foreground">{error}</p>
+              {downloadReady && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  You can still download the file using the Download button above.
+                </p>
+              )}
             </div>
             <Button variant="outline" size="sm" onClick={load} className="gap-2">
               <RefreshCw className="h-4 w-4" />
