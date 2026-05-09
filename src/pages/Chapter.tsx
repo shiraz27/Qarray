@@ -29,6 +29,7 @@ interface ChapterData {
   answerCount: number;
   resourceCount: number;
   totalPages: number;
+  pendingPages: number;
   isBookmarked: boolean;
 }
 
@@ -236,6 +237,9 @@ export default function Chapter() {
         const totalPages =
           ((resPageRows as any[] | null) || []).reduce((s, r) => s + (r.page_count || 0), 0) +
           ((qPageRows as any[] | null) || []).reduce((s, r) => s + (r.page_count || 0), 0);
+        const pendingPages =
+          ((resPageRows as any[] | null) || []).filter((r) => r.page_count == null).length +
+          ((qPageRows as any[] | null) || []).filter((r) => r.page_count == null).length;
 
         // Check if bookmarked
         let isBookmarked = false;
@@ -257,6 +261,7 @@ export default function Chapter() {
           answerCount: answerCount || 0,
           resourceCount: resourceCount || 0,
           totalPages,
+          pendingPages,
           isBookmarked,
         });
 
