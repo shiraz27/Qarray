@@ -1863,6 +1863,52 @@ export default function Statistics() {
                                             {resource.chapters?.name || 'N/A'}
                                           </TableCell>
                                           <TableCell>
+                                            <MetaCell
+                                              variant="array"
+                                              value={resource.teacher_names ?? []}
+                                              canSuggest={!!resource.ocr_text}
+                                              onSuggest={() => suggestCellValue('resource', resource, 'teachers')}
+                                              onSave={(v) => saveResourceCell(resource, 'teachers', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="array"
+                                              value={resource.school_names ?? []}
+                                              canSuggest={!!resource.ocr_text}
+                                              onSuggest={() => suggestCellValue('resource', resource, 'schools')}
+                                              onSave={(v) => saveResourceCell(resource, 'schools', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="array"
+                                              value={resource.books ?? []}
+                                              canSuggest={!!resource.ocr_text}
+                                              onSuggest={() => suggestCellValue('resource', resource, 'books')}
+                                              onSave={(v) => saveResourceCell(resource, 'books', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="typeIds"
+                                              value={resource.type_ids ?? []}
+                                              resourceTypes={resourceTypes}
+                                              canSuggest={!!resource.ocr_text}
+                                              onSuggest={() => suggestCellValue('resource', resource, 'types')}
+                                              onSave={(v) => saveResourceCell(resource, 'types', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="number"
+                                              value={resource.page_count ?? null}
+                                              canSuggest={false}
+                                              onSuggest={() => suggestCellValue('resource', resource, 'pages')}
+                                              onSave={(v) => saveResourceCell(resource, 'pages', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
                                             <div className="space-y-1">
                                               {getOcrStatusBadge(resource.ocr_status)}
                                               <div className="text-[10px] font-mono text-muted-foreground">
