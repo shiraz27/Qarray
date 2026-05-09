@@ -38,7 +38,8 @@ import { processResourceOCR } from '@/utils/clientOcrProcessor';
 import type { OcrMode } from '@/utils/pdfOcrHelpers';
 import { isPdfUrl, isImageUrl, urlsHaveOcrable, textHasOcrableUrl } from '@/utils/mediaTypeUtils';
 import { processQuestionOCR } from '@/utils/clientQuestionOcrProcessor';
-import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, applySuggestedTitle, type ExtractedMetadata, type MetadataField } from '@/utils/metadataExtractor';
+import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, applySuggestedTitle, extractMetadataFromOCR, type ExtractedMetadata, type MetadataField } from '@/utils/metadataExtractor';
+import { MetaCell, type CellValue } from '@/components/statistics/MetaCell';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
 interface Stats {
@@ -74,12 +75,12 @@ interface ResourceRow {
   resource_types?: { type: string };
   school_name?: string | null;
   teacher_name?: string | null;
+  suggested_title?: string | null;
   teacher_names?: string[] | null;
   school_names?: string[] | null;
   books?: string[] | null;
   type_ids?: number[] | null;
   page_count?: number | null;
-  suggested_title?: string | null;
 }
 
 // Track suggested titles from AI extraction
@@ -95,7 +96,6 @@ interface QuestionRow {
   ocr_text?: string | null;
   chapter_id: number | null;
   chapters?: { name: string };
-  book?: string | null;
   teacher_names?: string[] | null;
   school_names?: string[] | null;
   books?: string[] | null;
@@ -326,10 +326,7 @@ export default function Statistics() {
   useEffect(() => {
     if (!roleLoading && (isModerator || isAdmin)) {
       fetchClasses();
-      (async () => {
-        const { data } = await supabase.from('resource_types').select('id, type').order('id');
-        setResourceTypes(data || []);
-      })();
+      fetchResourceTypes();
       fetchStats(selectedClass, selectedSubject, selectedChapter);
       fetchOcrStats(selectedClass, selectedSubject, selectedChapter);
       fetchQuestionOcrStats(selectedClass, selectedSubject, selectedChapter);
@@ -376,6 +373,15 @@ export default function Statistics() {
       setClasses(data || []);
     } catch (error) {
       console.error('Error fetching classes:', error);
+    }
+  };
+
+  const fetchResourceTypes = async () => {
+    try {
+      const { data } = await supabase.from('resource_types').select('id, type').order('id');
+      setResourceTypes(data || []);
+    } catch (error) {
+      console.error('Error fetching resource types:', error);
     }
   };
 
@@ -642,7 +648,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('questions')
-        .select('id, data, ocr_status, ocr_text, chapter_id, chapters(name, subject_id), book, teacher_names, school_names, books, type_ids, page_count')
+        .select('id, data, ocr_status, ocr_text, chapter_id, chapters(name, subject_id), teacher_names, school_names, books, type_ids, page_count')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -1141,149 +1147,7 @@ export default function Statistics() {
             {label}
           </Button>
         ))}
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={pageBackfillStatus?.running}
-          onClick={() => runPageCountForSelected(kind, getIds())}
-          title="Recompute page_count for selected rows"
-        >
-          {pageBackfillStatus?.running ? (
-            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-          ) : (
-            <FileText className="mr-1 h-4 w-4" />
-          )}
-          Pages
-        </Button>
       </div>
-    );
-  };
-
-  const runPageCountForSelected = async (kind: 'resource' | 'question', ids: number[]) => {
-    if (!ids.length) return;
-    const table = kind === 'resource' ? 'resources' : 'questions';
-    setPageBackfillStatus({
-      running: true, done: 0, total: ids.length,
-      label: kind === 'resource' ? 'Resources (selected)' : 'Questions (selected)',
-      success: 0, partial: 0, failed: 0,
-    });
-    let done = 0, success = 0, partial = 0, failed = 0;
-    const update = (label: string) =>
-      setPageBackfillStatus({ running: true, done, total: ids.length, label, success, partial, failed });
-    try {
-      const { data: rows } = await (supabase as any)
-        .from(table)
-        .select('id, data')
-        .in('id', ids);
-      for (const row of (rows || [])) {
-        try {
-          const result = kind === 'resource'
-            ? await withTimeout(computePageCountFromUrls(row.data || []), PAGE_BACKFILL_ROW_TIMEOUT_MS)
-            : await withTimeout(computePageCountFromText(row.data || ''), PAGE_BACKFILL_ROW_TIMEOUT_MS);
-          if (result.complete) {
-            await (supabase as any).from(table).update({ page_count: result.count }).eq('id', row.id);
-            success += 1;
-          } else if (result.count > 0) {
-            await (supabase as any).from(table).update({ page_count: result.count }).eq('id', row.id);
-            partial += 1;
-          } else {
-            failed += 1;
-          }
-        } catch (err) {
-          console.warn('[page-count selected]', kind, row.id, err);
-          failed += 1;
-        } finally {
-          done += 1;
-          update(kind === 'resource' ? 'Resources (selected)' : 'Questions (selected)');
-        }
-      }
-      toast.success(`Pages — ${success} ok, ${partial} partial, ${failed} failed`);
-      if (kind === 'resource') {
-        fetchResources(selectedClass, selectedSubject, selectedChapter);
-      } else {
-        fetchQuestions(selectedClass, selectedSubject, selectedChapter);
-      }
-    } finally {
-      setPageBackfillStatus(prev => prev ? { ...prev, running: false } : null);
-    }
-  };
-
-  const renderArrayChips = (items?: string[] | null) => {
-    const arr = items || [];
-    if (!arr.length) return <span className="text-xs text-muted-foreground">—</span>;
-    const visible = arr.slice(0, 2);
-    const extra = arr.length - visible.length;
-    return (
-      <div className="flex flex-wrap gap-1 max-w-[180px]">
-        {visible.map((v, i) => (
-          <Badge key={i} variant="outline" className="text-xs truncate max-w-[120px]" title={v}>
-            {v}
-          </Badge>
-        ))}
-        {extra > 0 && (
-          <Badge variant="secondary" className="text-xs" title={arr.slice(2).join(', ')}>+{extra}</Badge>
-        )}
-      </div>
-    );
-  };
-
-  const renderTypeChips = (typeIds?: number[] | null, fallback?: string) => {
-    const ids = typeIds || [];
-    if (!ids.length) {
-      return fallback
-        ? <Badge variant="outline" className="text-xs">{fallback}</Badge>
-        : <span className="text-xs text-muted-foreground">—</span>;
-    }
-    const visible = ids.slice(0, 2);
-    const extra = ids.length - visible.length;
-    return (
-      <div className="flex flex-wrap gap-1">
-        {visible.map((id) => {
-          const t = resourceTypes.find((rt) => rt.id === id);
-          return (
-            <Badge key={id} variant="outline" className="text-xs">{t?.type || `#${id}`}</Badge>
-          );
-        })}
-        {extra > 0 && <Badge variant="secondary" className="text-xs">+{extra}</Badge>}
-      </div>
-    );
-  };
-
-  const aiRowMenu = (kind: 'resource' | 'question', id: number) => {
-    const fieldsList: Array<{ key: MetadataField; label: string }> =
-      kind === 'resource'
-        ? [
-            { key: 'title', label: 'Title' },
-            { key: 'description', label: 'Description' },
-            { key: 'teachers', label: 'Teachers' },
-            { key: 'schools', label: 'Schools' },
-            { key: 'books', label: 'Books' },
-            { key: 'types', label: 'Types' },
-          ]
-        : [
-            { key: 'teachers', label: 'Teachers' },
-            { key: 'schools', label: 'Schools' },
-            { key: 'books', label: 'Books' },
-            { key: 'types', label: 'Types' },
-          ];
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button size="sm" variant="ghost" disabled={isExtractingBatch} title="AI: fill fields">
-            <Sparkles className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => runAiMetadataBatch(kind, [id])}>
-            <Sparkles className="mr-2 h-4 w-4" /> All fields
-          </DropdownMenuItem>
-          {fieldsList.map(({ key, label }) => (
-            <DropdownMenuItem key={key} onClick={() => runAiMetadataBatch(kind, [id], [key])}>
-              {label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
     );
   };
 
@@ -1349,6 +1213,89 @@ export default function Statistics() {
   if (!isModerator && !isAdmin) {
     return <Navigate to="/" replace />;
   }
+
+  // Per-row AI suggestion cache so multiple cells on the same row share one call.
+  const suggestionCache = new Map<string, Promise<ExtractedMetadata>>();
+  const suggestForRow = (kind: 'resource' | 'question', id: number, ocrText: string | null) => {
+    const key = `${kind}:${id}`;
+    if (!ocrText) return Promise.resolve<ExtractedMetadata>({
+      school_name: null, teacher_name: null, suggested_title: null,
+      suggested_type_id: null, suggested_devoir_type_id: null, suggested_description: null,
+      teacher_names: [], school_names: [], books: [],
+    });
+    let p = suggestionCache.get(key);
+    if (!p) {
+      p = extractMetadataFromOCR(ocrText, kind === 'resource' ? { resourceId: id } : { questionId: id })
+        .then((r) => r.metadata);
+      suggestionCache.set(key, p);
+    }
+    return p;
+  };
+
+  type CellField = 'teachers' | 'schools' | 'books' | 'types' | 'pages';
+  const suggestCellValue = async (
+    kind: 'resource' | 'question',
+    row: { id: number; ocr_text: string | null },
+    field: CellField,
+  ): Promise<CellValue | null> => {
+    if (field === 'pages') return null; // No AI for page count; user edits manually.
+    const m = await suggestForRow(kind, row.id, row.ocr_text);
+    if (field === 'teachers') return m.teacher_names ?? [];
+    if (field === 'schools') return m.school_names ?? [];
+    if (field === 'books') return m.books ?? [];
+    if (field === 'types') {
+      const ids: number[] = [];
+      if (m.suggested_type_id) ids.push(m.suggested_type_id);
+      return ids;
+    }
+    return null;
+  };
+
+  const saveResourceCell = async (row: ResourceRow, field: CellField, next: CellValue) => {
+    const updates: Record<string, any> = {};
+    if (field === 'teachers') {
+      const arr = (next as string[]) ?? [];
+      updates.teacher_names = arr;
+      updates.teacher_name = arr[0] ?? null;
+    } else if (field === 'schools') {
+      const arr = (next as string[]) ?? [];
+      updates.school_names = arr;
+      updates.school_name = arr[0] ?? null;
+    } else if (field === 'books') {
+      const arr = (next as string[]) ?? [];
+      updates.books = arr;
+      updates.book = arr[0] ?? null;
+    } else if (field === 'types') {
+      const arr = (next as number[]) ?? [];
+      updates.type_ids = arr;
+      updates.type_id = arr[0] ?? null;
+    } else if (field === 'pages') {
+      updates.page_count = next == null ? null : (next as number);
+    }
+    const { error } = await supabase.from('resources').update(updates).eq('id', row.id);
+    if (error) throw error;
+    setResources((prev) => prev.map((r) => (r.id === row.id ? { ...r, ...updates } : r)));
+  };
+
+  const saveQuestionCell = async (row: QuestionRow, field: CellField, next: CellValue) => {
+    const updates: Record<string, any> = {};
+    if (field === 'teachers') updates.teacher_names = (next as string[]) ?? [];
+    else if (field === 'schools') updates.school_names = (next as string[]) ?? [];
+    else if (field === 'books') {
+      const arr = (next as string[]) ?? [];
+      updates.books = arr;
+      updates.book = arr[0] ?? null;
+    } else if (field === 'types') {
+      const arr = (next as number[]) ?? [];
+      updates.type_ids = arr;
+      updates.type_id = arr[0] ?? null;
+    } else if (field === 'pages') {
+      updates.page_count = next == null ? null : (next as number);
+    }
+    const { error } = await supabase.from('questions').update(updates).eq('id', row.id);
+    if (error) throw error;
+    setQuestions((prev) => prev.map((q) => (q.id === row.id ? { ...q, ...updates } : q)));
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -1835,12 +1782,13 @@ export default function Statistics() {
                                       </TableHead>
                                       <TableHead className="w-[80px]">ID</TableHead>
                                       <TableHead>Title</TableHead>
+                                      <TableHead>Type</TableHead>
+                                      <TableHead>Chapter</TableHead>
                                       <TableHead>Teachers</TableHead>
                                       <TableHead>Schools</TableHead>
                                       <TableHead>Books</TableHead>
                                       <TableHead>Types</TableHead>
-                                      <TableHead className="w-[70px]">Pages</TableHead>
-                                      <TableHead>Chapter</TableHead>
+                                      <TableHead>Pages</TableHead>
                                       <TableHead>OCR Status</TableHead>
                                       <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
@@ -1908,19 +1856,57 @@ export default function Statistics() {
                                               )}
                                             </div>
                                           </TableCell>
-                                          <TableCell>{renderArrayChips(resource.teacher_names)}</TableCell>
-                                          <TableCell>{renderArrayChips(resource.school_names)}</TableCell>
-                                          <TableCell>{renderArrayChips(resource.books)}</TableCell>
-                                          <TableCell>{renderTypeChips(resource.type_ids, resource.resource_types?.type)}</TableCell>
                                           <TableCell>
-                                            {resource.page_count != null ? (
-                                              <span className="text-xs font-medium">{resource.page_count}</span>
-                                            ) : (
-                                              <span className="text-xs text-muted-foreground">—</span>
-                                            )}
+                                            <Badge variant="outline">{resource.resource_types?.type || 'Unknown'}</Badge>
                                           </TableCell>
                                           <TableCell>
                                             {resource.chapters?.name || 'N/A'}
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="array"
+                                              value={resource.teacher_names ?? []}
+                                              canSuggest={!!resource.ocr_text}
+                                              onSuggest={() => suggestCellValue('resource', resource, 'teachers')}
+                                              onSave={(v) => saveResourceCell(resource, 'teachers', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="array"
+                                              value={resource.school_names ?? []}
+                                              canSuggest={!!resource.ocr_text}
+                                              onSuggest={() => suggestCellValue('resource', resource, 'schools')}
+                                              onSave={(v) => saveResourceCell(resource, 'schools', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="array"
+                                              value={resource.books ?? []}
+                                              canSuggest={!!resource.ocr_text}
+                                              onSuggest={() => suggestCellValue('resource', resource, 'books')}
+                                              onSave={(v) => saveResourceCell(resource, 'books', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="typeIds"
+                                              value={resource.type_ids ?? []}
+                                              resourceTypes={resourceTypes}
+                                              canSuggest={!!resource.ocr_text}
+                                              onSuggest={() => suggestCellValue('resource', resource, 'types')}
+                                              onSave={(v) => saveResourceCell(resource, 'types', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="number"
+                                              value={resource.page_count ?? null}
+                                              canSuggest={false}
+                                              onSuggest={() => suggestCellValue('resource', resource, 'pages')}
+                                              onSave={(v) => saveResourceCell(resource, 'pages', v)}
+                                            />
                                           </TableCell>
                                           <TableCell>
                                             <div className="space-y-1">
@@ -1964,13 +1950,19 @@ export default function Statistics() {
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
                                               {resource.ocr_status === 'completed' && resource.ocr_text && (
-                                                extractingMetadataId === resource.id ? (
-                                                  <Button size="sm" variant="ghost" disabled>
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={() => handleExtractMetadata(resource.id)}
+                                                  disabled={extractingMetadataId === resource.id}
+                                                  title="Extract metadata with AI"
+                                                >
+                                                  {extractingMetadataId === resource.id ? (
                                                     <Loader2 className="h-4 w-4 animate-spin" />
-                                                  </Button>
-                                                ) : (
-                                                  aiRowMenu('resource', resource.id)
-                                                )
+                                                  ) : (
+                                                    <Sparkles className="h-4 w-4" />
+                                                  )}
+                                                </Button>
                                               )}
                                               {canProcess && (
                                                 <>
@@ -2279,12 +2271,12 @@ export default function Statistics() {
                                       </TableHead>
                                       <TableHead className="w-[80px]">ID</TableHead>
                                       <TableHead>Question</TableHead>
+                                      <TableHead>Chapter</TableHead>
                                       <TableHead>Teachers</TableHead>
                                       <TableHead>Schools</TableHead>
                                       <TableHead>Books</TableHead>
                                       <TableHead>Types</TableHead>
-                                      <TableHead className="w-[70px]">Pages</TableHead>
-                                      <TableHead>Chapter</TableHead>
+                                      <TableHead>Pages</TableHead>
                                       <TableHead>OCR Status</TableHead>
                                       <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
@@ -2311,19 +2303,54 @@ export default function Statistics() {
                                           <TableCell>
                                             <div className="max-w-[400px] truncate">{question.data.substring(0, 100)}</div>
                                           </TableCell>
-                                          <TableCell>{renderArrayChips(question.teacher_names)}</TableCell>
-                                          <TableCell>{renderArrayChips(question.school_names)}</TableCell>
-                                          <TableCell>{renderArrayChips(question.books)}</TableCell>
-                                          <TableCell>{renderTypeChips(question.type_ids)}</TableCell>
-                                          <TableCell>
-                                            {question.page_count != null ? (
-                                              <span className="text-xs font-medium">{question.page_count}</span>
-                                            ) : (
-                                              <span className="text-xs text-muted-foreground">—</span>
-                                            )}
-                                          </TableCell>
                                           <TableCell>
                                             {question.chapters?.name || 'N/A'}
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="array"
+                                              value={question.teacher_names ?? []}
+                                              canSuggest={!!question.ocr_text}
+                                              onSuggest={() => suggestCellValue('question', { id: question.id, ocr_text: question.ocr_text ?? null }, 'teachers')}
+                                              onSave={(v) => saveQuestionCell(question, 'teachers', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="array"
+                                              value={question.school_names ?? []}
+                                              canSuggest={!!question.ocr_text}
+                                              onSuggest={() => suggestCellValue('question', { id: question.id, ocr_text: question.ocr_text ?? null }, 'schools')}
+                                              onSave={(v) => saveQuestionCell(question, 'schools', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="array"
+                                              value={question.books ?? []}
+                                              canSuggest={!!question.ocr_text}
+                                              onSuggest={() => suggestCellValue('question', { id: question.id, ocr_text: question.ocr_text ?? null }, 'books')}
+                                              onSave={(v) => saveQuestionCell(question, 'books', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="typeIds"
+                                              value={question.type_ids ?? []}
+                                              resourceTypes={resourceTypes}
+                                              canSuggest={!!question.ocr_text}
+                                              onSuggest={() => suggestCellValue('question', { id: question.id, ocr_text: question.ocr_text ?? null }, 'types')}
+                                              onSave={(v) => saveQuestionCell(question, 'types', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="number"
+                                              value={question.page_count ?? null}
+                                              canSuggest={false}
+                                              onSuggest={() => suggestCellValue('question', { id: question.id, ocr_text: question.ocr_text ?? null }, 'pages')}
+                                              onSave={(v) => saveQuestionCell(question, 'pages', v)}
+                                            />
                                           </TableCell>
                                           <TableCell>
                                             <div className="space-y-1">
@@ -2366,9 +2393,6 @@ export default function Statistics() {
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
-                                              {question.ocr_status === 'completed' && question.ocr_text && (
-                                                aiRowMenu('question', question.id)
-                                              )}
                                               {canProcess && (
                                                 <>
                                                   <Button
