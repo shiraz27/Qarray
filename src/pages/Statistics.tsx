@@ -1824,7 +1824,13 @@ export default function Statistics() {
                                           <TableCell className="font-medium">{resource.id}</TableCell>
                                           <TableCell>
                                             <div className="space-y-1">
-                                              <div className="max-w-[300px] truncate">{resource.title}</div>
+                                              <MetaCell
+                                                variant="text"
+                                                value={resource.title ?? ''}
+                                                canSuggest={!!resource.ocr_text}
+                                                onSuggest={() => suggestCellValue('resource', resource, 'title')}
+                                                onSave={(v) => saveResourceCell(resource, 'title', v)}
+                                              />
                                               {suggestedTitle && (
                                                 <div className="flex items-center gap-2">
                                                   <Badge variant="outline" className="text-xs gap-1 text-primary border-primary/30">
@@ -1864,6 +1870,15 @@ export default function Statistics() {
                                                 </div>
                                               )}
                                             </div>
+                                          </TableCell>
+                                          <TableCell>
+                                            <MetaCell
+                                              variant="longText"
+                                              value={resource.description ?? ''}
+                                              canSuggest={!!resource.ocr_text}
+                                              onSuggest={() => suggestCellValue('resource', resource, 'description')}
+                                              onSave={(v) => saveResourceCell(resource, 'description', v)}
+                                            />
                                           </TableCell>
                                           <TableCell>
                                             <Badge variant="outline">{resource.resource_types?.type || 'Unknown'}</Badge>
