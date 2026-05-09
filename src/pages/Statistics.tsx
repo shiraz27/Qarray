@@ -1291,22 +1291,48 @@ export default function Statistics() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button
-                  onClick={runPageCountBackfill}
-                  disabled={pageBackfillStatus?.running}
-                  variant="default"
-                >
-                  {pageBackfillStatus?.running
-                    ? `Processing ${pageBackfillStatus.label} ${pageBackfillStatus.done}/${pageBackfillStatus.total}…`
-                    : 'Run page count backfill'}
-                </Button>
-                {pageBackfillStatus && !pageBackfillStatus.running && pageBackfillStatus.total > 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Done. Processed {pageBackfillStatus.done} item(s).
-                  </p>
-                )}
-                {pageBackfillStatus && pageBackfillStatus.total === 0 && !pageBackfillStatus.running && (
-                  <p className="text-sm text-muted-foreground">No items needed backfilling.</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => runPageCountBackfill({ skipPreviouslyFailed: true })}
+                    disabled={pageBackfillStatus?.running}
+                    variant="default"
+                  >
+                    {pageBackfillStatus?.running
+                      ? `Processing ${pageBackfillStatus.label} ${pageBackfillStatus.done}/${pageBackfillStatus.total}…`
+                      : 'Run page count backfill'}
+                  </Button>
+                  <Button
+                    onClick={() => runPageCountBackfill({ skipPreviouslyFailed: false })}
+                    disabled={pageBackfillStatus?.running}
+                    variant="outline"
+                  >
+                    Retry previously failed
+                  </Button>
+                  <Button
+                    onClick={resetPageBackfillCheckpoint}
+                    disabled={pageBackfillStatus?.running}
+                    variant="ghost"
+                  >
+                    Reset checkpoint
+                  </Button>
+                </div>
+                {pageBackfillStatus && (
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p>
+                      {pageBackfillStatus.running ? 'Running' : pageBackfillStatus.label} —{' '}
+                      {pageBackfillStatus.done}/{pageBackfillStatus.total}
+                    </p>
+                    <p>
+                      <span className="text-green-600">{pageBackfillStatus.success} ok</span>
+                      {' · '}
+                      <span className="text-yellow-600">{pageBackfillStatus.partial} partial</span>
+                      {' · '}
+                      <span className="text-red-600">{pageBackfillStatus.failed} failed</span>
+                    </p>
+                    {pageBackfillStatus.total === 0 && !pageBackfillStatus.running && (
+                      <p>No items needed backfilling.</p>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>
