@@ -181,7 +181,9 @@ const resources = {
       noSubjectsYet: "No subjects available yet",
       viewStatsFor: "View statistics for",
       across: "Across",
-      classes: "classes"
+      classes: "classes",
+      page: "page",
+      pages: "pages"
     }
   },
   fr: {
@@ -348,7 +350,9 @@ const resources = {
       noSubjectsYet: "Aucune matière disponible pour le moment",
       viewStatsFor: "Voir les statistiques pour",
       across: "Dans",
-      classes: "classes"
+      classes: "classes",
+      page: "page",
+      pages: "pages"
     }
   },
   ar: {
@@ -515,7 +519,9 @@ const resources = {
       noSubjectsYet: "لا توجد مواد متاحة بعد",
       viewStatsFor: "عرض إحصائيات",
       across: "عبر",
-      classes: "أقسام"
+      classes: "أقسام",
+      page: "صفحة",
+      pages: "صفحات"
     }
   }
 };
