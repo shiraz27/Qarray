@@ -49,7 +49,7 @@ const detectFileType = detectMediaType;
  * Extract text from image using Tesseract.js OCR
  */
 async function extractImageText(blob: Blob): Promise<string> {
-  const worker = await createWorker('eng+ara'); // English + Arabic
+  const worker = await createWorker('eng+ara+fra'); // English + Arabic + French
 
   try {
     const {
