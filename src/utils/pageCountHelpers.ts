@@ -1,6 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { isPdfUrl, isImageUrl } from '@/utils/mediaTypeUtils';
+import { isSplitPdfManifestUrl, fetchSplitPdfManifest } from '@/utils/splitPdfManifest';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
@@ -64,7 +65,15 @@ export async function computePageCountFromUrls(urls: string[]): Promise<PageCoun
 
   for (const url of urls) {
     if (!url) continue;
-    if (isPdfUrl(url)) {
+    if (isSplitPdfManifestUrl(url)) {
+      try {
+        const manifest = await fetchSplitPdfManifest(url);
+        if (manifest.totalPages > 0) total += manifest.totalPages;
+        else complete = false;
+      } catch {
+        complete = false;
+      }
+    } else if (isPdfUrl(url)) {
       try {
         const blob = await fetchViaProxy(url);
         const n = await countPdfPages(blob);
