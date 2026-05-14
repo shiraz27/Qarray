@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { detectMediaType, mediaTypeFromMime, type MediaType } from '@/utils/mediaTypeUtils';
 import { extractPdfTextAndOcr, type OcrMode } from '@/utils/pdfOcrHelpers';
+import { expandManifestUrls } from '@/utils/splitPdfManifest';
 
 export type { OcrMode };
 
@@ -86,7 +87,12 @@ export async function processResourceOCR(
       Array.isArray(resource.data) ? resource.data.join('\n') : resource.data
     ).media;
 
-    if (mediaFiles.length === 0) {
+    // Expand split-PDF manifests to their underlying per-page URLs so OCR
+    // runs page-by-page exactly like a regular multi-page PDF would.
+    const expandedUrls = await expandManifestUrls(mediaFiles.map((m) => m.url));
+    const expandedFiles = expandedUrls.map((url) => ({ url }));
+
+    if (expandedFiles.length === 0) {
       // No media to process
       await supabase
         .from('resources')
@@ -109,12 +115,12 @@ export async function processResourceOCR(
     let hadFetchFailure = false;
     let imagesSkippedTextMode = 0;
 
-    for (let i = 0; i < mediaFiles.length; i++) {
-      const mediaFile = mediaFiles[i];
+    for (let i = 0; i < expandedFiles.length; i++) {
+      const mediaFile = expandedFiles[i];
       let fileType = detectFileType(mediaFile.url);
 
       onProgress?.(
-        `Processing file ${i + 1}/${mediaFiles.length}: ${fileType}...`
+        `Processing file ${i + 1}/${expandedFiles.length}: ${fileType}...`
       );
 
       if (fileType === 'video' || fileType === 'audio') {
