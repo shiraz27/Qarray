@@ -28,7 +28,19 @@ export function extractMediaFromText(text: string): { text: string; media: Media
         displayName: '📹 YouTube Video'
       };
     }
-    
+
+    // Split-PDF manifest: render as a single PDF attachment.
+    if (
+      lowerUrl.includes('/pages/manifest.json') ||
+      lowerUrl.includes('/pages/manifest-json')
+    ) {
+      return {
+        url,
+        type: 'pdf' as const,
+        displayName: '📄 PDF Document (multi-page)',
+      };
+    }
+
     // Check for PDF (with dot or dash for Archive.org sanitized URLs)
     if (lowerUrl.includes('.pdf') || lowerUrl.endsWith('-pdf') || lowerUrl.includes('-pdf/') || lowerUrl.includes('-pdf?')) {
       return {
