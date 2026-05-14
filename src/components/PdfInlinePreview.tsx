@@ -4,7 +4,7 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { PDFDocument } from 'pdf-lib';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Download, ExternalLink, ZoomIn, ZoomOut, AlertCircle, RefreshCw, Files, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Loader2, Download, ExternalLink, ZoomIn, ZoomOut, AlertCircle, RefreshCw, FileText, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -106,6 +106,8 @@ function SinglePdfView({
   pageBadge,
   downloadLabel,
   extraDownloadActions,
+  downloadIcon,
+  downloadTitle,
 }: {
   url: string;
   className?: string;
@@ -114,6 +116,8 @@ function SinglePdfView({
   pageBadge?: string;
   downloadLabel?: string;
   extraDownloadActions?: React.ReactNode;
+  downloadIcon?: React.ReactNode;
+  downloadTitle?: string;
 }) {
   const [pages, setPages] = useState<any[]>([]);
   const [scale, setScale] = useState(1);
@@ -229,16 +233,17 @@ function SinglePdfView({
           </Button>
           <div className="inline-flex rounded-md shadow-sm overflow-hidden">
             <Button
-              variant="default"
+              variant={extraDownloadActions ? 'outline' : 'default'}
               size="sm"
               onClick={handleDownload}
               disabled={downloading}
+              title={downloadTitle ?? 'Download this file'}
               className={`gap-1 ${extraDownloadActions ? 'rounded-r-none' : ''}`}
             >
               {downloading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Download className="h-4 w-4" />
+                downloadIcon ?? <Download className="h-4 w-4" />
               )}
               <span className="hidden sm:inline">{downloadLabel ?? 'Download'}</span>
             </Button>
@@ -500,14 +505,14 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
       onClick={handleDownloadAll}
       disabled={downloadingAll}
       className="gap-1 rounded-l-none border-l border-primary-foreground/20"
-      title={`Merge all ${total} pages into one PDF and download`}
+      title={`Merge all ${total} pages into a single PDF and download`}
     >
       {downloadingAll ? (
         <Loader2 className="h-4 w-4 animate-spin" />
       ) : (
-        <Files className="h-4 w-4" />
+        <Download className="h-4 w-4" />
       )}
-      <span className="hidden sm:inline">All {total} pages</span>
+      <span className="hidden sm:inline">Full PDF ({total}p)</span>
     </Button>
   );
 
@@ -519,7 +524,9 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
       filenameOverride={pageFilename}
       pageBadge={`${manifest.totalPages} pages`}
       rightSlot={dropdown}
-      downloadLabel={`Page ${currentPage.n}`}
+      downloadLabel={`Page ${currentPage.n} only`}
+      downloadIcon={<FileText className="h-4 w-4" />}
+      downloadTitle={`Download only page ${currentPage.n} as a single-page PDF`}
       extraDownloadActions={downloadAllButton}
     />
   );
