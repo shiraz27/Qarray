@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { MediaList } from '@/components/MediaList';
 import { MediaPreview } from '@/components/MediaPreview';
 import { PdfInlinePreview } from '@/components/PdfInlinePreview';
+import { isPdfUrl } from '@/utils/mediaTypeUtils';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
@@ -646,19 +647,11 @@ export default function ResourceDetail() {
                   <div className="grid grid-cols-1 gap-4">
                     {resource.data.map((url, index) => (
                       <div key={index} className="w-full">
-                        {(() => {
-                          const lower = url.toLowerCase();
-                          const isPdf =
-                            lower.includes('.pdf') ||
-                            lower.endsWith('-pdf') ||
-                            lower.includes('-pdf/') ||
-                            lower.includes('-pdf?');
-                          return isPdf ? (
-                            <PdfInlinePreview url={url} className="w-full" />
-                          ) : (
-                            <MediaPreview url={url} className="w-full" />
-                          );
-                        })()}
+                        {isPdfUrl(url) ? (
+                          <PdfInlinePreview url={url} className="w-full" />
+                        ) : (
+                          <MediaPreview url={url} className="w-full" />
+                        )}
                       </div>
                     ))}
                   </div>
