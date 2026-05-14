@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getSessionByRoute, persistUrlToSessionByRoute, type FormSession } from '@/hooks/useFormPersistence';
 import { uploadFileToArchiveControlled, type ArchiveUploadController } from '@/utils/archiveMultipartUpload';
+import { uploadPdfMaybeSplit } from '@/utils/pdfSplitUpload';
 
 export interface UploadItem {
   id: string;
@@ -186,22 +187,26 @@ export const UploadManagerProvider: React.FC<{ children: React.ReactNode }> = ({
   const uploadWithRetry = async (item: UploadItem): Promise<{ url: string }> => {
     // Part-level retries are handled inside uploadFileToArchiveControlled.
     // No outer retry: full restart wastes parts archive.org already accepted.
-    const handle = uploadFileToArchiveControlled(
-      item.file,
-      {
-        fileName: item.fileName,
-        fileType: item.fileType,
-        chapterId: item.chapterId,
-        contentType: item.contentType,
-        contentId: item.contentId,
-      },
-      (p) => {
-        const pct = Math.min(99, Math.max(0, Math.round(p.ratio * 100)));
-        setItems(prev => prev.map(i =>
-          i.id === item.id ? { ...i, progress: pct } : i
-        ));
-      },
-    );
+    const onProgress = (p: { ratio: number }) => {
+      const pct = Math.min(99, Math.max(0, Math.round(p.ratio * 100)));
+      setItems(prev => prev.map(i =>
+        i.id === item.id ? { ...i, progress: pct } : i
+      ));
+    };
+
+    const archiveOpts = {
+      fileName: item.fileName,
+      fileType: item.fileType,
+      chapterId: item.chapterId,
+      contentType: item.contentType,
+      contentId: item.contentId,
+    };
+
+    // PDFs are routed through the split-aware uploader. It transparently
+    // falls back to a single upload for short PDFs (≤ threshold pages).
+    const handle = item.fileType === 'pdf'
+      ? uploadPdfMaybeSplit(item.file, archiveOpts, onProgress)
+      : uploadFileToArchiveControlled(item.file, archiveOpts, onProgress);
     controllersRef.current.set(item.id, handle.controller);
     return handle.promise;
   };
