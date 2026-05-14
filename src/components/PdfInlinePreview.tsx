@@ -104,12 +104,16 @@ function SinglePdfView({
   filenameOverride,
   rightSlot,
   pageBadge,
+  downloadLabel,
+  extraDownloadActions,
 }: {
   url: string;
   className?: string;
   filenameOverride?: string;
   rightSlot?: React.ReactNode;
   pageBadge?: string;
+  downloadLabel?: string;
+  extraDownloadActions?: React.ReactNode;
 }) {
   const [pages, setPages] = useState<any[]>([]);
   const [scale, setScale] = useState(1);
@@ -223,20 +227,23 @@ function SinglePdfView({
           >
             <ZoomIn className="h-4 w-4" />
           </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleDownload}
-            disabled={downloading}
-            className="gap-1"
-          >
-            {downloading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4" />
-            )}
-            <span className="hidden sm:inline">Download</span>
-          </Button>
+          <div className="inline-flex rounded-md shadow-sm overflow-hidden">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleDownload}
+              disabled={downloading}
+              className={`gap-1 ${extraDownloadActions ? 'rounded-r-none' : ''}`}
+            >
+              {downloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">{downloadLabel ?? 'Download'}</span>
+            </Button>
+            {extraDownloadActions}
+          </div>
           <Button variant="ghost" size="sm" asChild className="gap-1">
             <a
               href={url.replace(/ /g, '%20')}
