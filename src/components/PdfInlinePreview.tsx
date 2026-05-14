@@ -4,7 +4,7 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { PDFDocument } from 'pdf-lib';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Download, ExternalLink, ZoomIn, ZoomOut, AlertCircle, RefreshCw, Files, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Loader2, Download, ExternalLink, ZoomIn, ZoomOut, AlertCircle, RefreshCw, FileText, FileStack, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -106,6 +106,8 @@ function SinglePdfView({
   pageBadge,
   downloadLabel,
   extraDownloadActions,
+  downloadIcon,
+  downloadTitle,
 }: {
   url: string;
   className?: string;
@@ -114,6 +116,8 @@ function SinglePdfView({
   pageBadge?: string;
   downloadLabel?: string;
   extraDownloadActions?: React.ReactNode;
+  downloadIcon?: React.ReactNode;
+  downloadTitle?: string;
 }) {
   const [pages, setPages] = useState<any[]>([]);
   const [scale, setScale] = useState(1);
@@ -229,16 +233,17 @@ function SinglePdfView({
           </Button>
           <div className="inline-flex rounded-md shadow-sm overflow-hidden">
             <Button
-              variant="default"
+              variant={extraDownloadActions ? 'outline' : 'default'}
               size="sm"
               onClick={handleDownload}
               disabled={downloading}
+              title={downloadTitle ?? 'Download this file'}
               className={`gap-1 ${extraDownloadActions ? 'rounded-r-none' : ''}`}
             >
               {downloading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Download className="h-4 w-4" />
+                downloadIcon ?? <Download className="h-4 w-4" />
               )}
               <span className="hidden sm:inline">{downloadLabel ?? 'Download'}</span>
             </Button>
