@@ -131,8 +131,9 @@ async function buildPathAndMetadata(opts: {
   chapterId?: string | null;
   contentType?: string | null;
   contentId?: string | null;
+  subPath?: string | null;
 }): Promise<PathContext> {
-  const { fileName, fileType, chapterId, contentType, contentId } = opts;
+  const { fileName, fileType, chapterId, contentType, contentId, subPath } = opts;
   const mediatype =
     fileType === 'audio' ? 'audio' : fileType === 'image' ? 'image' : 'texts';
 
@@ -172,10 +173,13 @@ async function buildPathAndMetadata(opts: {
     const subjectName = sanitize(subject.name);
     const chapterName = sanitize(chapter.name);
 
+    // When subPath is provided it replaces the leaf filename and lets callers
+    // place files under a deeper folder (e.g. <originalBase>/pages/1.pdf).
+    const leaf = subPath || fileName;
     const folderPath =
       contentType && contentId
-        ? `${className}/${subjectName}/${chapterName}/${contentType}/${contentId}/${fileName}`
-        : `${className}/${subjectName}/${chapterName}/${fileName}`;
+        ? `${className}/${subjectName}/${chapterName}/${contentType}/${contentId}/${leaf}`
+        : `${className}/${subjectName}/${chapterName}/${leaf}`;
 
     return {
       folderPath,
@@ -194,8 +198,10 @@ async function buildPathAndMetadata(opts: {
   }
 
   const timestamp = Date.now();
+  // Without a chapter we still honor subPath so per-page splits group together.
+  const fallbackLeaf = subPath || sanitize(fileName);
   return {
-    folderPath: `uploads/${timestamp}-${sanitize(fileName)}`,
+    folderPath: `uploads/${timestamp}-${fallbackLeaf}`,
     metadataHeaders: {
       ...baseHeaders,
       'x-archive-meta-title': encodeForHeader(`Upload - ${fileName}`),
@@ -220,6 +226,7 @@ async function handleSingle(req: Request): Promise<Response> {
   const chapterId = formData.get('chapterId') as string | null;
   const contentType = formData.get('contentType') as string | null;
   const contentId = formData.get('contentId') as string | null;
+  const subPath = formData.get('subPath') as string | null;
 
   if (!file || !fileName) throw new Error('File and fileName are required');
 
@@ -229,6 +236,7 @@ async function handleSingle(req: Request): Promise<Response> {
     chapterId,
     contentType,
     contentId,
+    subPath,
   });
 
   const buffer = await file.arrayBuffer();
@@ -259,7 +267,7 @@ async function handleSingle(req: Request): Promise<Response> {
 // ---------- Multipart: initiate ----------
 async function handleInitiate(req: Request): Promise<Response> {
   const body = await req.json();
-  const { fileName, fileType, chapterId, contentType, contentId, mimeType } = body;
+  const { fileName, fileType, chapterId, contentType, contentId, mimeType, subPath } = body;
   if (!fileName) throw new Error('fileName is required');
 
   const { folderPath, metadataHeaders } = await buildPathAndMetadata({
@@ -268,6 +276,7 @@ async function handleInitiate(req: Request): Promise<Response> {
     chapterId,
     contentType,
     contentId,
+    subPath,
   });
 
   const url = `${archiveS3Url(folderPath)}?uploads`;

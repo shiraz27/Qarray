@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { extractMetadataFromOCR, ExtractedMetadata } from '@/utils/metadataExtractor';
 import { extractPdfTextAndOcr } from '@/utils/pdfOcrHelpers';
+import { expandManifestUrls } from '@/utils/splitPdfManifest';
 
 type FileType = 'pdf' | 'image' | 'video' | 'audio' | 'unknown';
 
@@ -112,12 +113,15 @@ async function extractImageText(
  *                     propagation-delay 404s and is much faster.
  */
 export async function processOcrAndExtractMetadata(
-  mediaUrls: string[],
+  mediaUrlsRaw: string[],
   onProgress?: (update: { message: string; progress: number }) => void,
   localFiles?: Map<string, File>,
   signal?: AbortSignal
 ): Promise<OcrAndExtractResult> {
   try {
+    // Expand split-PDF manifests so this code path treats each page as a
+    // standalone PDF for OCR purposes.
+    const mediaUrls = await expandManifestUrls(mediaUrlsRaw);
     if (mediaUrls.length === 0) {
       return {
         success: false,
