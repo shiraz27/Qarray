@@ -40,8 +40,11 @@ async function splitPdfToPages(file: File): Promise<File[]> {
     const [copied] = await dst.copyPages(src, [i]);
     dst.addPage(copied);
     const bytes = await dst.save();
+    // pdf-lib returns Uint8Array<ArrayBufferLike>; copy into a plain ArrayBuffer
+    // so it satisfies BlobPart in strict TS.
+    const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     out.push(
-      new File([bytes], `${i + 1}.pdf`, { type: 'application/pdf' }),
+      new File([ab], `${i + 1}.pdf`, { type: 'application/pdf' }),
     );
   }
   return out;
