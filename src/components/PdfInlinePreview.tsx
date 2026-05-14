@@ -104,12 +104,16 @@ function SinglePdfView({
   filenameOverride,
   rightSlot,
   pageBadge,
+  downloadLabel,
+  extraDownloadActions,
 }: {
   url: string;
   className?: string;
   filenameOverride?: string;
   rightSlot?: React.ReactNode;
   pageBadge?: string;
+  downloadLabel?: string;
+  extraDownloadActions?: React.ReactNode;
 }) {
   const [pages, setPages] = useState<any[]>([]);
   const [scale, setScale] = useState(1);
@@ -223,20 +227,23 @@ function SinglePdfView({
           >
             <ZoomIn className="h-4 w-4" />
           </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleDownload}
-            disabled={downloading}
-            className="gap-1"
-          >
-            {downloading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4" />
-            )}
-            <span className="hidden sm:inline">Download</span>
-          </Button>
+          <div className="inline-flex rounded-md shadow-sm overflow-hidden">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleDownload}
+              disabled={downloading}
+              className={`gap-1 ${extraDownloadActions ? 'rounded-r-none' : ''}`}
+            >
+              {downloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">{downloadLabel ?? 'Download'}</span>
+            </Button>
+            {extraDownloadActions}
+          </div>
           <Button variant="ghost" size="sm" asChild className="gap-1">
             <a
               href={url.replace(/ /g, '%20')}
@@ -418,6 +425,8 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
 
   const total = manifest.totalPages;
   const goTo = (n: number) => setSelected(Math.min(total, Math.max(1, n)));
+  const baseName = (manifest.originalName || 'document.pdf').replace(/\.pdf$/i, '');
+  const pageFilename = `${baseName}-page-${currentPage.n}.pdf`;
 
   const dropdown = (
     <div className="flex items-center gap-1.5 flex-wrap">
@@ -481,21 +490,25 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
           ))}
         </SelectContent>
       </Select>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleDownloadAll}
-        disabled={downloadingAll}
-        className="gap-1"
-      >
-        {downloadingAll ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Files className="h-4 w-4" />
-        )}
-        <span className="hidden sm:inline">Download all</span>
-      </Button>
     </div>
+  );
+
+  const downloadAllButton = (
+    <Button
+      variant="default"
+      size="sm"
+      onClick={handleDownloadAll}
+      disabled={downloadingAll}
+      className="gap-1 rounded-l-none border-l border-primary-foreground/20"
+      title={`Merge all ${total} pages into one PDF and download`}
+    >
+      {downloadingAll ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <Files className="h-4 w-4" />
+      )}
+      <span className="hidden sm:inline">All {total} pages</span>
+    </Button>
   );
 
   return (
@@ -503,9 +516,11 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
       key={currentPage.url}
       url={currentPage.url}
       className={className}
-      filenameOverride={`${manifest.originalName} — page ${currentPage.n}`}
+      filenameOverride={pageFilename}
       pageBadge={`${manifest.totalPages} pages`}
       rightSlot={dropdown}
+      downloadLabel={`Page ${currentPage.n}`}
+      extraDownloadActions={downloadAllButton}
     />
   );
 }
