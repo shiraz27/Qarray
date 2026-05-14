@@ -4,7 +4,7 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { PDFDocument } from 'pdf-lib';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Download, ExternalLink, ZoomIn, ZoomOut, AlertCircle, RefreshCw, Files } from 'lucide-react';
+import { Loader2, Download, ExternalLink, ZoomIn, ZoomOut, AlertCircle, RefreshCw, Files, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -416,19 +416,67 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
   const currentPage =
     manifest.pages.find((p) => p.n === selected) || manifest.pages[0];
 
+  const total = manifest.totalPages;
+  const goTo = (n: number) => setSelected(Math.min(total, Math.max(1, n)));
+
   const dropdown = (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-center rounded-md border border-border bg-background overflow-hidden">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-none"
+          onClick={() => goTo(1)}
+          disabled={selected <= 1}
+          aria-label="First page"
+        >
+          <ChevronsLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-none border-l border-border"
+          onClick={() => goTo(selected - 1)}
+          disabled={selected <= 1}
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="px-2 text-xs font-medium tabular-nums border-l border-border h-8 flex items-center min-w-[64px] justify-center">
+          {selected} / {total}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-none border-l border-border"
+          onClick={() => goTo(selected + 1)}
+          disabled={selected >= total}
+          aria-label="Next page"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-none border-l border-border"
+          onClick={() => goTo(total)}
+          disabled={selected >= total}
+          aria-label="Last page"
+        >
+          <ChevronsRight className="h-4 w-4" />
+        </Button>
+      </div>
       <Select
         value={String(selected)}
         onValueChange={(v) => setSelected(parseInt(v, 10))}
       >
-        <SelectTrigger className="h-8 w-[140px] text-xs">
+        <SelectTrigger className="h-8 w-[120px] text-xs">
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-[300px]">
           {manifest.pages.map((p) => (
             <SelectItem key={p.n} value={String(p.n)} className="text-xs">
-              Page {p.n} / {manifest.totalPages}
+              Page {p.n} / {total}
             </SelectItem>
           ))}
         </SelectContent>
