@@ -6,6 +6,13 @@ export interface ArchiveUploadOptions {
   chapterId?: number | string;
   contentType?: string;
   contentId?: string;
+  /**
+   * Optional sub-path appended to the computed folder, replacing the leaf
+   * filename. Used by the split-PDF pipeline to drop pages under
+   * `<originalBase>/pages/<n>.pdf` while keeping all related files in one
+   * Archive.org item folder.
+   */
+  subPath?: string;
 }
 
 export interface ArchiveUploadProgress {
@@ -57,6 +64,7 @@ async function singleUpload(
   }
   if (options.contentType) formData.append('contentType', options.contentType);
   if (options.contentId) formData.append('contentId', options.contentId);
+  if (options.subPath) formData.append('subPath', options.subPath);
 
   const data = await invokeFn<{ url: string }>(formData);
   if (!data?.url) throw new Error('No URL returned from upload');
@@ -137,6 +145,7 @@ async function multipartUpload(
     chapterId: options.chapterId !== undefined ? String(options.chapterId) : undefined,
     contentType: options.contentType,
     contentId: options.contentId,
+    subPath: options.subPath,
     mimeType: file.type || 'application/octet-stream',
   });
   const { uploadId, key } = init;
