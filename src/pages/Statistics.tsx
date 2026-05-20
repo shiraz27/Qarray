@@ -1945,35 +1945,18 @@ export default function Statistics() {
                                             />
                                           </TableCell>
                                           <TableCell>
-                                            {resource.ocr_text ? (
-                                              <Popover>
-                                                <PopoverTrigger asChild>
-                                                  <button className="text-xs text-left text-muted-foreground hover:text-foreground max-w-[200px] truncate underline-offset-2 hover:underline">
-                                                    {resource.ocr_text.substring(0, 60)}
-                                                    {resource.ocr_text.length > 60 ? '…' : ''}
-                                                  </button>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="w-[480px] max-h-[400px] overflow-auto">
-                                                  <div className="flex justify-end mb-2">
-                                                    <Button
-                                                      size="sm"
-                                                      variant="ghost"
-                                                      onClick={() => {
-                                                        navigator.clipboard.writeText(resource.ocr_text || '');
-                                                        toast.success('Copied OCR text');
-                                                      }}
-                                                    >
-                                                      Copy
-                                                    </Button>
-                                                  </div>
-                                                  <pre className="text-xs whitespace-pre-wrap break-words">
-                                                    {resource.ocr_text}
-                                                  </pre>
-                                                </PopoverContent>
-                                              </Popover>
-                                            ) : (
-                                              <span className="text-xs text-muted-foreground">—</span>
-                                            )}
+                                            <OcrTextEditor
+                                              table="resources"
+                                              rowId={resource.id}
+                                              text={resource.ocr_text ?? null}
+                                              onChanged={(next) =>
+                                                setResources((prev) =>
+                                                  prev.map((r) =>
+                                                    r.id === resource.id ? { ...r, ocr_text: next } : r,
+                                                  ),
+                                                )
+                                              }
+                                            />
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
