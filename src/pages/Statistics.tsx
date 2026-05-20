@@ -1930,12 +1930,18 @@ export default function Statistics() {
                                             />
                                           </TableCell>
                                           <TableCell>
-                                            <div className="space-y-1">
-                                              {getOcrStatusBadge(resource.ocr_status)}
-                                              <div className="text-[10px] font-mono text-muted-foreground">
-                                                {resource.ocr_status ?? 'null'}
-                                              </div>
-                                            </div>
+                                            <OcrStatusEditor
+                                              table="resources"
+                                              rowId={resource.id}
+                                              status={resource.ocr_status as OcrStatus}
+                                              onChanged={(next) =>
+                                                setResources((prev) =>
+                                                  prev.map((r) =>
+                                                    r.id === resource.id ? { ...r, ocr_status: next } : r,
+                                                  ),
+                                                )
+                                              }
+                                            />
                                           </TableCell>
                                           <TableCell>
                                             {resource.ocr_text ? (
