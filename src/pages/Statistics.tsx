@@ -2380,12 +2380,18 @@ export default function Statistics() {
                                             />
                                           </TableCell>
                                           <TableCell>
-                                            <div className="space-y-1">
-                                              {getOcrStatusBadge(question.ocr_status)}
-                                              <div className="text-[10px] font-mono text-muted-foreground">
-                                                {question.ocr_status ?? 'null'}
-                                              </div>
-                                            </div>
+                                            <OcrStatusEditor
+                                              table="questions"
+                                              rowId={question.id}
+                                              status={question.ocr_status as OcrStatus}
+                                              onChanged={(next) =>
+                                                setQuestions((prev) =>
+                                                  prev.map((q) =>
+                                                    q.id === question.id ? { ...q, ocr_status: next } : q,
+                                                  ),
+                                                )
+                                              }
+                                            />
                                           </TableCell>
                                           <TableCell>
                                             {question.ocr_text ? (
