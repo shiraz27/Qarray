@@ -40,6 +40,7 @@ import { isPdfUrl, isImageUrl, urlsHaveOcrable, textHasOcrableUrl } from '@/util
 import { processQuestionOCR } from '@/utils/clientQuestionOcrProcessor';
 import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, applySuggestedTitle, extractMetadataFromOCR, type ExtractedMetadata, type MetadataField } from '@/utils/metadataExtractor';
 import { MetaCell, type CellValue } from '@/components/statistics/MetaCell';
+import { OcrStatusEditor, type OcrStatus } from '@/components/statistics/OcrStatusEditor';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
 interface Stats {
