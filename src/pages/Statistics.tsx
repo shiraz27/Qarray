@@ -40,6 +40,7 @@ import { isPdfUrl, isImageUrl, urlsHaveOcrable, textHasOcrableUrl } from '@/util
 import { processQuestionOCR } from '@/utils/clientQuestionOcrProcessor';
 import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, applySuggestedTitle, extractMetadataFromOCR, type ExtractedMetadata, type MetadataField } from '@/utils/metadataExtractor';
 import { MetaCell, type CellValue } from '@/components/statistics/MetaCell';
+import { OcrStatusEditor, type OcrStatus } from '@/components/statistics/OcrStatusEditor';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
 interface Stats {
@@ -1929,12 +1930,18 @@ export default function Statistics() {
                                             />
                                           </TableCell>
                                           <TableCell>
-                                            <div className="space-y-1">
-                                              {getOcrStatusBadge(resource.ocr_status)}
-                                              <div className="text-[10px] font-mono text-muted-foreground">
-                                                {resource.ocr_status ?? 'null'}
-                                              </div>
-                                            </div>
+                                            <OcrStatusEditor
+                                              table="resources"
+                                              rowId={resource.id}
+                                              status={resource.ocr_status as OcrStatus}
+                                              onChanged={(next) =>
+                                                setResources((prev) =>
+                                                  prev.map((r) =>
+                                                    r.id === resource.id ? { ...r, ocr_status: next } : r,
+                                                  ),
+                                                )
+                                              }
+                                            />
                                           </TableCell>
                                           <TableCell>
                                             {resource.ocr_text ? (
@@ -2373,12 +2380,18 @@ export default function Statistics() {
                                             />
                                           </TableCell>
                                           <TableCell>
-                                            <div className="space-y-1">
-                                              {getOcrStatusBadge(question.ocr_status)}
-                                              <div className="text-[10px] font-mono text-muted-foreground">
-                                                {question.ocr_status ?? 'null'}
-                                              </div>
-                                            </div>
+                                            <OcrStatusEditor
+                                              table="questions"
+                                              rowId={question.id}
+                                              status={question.ocr_status as OcrStatus}
+                                              onChanged={(next) =>
+                                                setQuestions((prev) =>
+                                                  prev.map((q) =>
+                                                    q.id === question.id ? { ...q, ocr_status: next } : q,
+                                                  ),
+                                                )
+                                              }
+                                            />
                                           </TableCell>
                                           <TableCell>
                                             {question.ocr_text ? (

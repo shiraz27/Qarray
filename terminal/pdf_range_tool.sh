@@ -24,31 +24,47 @@ while true; do
     read -p "Page ranges (e.g., 5-15,17-21,165,168-169) or 'quit': " ranges
     [[ "$ranges" == "quit" ]] && break
     [[ -z "$ranges" ]] && continue
+
+    # Split ranges by comma and clean up any spaces
+    IFS=',' read -ra groups <<< "$(echo "$ranges" | tr -d ' ')"
     
-        # Split ranges by comma and clean up any spaces
-    ranges_clean=$(echo "$ranges" | tr -d ' ')
-    IFS=',' read -ra parts <<< "$ranges_clean"
-    
-    # Process each range separately
-    for part in "${parts[@]}"; do
-        # Validate range format
-        if [[ ! "$part" =~ ^[0-9]+$ ]] && [[ ! "$part" =~ ^([0-9]+)-([0-9]+)$ ]]; then
-            echo "Invalid range: $part"
+    # Process each group (may contain merged ranges with +)
+    for group in "${groups[@]}"; do
+        # Split group into individual ranges by +
+        IFS='+' read -ra subranges <<< "$group"
+        
+        # Validate each subrange and build the range string for qpdf
+        valid_ranges=()
+        for subrange in "${subranges[@]}"; do
+            if [[ "$subrange" =~ ^[0-9]+$ ]]; then
+                valid_ranges+=("$subrange")
+            elif [[ "$subrange" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+                valid_ranges+=("${BASH_REMATCH[1]}-${BASH_REMATCH[2]}")
+            else
+                echo "Invalid range: $subrange"
+                continue 2
+            fi
+        done
+        
+        # Skip if no valid ranges found
+        if [ ${#valid_ranges[@]} -eq 0 ]; then
+            echo "No valid ranges in group: $group"
             continue
         fi
         
-        # Create output filename based on range
-        output="${INPUT_PDF%.*}_${part}.pdf"
-        echo "Extracting $part → $output"
+        # Create output filename based on the group (replace + with _ for readability)
+        output="${INPUT_PDF%.*}_${group//+/_}.pdf"
+        echo "Extracting ${valid_ranges[*]} → $output"
         
         # Display the exact command for debugging
-        echo "Running: qpdf --empty --pages \"$INPUT_PDF\" \"$part\" -- \"$output\""
+        echo "Running: qpdf --empty --pages \"$INPUT_PDF\" ${valid_ranges[*]} -- \"$output\""
         
-        # Execute qpdf command for this specific range
-        qpdf --empty --pages "$INPUT_PDF" "$part" -- "$output"
+        # Execute qpdf command for this group of ranges
+        qpdf --empty --pages "$INPUT_PDF" "${valid_ranges[*]}" -- "$output"
         
         echo "✅ Created $output"
     done
+
 
 
 done
