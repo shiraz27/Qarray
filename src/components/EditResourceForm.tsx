@@ -16,6 +16,8 @@ import { MediaUploader } from './MediaUploader';
 import { computePageCountFromUrls } from '@/utils/pageCountHelpers';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
 import { ResourceTypeMultiSelect } from './ResourceTypeMultiSelect';
+import { SharedChaptersMultiSelect } from './SharedChaptersMultiSelect';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
@@ -44,6 +46,7 @@ interface EditResourceFormProps {
     school_name?: string | null;
     teacher_name?: string | null;
     book?: string | null;
+    shared_with?: number[] | null;
   };
   resourceTypes: Array<{ id: number; type: string }>;
   devoirTypes: Array<{ id: number; devoir_type: string }>;
@@ -62,6 +65,8 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>(initialData.data);
+  const [sharedWith, setSharedWith] = useState<number[]>(initialData.shared_with ?? []);
+  const { isModerator } = useUserRole();
   const { getUploadsByCallback } = useUploadManager();
   
   // Generate stable callback ID for tracking uploads
@@ -152,6 +157,11 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
           books: data.book ? [data.book] : [],
         page_count: await computePageCountFromUrls(mediaUrls).then(r => r.complete ? r.count : null).catch(() => null),
       };
+
+      // Only mods/admins can write shared_with (DB trigger also enforces this).
+      if (isModerator) {
+        updateData.shared_with = sharedWith;
+      }
 
       // Only update OCR status if new PDF/image was added
       if (hasNewPdfOrImage) {
@@ -328,6 +338,25 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
             </FormItem>
           )}
         />
+
+        {isModerator && (
+          <div className="space-y-2 rounded-md border border-dashed border-border p-3">
+            <FormLabel className="flex items-center gap-2">
+              Also share with chapters
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Mod only
+              </span>
+            </FormLabel>
+            <p className="text-xs text-muted-foreground">
+              This resource will also appear inline in the chapters you pick — no re-upload.
+            </p>
+            <SharedChaptersMultiSelect
+              value={sharedWith}
+              onChange={setSharedWith}
+              excludeChapterId={chapterId}
+            />
+          </div>
+        )}
 
         <div className="flex gap-2 justify-end">
           <Button type="button" variant="outline" onClick={onCancel}>

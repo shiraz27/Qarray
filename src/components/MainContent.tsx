@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { resourceChapterFilter } from '@/utils/resourceChapterFilter';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -135,7 +136,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
             const { count: resourceCount } = await supabase
               .from('resources')
               .select('*', { count: 'exact', head: true })
-              .eq('chapter_id', chapter.id)
+              .or(resourceChapterFilter(chapter.id))
               .eq('deleted', false);
 
             // Sum page_count from resources + questions
@@ -143,7 +144,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
               supabase
                 .from('resources')
                 .select('page_count')
-                .eq('chapter_id', chapter.id)
+                .or(resourceChapterFilter(chapter.id))
                 .eq('deleted', false),
               supabase
                 .from('questions')
@@ -226,13 +227,13 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
                 const { count: resourceCount } = await supabase
                   .from('resources')
                   .select('*', { count: 'exact', head: true })
-                  .eq('chapter_id', ch.id)
+                  .or(resourceChapterFilter(ch.id))
                   .eq('deleted', false);
                 const [{ data: resPages }, { data: qPages }] = await Promise.all([
                   supabase
                     .from('resources')
                     .select('page_count')
-                    .eq('chapter_id', ch.id)
+                    .or(resourceChapterFilter(ch.id))
                     .eq('deleted', false),
                   supabase
                     .from('questions')
@@ -379,14 +380,14 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
             const { count: resourceCount } = await supabase
               .from('resources')
               .select('*', { count: 'exact', head: true })
-              .eq('chapter_id', chapter.id)
+              .or(resourceChapterFilter(chapter.id))
               .eq('deleted', false);
 
             const [{ data: resPages }, { data: qPages }] = await Promise.all([
               supabase
                 .from('resources')
                 .select('page_count')
-                .eq('chapter_id', chapter.id)
+                .or(resourceChapterFilter(chapter.id))
                 .eq('deleted', false),
               supabase
                 .from('questions')

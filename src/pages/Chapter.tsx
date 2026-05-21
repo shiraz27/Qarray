@@ -21,6 +21,7 @@ import { PageCountBadge } from '@/components/PageCountBadge';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { SEO, createCourseSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
+import { resourceChapterFilter } from '@/utils/resourceChapterFilter';
 
 interface ChapterData {
   id: number;
@@ -222,7 +223,7 @@ export default function Chapter() {
         const { count: resourceCount } = await supabase
           .from('resources')
           .select('*', { count: 'exact', head: true })
-          .eq('chapter_id', chapterId)
+          .or(resourceChapterFilter(chapterId))
           .eq('deleted', false);
 
         // Aggregate page count: sum of resources.page_count + questions.page_count
@@ -230,7 +231,7 @@ export default function Chapter() {
           supabase
             .from('resources')
             .select('page_count')
-            .eq('chapter_id', chapterId)
+            .or(resourceChapterFilter(chapterId))
             .eq('deleted', false),
           supabase
             .from('questions')
@@ -360,7 +361,7 @@ export default function Chapter() {
         const { data: resourcesData } = await (supabase as any)
           .from('resources')
           .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, book, page_count')
-          .eq('chapter_id', chapterId)
+          .or(resourceChapterFilter(chapterId))
           .eq('deleted', false)
           .order('created_at', { ascending: false });
 
@@ -624,7 +625,7 @@ export default function Chapter() {
         const { data: resourcesData } = await (supabase as any)
           .from('resources')
           .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, page_count')
-          .eq('chapter_id', chapter?.id)
+          .or(resourceChapterFilter(chapter?.id))
           .eq('deleted', false)
           .order('created_at', { ascending: false });
 
@@ -1139,7 +1140,7 @@ export default function Chapter() {
                       const { data: resourcesData } = await (supabase as any)
                         .from('resources')
                         .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, page_count')
-                        .eq('chapter_id', chapter.id)
+                        .or(resourceChapterFilter(chapter.id))
                         .eq('deleted', false)
                         .order('created_at', { ascending: false });
 

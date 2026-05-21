@@ -726,6 +726,7 @@ export default function ResourceDetail() {
                       school_name: resource.school_name,
                       teacher_name: resource.teacher_name,
                       book: (resource as any).book,
+                      shared_with: (resource as any).shared_with ?? [],
                     }}
                     resourceTypes={resourceTypes}
                     devoirTypes={devoirTypes}
