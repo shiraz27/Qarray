@@ -339,6 +339,25 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
           )}
         />
 
+        {isModerator && (
+          <div className="space-y-2 rounded-md border border-dashed border-border p-3">
+            <FormLabel className="flex items-center gap-2">
+              Also share with chapters
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Mod only
+              </span>
+            </FormLabel>
+            <p className="text-xs text-muted-foreground">
+              This resource will also appear inline in the chapters you pick — no re-upload.
+            </p>
+            <SharedChaptersMultiSelect
+              value={sharedWith}
+              onChange={setSharedWith}
+              excludeChapterId={chapterId}
+            />
+          </div>
+        )}
+
         <div className="flex gap-2 justify-end">
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
