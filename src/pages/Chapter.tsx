@@ -21,6 +21,7 @@ import { PageCountBadge } from '@/components/PageCountBadge';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { SEO, createCourseSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
+import { resourceChapterFilter } from '@/utils/resourceChapterFilter';
 
 interface ChapterData {
   id: number;
