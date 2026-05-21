@@ -698,6 +698,7 @@ export type Database = {
           published_by: string | null
           school_name: string | null
           school_names: string[]
+          shared_with: number[]
           subject_id: number | null
           teacher_name: string | null
           teacher_names: string[]
@@ -727,6 +728,7 @@ export type Database = {
           published_by?: string | null
           school_name?: string | null
           school_names?: string[]
+          shared_with?: number[]
           subject_id?: number | null
           teacher_name?: string | null
           teacher_names?: string[]
@@ -756,6 +758,7 @@ export type Database = {
           published_by?: string | null
           school_name?: string | null
           school_names?: string[]
+          shared_with?: number[]
           subject_id?: number | null
           teacher_name?: string | null
           teacher_names?: string[]
