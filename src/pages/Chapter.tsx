@@ -222,7 +222,7 @@ export default function Chapter() {
         const { count: resourceCount } = await supabase
           .from('resources')
           .select('*', { count: 'exact', head: true })
-          .eq('chapter_id', chapterId)
+          .or(resourceChapterFilter(chapterId))
           .eq('deleted', false);
 
         // Aggregate page count: sum of resources.page_count + questions.page_count
@@ -230,7 +230,7 @@ export default function Chapter() {
           supabase
             .from('resources')
             .select('page_count')
-            .eq('chapter_id', chapterId)
+            .or(resourceChapterFilter(chapterId))
             .eq('deleted', false),
           supabase
             .from('questions')
