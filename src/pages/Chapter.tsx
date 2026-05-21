@@ -1140,7 +1140,7 @@ export default function Chapter() {
                       const { data: resourcesData } = await (supabase as any)
                         .from('resources')
                         .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, page_count')
-                        .eq('chapter_id', chapter.id)
+                        .or(resourceChapterFilter(chapter.id))
                         .eq('deleted', false)
                         .order('created_at', { ascending: false });
 
