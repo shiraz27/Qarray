@@ -1,5 +1,6 @@
 import React from 'react';
 import { Share2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSharedWithSummary } from '@/hooks/useSharedWithSummary';
