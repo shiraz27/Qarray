@@ -18,6 +18,11 @@ export interface SharedWithSummary {
 
 const EMPTY: SharedWithSummary = { classes: [], subjects: [], chapters: [], destinations: [], loading: false };
 
+type ChapterRow = { id: number; name: string | null; class_id: number | null; subject_id: number | null };
+type LookupRow = { id: number; name: string };
+const isNumber = (value: number | null | undefined): value is number => typeof value === 'number';
+const isChapterRow = (value: ChapterRow | undefined): value is ChapterRow => Boolean(value);
+
 /**
  * Given a list of chapter ids (resource.shared_with), resolve the distinct
  * destination classes and subjects for the small "Shared with" badge.
@@ -35,28 +40,28 @@ export function useSharedWithSummary(sharedWithIds: number[] | null | undefined)
     let cancelled = false;
     setState((s) => ({ ...s, loading: true }));
     (async () => {
-      const { data: chapterRows } = await (supabase as any)
+      const { data: chapterRows } = await supabase
         .from('chapters')
         .select('id, name, class_id, subject_id')
         .in('id', ids);
       if (cancelled) return;
 
-      const rows = (chapterRows as any[] | null) || [];
-      const classIds = Array.from(new Set(rows.map((c) => c.class_id).filter(Boolean)));
-      const subjectIds = Array.from(new Set(rows.map((c) => c.subject_id).filter(Boolean)));
+      const rows = (chapterRows || []) as ChapterRow[];
+      const classIds = Array.from(new Set(rows.map((c) => c.class_id).filter(isNumber)));
+      const subjectIds = Array.from(new Set(rows.map((c) => c.subject_id).filter(isNumber)));
 
       const [{ data: classRows }, { data: subjectRows }] = await Promise.all([
         classIds.length
-          ? (supabase as any).from('classes').select('id, name').in('id', classIds)
+          ? supabase.from('classes').select('id, name').in('id', classIds)
           : Promise.resolve({ data: [] }),
         subjectIds.length
-          ? (supabase as any).from('subjects').select('id, name').in('id', subjectIds)
+          ? supabase.from('subjects').select('id, name').in('id', subjectIds)
           : Promise.resolve({ data: [] }),
       ]);
       if (cancelled) return;
 
-      const classNames = new Map<number, string>(((classRows as any[] | null) || []).map((c) => [c.id, c.name]));
-      const subjectNames = new Map<number, string>(((subjectRows as any[] | null) || []).map((s) => [s.id, s.name]));
+      const classNames = new Map<number, string>(((classRows || []) as LookupRow[]).map((c) => [c.id, c.name]));
+      const subjectNames = new Map<number, string>(((subjectRows || []) as LookupRow[]).map((s) => [s.id, s.name]));
       const classMap = new Map<number, string>();
       const subjectMap = new Map<number, string>();
       const chapterMap = new Map<number, string>();
@@ -72,7 +77,7 @@ export function useSharedWithSummary(sharedWithIds: number[] | null | undefined)
         chapters: Array.from(chapterMap, ([id, name]) => ({ id, name })),
         destinations: ids
           .map((id) => byChapterId.get(id))
-          .filter(Boolean)
+          .filter(isChapterRow)
           .map((c) => ({
             chapterId: c.id,
             chapterName: c.name ?? `Chapter #${c.id}`,
