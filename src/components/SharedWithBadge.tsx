@@ -15,7 +15,7 @@ interface Props {
  * chapters. Counts distinct destination classes/subjects (not chapter names).
  */
 export const SharedWithBadge: React.FC<Props> = ({ sharedWith, size = 'xs' }) => {
-  const { classes, subjects, chapters } = useSharedWithSummary(sharedWith);
+  const { classes, subjects, chapters, destinations, loading } = useSharedWithSummary(sharedWith);
   if (!sharedWith || sharedWith.length === 0) return null;
 
   const textSize = size === 'xs' ? 'text-[10px]' : 'text-xs';
@@ -36,8 +36,35 @@ export const SharedWithBadge: React.FC<Props> = ({ sharedWith, size = 'xs' }) =>
           </span>
         </Badge>
       </PopoverTrigger>
-      <PopoverContent className="w-72 text-xs space-y-3 p-3" align="start">
+      <PopoverContent className="w-96 max-w-[calc(100vw-2rem)] text-xs space-y-3 p-3" align="start">
         <TooltipProvider delayDuration={150}>
+          <div>
+            <div className="font-semibold mb-2">Shared with</div>
+            {loading ? (
+              <div className="text-muted-foreground">Loading shared destinations…</div>
+            ) : destinations.length === 0 ? (
+              <div className="text-muted-foreground">No shared destinations found.</div>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {destinations.map((destination) => (
+                  <Tooltip key={destination.chapterId}>
+                    <TooltipTrigger asChild>
+                      <div className="rounded-md border border-border bg-background/60 px-2 py-1.5 leading-relaxed">
+                        <div className="font-medium truncate">Chapter: {destination.chapterName}</div>
+                        <div className="text-muted-foreground truncate">Class: {destination.className}</div>
+                        <div className="text-muted-foreground truncate">Subject: {destination.subjectName}</div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs space-y-1">
+                      <div>Class: {destination.className}</div>
+                      <div>Subject: {destination.subjectName}</div>
+                      <div>Chapter: {destination.chapterName}</div>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            )}
+          </div>
           <Section title="Classes" items={classes} />
           <Section title="Subjects" items={subjects} />
           <Section title="Chapters" items={chapters} />
