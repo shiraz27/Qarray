@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,9 @@ interface ChapterOption {
   class_id?: number | null;
 }
 
+interface ClassOption { id: number; name: string }
+interface SubjectOption { id: number; name: string; class_id: number | null }
+
 interface Props {
   value: number[];
   onChange: (next: number[]) => void;
@@ -40,6 +43,60 @@ export const SharedChaptersMultiSelect: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [selectedDetails, setSelectedDetails] = useState<Record<number, ChapterOption>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Scope filters
+  const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<number[]>([]);
+
+  // Load classes once popover opens
+  useEffect(() => {
+    if (!open || classes.length > 0) return;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('classes')
+        .select('id, name, hidden')
+        .eq('hidden', false)
+        .order('id');
+      setClasses(((data as any[]) || []).map((c) => ({ id: c.id, name: c.name })));
+    })();
+  }, [open, classes.length]);
+
+  // Load subjects whenever class selection changes
+  useEffect(() => {
+    if (!open) return;
+    if (selectedClassIds.length === 0) {
+      setSubjects([]);
+      setSelectedSubjectIds([]);
+      return;
+    }
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('subjects')
+        .select('id, name, class_id, deleted')
+        .in('class_id', selectedClassIds)
+        .eq('deleted', false)
+        .order('name');
+      const list = ((data as any[]) || []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        class_id: s.class_id,
+      }));
+      setSubjects(list);
+      // Drop subject ids no longer in scope
+      setSelectedSubjectIds((prev) => prev.filter((id) => list.some((s) => s.id === id)));
+    })();
+  }, [selectedClassIds, open]);
+
+  const filterKey = useMemo(
+    () =>
+      `${selectedClassIds.slice().sort().join(',')}|${selectedSubjectIds
+        .slice()
+        .sort()
+        .join(',')}`,
+    [selectedClassIds, selectedSubjectIds],
+  );
 
   // Hydrate names for already-selected ids
   useEffect(() => {
@@ -74,15 +131,42 @@ export const SharedChaptersMultiSelect: React.FC<Props> = ({
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const { data } = await (supabase as any).rpc('search_chapters_normalized', {
-          search_query: search || '',
-        });
-        const list: ChapterOption[] = (data || []).map((r: any) => ({
-          id: r.id,
-          name: r.name,
-          subject_name: r.subject_name ?? null,
-          class_id: r.class_id,
-        }));
+        // Determine which (class_id, subject_id) pairs to query.
+        // Multi-select is collapsed into N single-id RPC calls then merged.
+        type Pair = { class_id: number | null; subject_id: number | null };
+        let pairs: Pair[] = [];
+        if (selectedSubjectIds.length > 0) {
+          pairs = selectedSubjectIds.map((sid) => ({ class_id: null, subject_id: sid }));
+        } else if (selectedClassIds.length > 0) {
+          pairs = selectedClassIds.map((cid) => ({ class_id: cid, subject_id: null }));
+        } else {
+          pairs = [{ class_id: null, subject_id: null }];
+        }
+
+        const responses = await Promise.all(
+          pairs.map((p) =>
+            (supabase as any).rpc('search_chapters_normalized', {
+              search_query: search || '',
+              p_class_id: p.class_id,
+              p_subject_id: p.subject_id,
+            }),
+          ),
+        );
+
+        const merged = new Map<number, ChapterOption>();
+        for (const { data } of responses as any[]) {
+          for (const r of (data || []) as any[]) {
+            if (!merged.has(r.id)) {
+              merged.set(r.id, {
+                id: r.id,
+                name: r.name,
+                subject_name: r.subject_name ?? null,
+                class_id: r.class_id,
+              });
+            }
+          }
+        }
+        const list: ChapterOption[] = Array.from(merged.values()).slice(0, 50);
         setResults(list);
         setSelectedDetails((prev) => {
           const next = { ...prev };
@@ -96,13 +180,22 @@ export const SharedChaptersMultiSelect: React.FC<Props> = ({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [search, open]);
+  }, [search, open, filterKey]);
 
   const toggle = (id: number) => {
     if (excludeChapterId && id === excludeChapterId) return;
     if (value.includes(id)) onChange(value.filter((v) => v !== id));
     else onChange([...value, id]);
   };
+
+  const toggleClass = (id: number) =>
+    setSelectedClassIds((prev) =>
+      prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id],
+    );
+  const toggleSubject = (id: number) =>
+    setSelectedSubjectIds((prev) =>
+      prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id],
+    );
 
   return (
     <div className="space-y-2">
@@ -124,6 +217,81 @@ export const SharedChaptersMultiSelect: React.FC<Props> = ({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+          <div className="border-b p-2 space-y-2 max-h-64 overflow-y-auto">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+                Classes
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {classes.length === 0 && (
+                  <span className="text-xs text-muted-foreground">Loading…</span>
+                )}
+                {classes.map((c) => {
+                  const on = selectedClassIds.includes(c.id);
+                  return (
+                    <button
+                      type="button"
+                      key={c.id}
+                      onClick={() => toggleClass(c.id)}
+                      className={cn(
+                        'text-[11px] px-2 py-0.5 rounded-full border transition',
+                        on
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background text-foreground border-border hover:bg-muted',
+                      )}
+                    >
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+                Subjects
+              </div>
+              {selectedClassIds.length === 0 ? (
+                <span className="text-xs text-muted-foreground">
+                  Pick a class to filter by subject.
+                </span>
+              ) : subjects.length === 0 ? (
+                <span className="text-xs text-muted-foreground">No subjects.</span>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {subjects.map((s) => {
+                    const on = selectedSubjectIds.includes(s.id);
+                    return (
+                      <button
+                        type="button"
+                        key={s.id}
+                        onClick={() => toggleSubject(s.id)}
+                        className={cn(
+                          'text-[11px] px-2 py-0.5 rounded-full border transition',
+                          on
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background text-foreground border-border hover:bg-muted',
+                        )}
+                      >
+                        {s.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {(selectedClassIds.length > 0 || selectedSubjectIds.length > 0) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedClassIds([]);
+                  setSelectedSubjectIds([]);
+                }}
+                className="text-[11px] text-muted-foreground hover:text-foreground underline"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
           <Command shouldFilter={false}>
             <CommandInput
               placeholder="Type a chapter name…"
