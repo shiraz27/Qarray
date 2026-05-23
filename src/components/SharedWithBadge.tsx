@@ -1,6 +1,5 @@
 import React from 'react';
 import { Share2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSharedWithSummary } from '@/hooks/useSharedWithSummary';
@@ -24,9 +23,10 @@ export const SharedWithBadge: React.FC<Props> = ({ sharedWith, size = 'xs' }) =>
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Badge
-          variant="secondary"
-          className={`gap-1 px-1.5 py-0 h-5 ${textSize} font-normal cursor-pointer`}
+        <button
+          type="button"
+          aria-label="Show shared class, subject, and chapter destinations"
+          className={`inline-flex h-5 items-center gap-1 rounded-full border border-transparent bg-secondary px-1.5 py-0 ${textSize} font-normal text-secondary-foreground transition-colors hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
         >
           <Share2 size={iconSize} />
           <span>
@@ -34,9 +34,9 @@ export const SharedWithBadge: React.FC<Props> = ({ sharedWith, size = 'xs' }) =>
             {subjects.length} {subjects.length === 1 ? 'subject' : 'subjects'} ·{' '}
             {chapters.length} {chapters.length === 1 ? 'chapter' : 'chapters'}
           </span>
-        </Badge>
+        </button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 max-w-[calc(100vw-2rem)] text-xs space-y-3 p-3" align="start">
+      <PopoverContent className="w-[32rem] max-w-[calc(100vw-2rem)] text-xs space-y-3 p-3" align="start">
         <TooltipProvider delayDuration={150}>
           <div>
             <div className="font-semibold mb-2">Shared with</div>
@@ -50,9 +50,9 @@ export const SharedWithBadge: React.FC<Props> = ({ sharedWith, size = 'xs' }) =>
                   <Tooltip key={destination.chapterId}>
                     <TooltipTrigger asChild>
                       <div className="rounded-md border border-border bg-background/60 px-2 py-1.5 leading-relaxed">
-                        <div className="font-medium truncate">Chapter: {destination.chapterName}</div>
-                        <div className="text-muted-foreground truncate">Class: {destination.className}</div>
-                        <div className="text-muted-foreground truncate">Subject: {destination.subjectName}</div>
+                        <div className="font-medium break-words">Class: {destination.className}</div>
+                        <div className="text-muted-foreground break-words">Subject: {destination.subjectName}</div>
+                        <div className="text-muted-foreground break-words">Chapter: {destination.chapterName}</div>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs text-xs space-y-1">
