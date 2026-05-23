@@ -21,6 +21,7 @@ import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
 import { BookBadge } from '@/components/BookBadge';
 import { PageCountBadge } from '@/components/PageCountBadge';
+import { SharedWithBadge } from '@/components/SharedWithBadge';
 import { EmptyState } from '@/components/EmptyState';
 import { SEO, createLearningResourceSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
@@ -617,6 +618,7 @@ export default function ResourceDetail() {
               <div className="flex items-center gap-2 flex-wrap mb-2">
                 <h2 className="text-xl font-bold text-foreground">{capitalizeEveryWord(resource.title)}</h2>
                 <PageCountBadge pageCount={(resource as any).page_count} />
+                <SharedWithBadge sharedWith={(resource as any).shared_with} size="sm" />
               </div>
               <p className="text-sm text-muted-foreground mb-3">{resource.description}</p>
               

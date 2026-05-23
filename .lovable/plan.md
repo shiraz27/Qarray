@@ -1,79 +1,57 @@
-# Share identical resources across chapters (mods/admins only)
+# Share-with chapter picker: class/subject filters + small "Shared with" badge
 
 ## Goal
-Let admins/moderators mark a single resource as also belonging to other chapters, without re-uploading and without any visual distinction from native resources. No interaction with the existing `chapter_common_mappings` (that stays a cross-class chapter-equivalence feature).
+Make the moderator-only "Also share with chapters" picker faster to scope, and surface where a resource is shared with a tiny, unobtrusive badge that lists the destination classes/subjects (not chapter names).
 
-## Data model
+## 1. Filtered chapter picker (in `EditResourceForm` → `SharedChaptersMultiSelect`)
 
-Add one column to `resources`:
+Add two filter rows above the chapter search input, inside the popover:
 
-- `shared_with integer[] NOT NULL DEFAULT '{}'` — list of additional chapter IDs the resource also appears in.
+- **Classes** — multi-select, fetched from `classes` (where `hidden = false`), ordered by id.
+- **Subjects** — multi-select, fetched from `subjects` filtered by the picked class ids (and `deleted = false`). Disabled until at least one class is picked. Clears automatically when classes change.
 
-GIN index on `shared_with` for fast `&&` / `ANY` lookups.
+Chapter search behavior:
 
-Single source of truth: the row still lives in its native `chapter_id`. `shared_with` is a pure visibility extension.
+- If exactly one class is picked → call `search_chapters_normalized(search, p_class_id)`.
+- If exactly one subject is picked → call `search_chapters_normalized(search, null, p_subject_id)`.
+- For multi-select (multiple classes and/or subjects), call the RPC once per id and merge/dedupe by chapter id (RPC only accepts single ids today; cheaper than a schema change).
+- Without filters, behavior is unchanged.
 
-No new table, no join, no duplication. Bookmarks, votes, OCR, page_count stay 1:1 with the row.
+Search input still works, but with filters it scopes to only those classes/subjects. Selected chapter chips remain visible across filter changes (a chapter stays selected even if it falls outside the active filter).
 
-## Permissions
+Self-chapter still excluded via existing `excludeChapterId`.
 
-RLS already lets moderators update any resource. We add:
+## 2. Small "Shared with" badge
 
-- A new policy or column-level constraint enforcing that **only `is_moderator_or_admin(auth.uid())` can write `shared_with`**. Simplest path: an `UPDATE` trigger that raises if `NEW.shared_with IS DISTINCT FROM OLD.shared_with` and the caller isn't a mod/admin. Owners keep their normal edit rights on all other fields.
-- Editing the resource itself (title, files, etc.) from any shared chapter remains a mod/admin action, matching your "manual cross editing for mods/admins only" requirement. Owners can still edit content from the native chapter as today.
+A new compact, read-only badge component `SharedWithBadge` that renders a single muted `Badge` like:
 
-## Query change (transparent merge)
+`Shared · 3 classes · 2 subjects`
 
-In `Chapter.tsx` (and any other place listing resources by chapter — `MainContent.tsx`, count queries) replace:
+- Counts derive from the resource's `shared_with` chapter ids → join to `chapters.class_id` and `chapters.subject_id` → distinct counts.
+- Hover/tap reveals a `HoverCard`/`Popover` listing the class names and subject names (no chapter names — keeps it concise and matches your "map the class/subjects" ask).
+- Renders nothing when `shared_with` is empty.
 
-```ts
-.eq('chapter_id', chapterId)
-```
+### Where it appears
+- `ResourceDetail.tsx` next to the title (same row as existing badges).
+- Resource cards rendered in `Chapter.tsx` and `MainContent.tsx`, inline next to the title (tiny `text-[10px]`, `variant="secondary"`).
 
-with:
+Visibility is universal (not mod-only) — it's metadata, not a control. This does **not** alter the existing "no visual distinction between native and shared resources" rule: the badge appears on the *origin* row everywhere it's shown; native resources without `shared_with` simply don't render it.
 
-```ts
-.or(`chapter_id.eq.${chapterId},shared_with.cs.{${chapterId}}`)
-```
+### Data fetching
+Single helper hook `useSharedWithSummary(sharedWithIds: number[])`:
+- `chapters` select `id, class_id, subject_id, classes(name), subjects(name)`
+- Returns `{ classes: {id,name}[], subjects: {id,name}[] }`
+- Memoized, skipped when array empty.
 
-(`cs` = contains). Same filter for the count query and the page-count aggregation. Result: shared resources appear inline, ordered with native ones, with zero visual difference.
+## Files
 
-## UI
+- `src/components/SharedChaptersMultiSelect.tsx` — add class/subject multi-filters, fetch + merge logic.
+- `src/components/SharedWithBadge.tsx` — new compact badge with hover details.
+- `src/hooks/useSharedWithSummary.ts` — new hook.
+- `src/pages/ResourceDetail.tsx` — render badge near title.
+- `src/pages/Chapter.tsx` and `src/components/MainContent.tsx` — render badge inline on resource rows (only where `shared_with.length > 0`).
 
-### Reading
-Nothing changes. No badge, no section, no tooltip. Identical to native resources.
-
-### Editing (mods/admins only)
-In `EditResourceForm.tsx`, add a moderator-gated field **"Also share with chapters"**:
-
-- Multi-select autocomplete searching chapters via existing `search_chapters_normalized` RPC.
-- Shows current `shared_with` as removable chips.
-- Hidden entirely for non-mods.
-- Saves as `shared_with: number[]`.
-
-We reuse the existing chapter search RPC, so no new endpoint.
-
-### Add flow
-Skip for v1 — moderators add `shared_with` from the edit form after creation. (Keeps the upload wizard untouched.)
-
-## Why this avoids confusion with "Common chapters"
-
-| Feature | Scope | Trigger | Storage |
-|---|---|---|---|
-| `chapter_common_mappings` | Maps **chapters** that teach the same topic across **different classes**, populated by AI | Edge function `match-common-chapters` | Separate table |
-| `resources.shared_with` | Lists extra chapters where **one specific resource** also appears | Manual mod action per resource | Column on `resources` |
-
-They never touch the same code path. The common-chapters AI job is unaffected.
-
-## Files touched
-
-- New migration: add `shared_with` column + GIN index + write-restriction trigger.
-- `src/pages/Chapter.tsx`: swap `.eq('chapter_id', …)` → `.or(...)` in the 4 resource queries (list + count + page-count aggregate).
-- `src/components/MainContent.tsx`: same swap where it lists chapter resources.
-- `src/components/EditResourceForm.tsx`: add mod-only "Also share with chapters" multi-select, persist `shared_with`.
-- `src/hooks/useUserRole.ts` (already exists) used to gate the UI.
-
-## Out of scope (v1)
-- Surfacing in Add flow.
-- Bulk share UI (can iterate later from Statistics/Moderation).
-- Auto-propagating to common-chapter equivalents (kept independent on purpose).
+## Out of scope
+- New RPC variants accepting arrays of class/subject ids (current merge-on-client is fine for picker volumes).
+- Editing `shared_with` from the badge (still done from `EditResourceForm`).
+- Showing per-chapter destination names in the badge tooltip.

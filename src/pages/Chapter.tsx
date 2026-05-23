@@ -18,6 +18,7 @@ import { AddResourceForm } from '@/components/AddResourceForm';
 import { UserAvatar } from '@/components/UserAvatar';
 import { BookBadge } from '@/components/BookBadge';
 import { PageCountBadge } from '@/components/PageCountBadge';
+import { SharedWithBadge } from '@/components/SharedWithBadge';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { SEO, createCourseSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
@@ -360,7 +361,7 @@ export default function Chapter() {
         // Fetch resources with vote counts
         const { data: resourcesData } = await (supabase as any)
           .from('resources')
-          .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, book, page_count')
+          .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, book, page_count, shared_with')
           .or(resourceChapterFilter(chapterId))
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -1240,6 +1241,7 @@ export default function Chapter() {
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-semibold text-foreground flex-1">{capitalizeEveryWord(resource.title)}</h3>
                     <div className="flex gap-1 ml-2 flex-shrink-0">
+                      <SharedWithBadge sharedWith={(resource as any).shared_with} />
                       {!resource.verified && (
                         <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full whitespace-nowrap">
                           Unverified
