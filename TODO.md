@@ -4,7 +4,8 @@
 - [x] Added `src/utils/watermark.ts` with PDF + image watermarking utilities.
 
 ## Next steps
-- [ ] Fix remaining TypeScript/lint issues in `src/utils/watermark.ts` if any.
+- [ ] Wire watermarking into PDF + image preview and downloads (ensures downloaded files are watermarked).
+
 - [ ] Wire watermarking into PDF download paths:
   - [ ] `src/components/MediaPreview.tsx` (PDF download)
   - [ ] `src/components/PdfInlinePreview.tsx` (download single page + download full/merged)
@@ -15,4 +16,5 @@
 - [ ] Ensure “in-browser preview” shows watermark (overlay for images; re-render watermarked PDF pages for PDFs).
 - [ ] Smoke test by downloading a PDF and verifying the downloaded file contains watermark text.
 - [ ] Smoke test by downloading an image and verifying the downloaded file contains watermark text.
+
 
