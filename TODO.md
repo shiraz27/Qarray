@@ -7,7 +7,8 @@
 - [x] Wire watermarking into PDF + image preview and downloads (ensures downloaded files are watermarked).
 
 
-- [ ] Wire watermarking into PDF download paths:
+- [x] Wire watermarking into PDF download paths:
+
   - [ ] `src/components/MediaPreview.tsx` (PDF download)
   - [ ] `src/components/PdfInlinePreview.tsx` (download single page + download full/merged)
 - [ ] Wire watermarking into image handling:
