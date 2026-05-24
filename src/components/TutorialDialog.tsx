@@ -9,6 +9,8 @@ import tutorialWelcome from '@/assets/tutorial-welcome.jpg';
 import tutorialSubjects from '@/assets/tutorial-subjects.jpg';
 import tutorialQuestions from '@/assets/tutorial-questions.jpg';
 import tutorialFlashcards from '@/assets/tutorial-flashcards.jpg';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
+
 
 interface TutorialDialogProps {
   open: boolean;
@@ -24,14 +26,20 @@ interface TutorialStep {
 
 export const TutorialDialog = ({ open, onClose, initialStep = 0 }: TutorialDialogProps) => {
   const { t } = useTranslation();
+  const { enabled: tutorialEnabled, loading: tutorialLoading } = useFeatureFlag('tutorial');
+
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
+    if (tutorialLoading) return;
+    if (tutorialEnabled === false) return;
+
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
     });
-  }, []);
+  }, [tutorialLoading, tutorialEnabled]);
+
 
   const steps: TutorialStep[] = [
     {
@@ -77,7 +85,9 @@ export const TutorialDialog = ({ open, onClose, initialStep = 0 }: TutorialDialo
   };
 
   const handleComplete = async () => {
+    if (tutorialEnabled === false) return;
     if (!user) return;
+
 
     try {
       const { error } = await supabase
@@ -99,7 +109,9 @@ export const TutorialDialog = ({ open, onClose, initialStep = 0 }: TutorialDialo
   };
 
   const updateTutorialProgress = async (step: number, completed: boolean) => {
+    if (tutorialEnabled === false) return;
     if (!user) return;
+
 
     try {
       await supabase
@@ -117,8 +129,13 @@ export const TutorialDialog = ({ open, onClose, initialStep = 0 }: TutorialDialo
   const currentStepData = steps[currentStep];
   const progress = ((currentStep + 1) / steps.length) * 100;
 
+  if (tutorialLoading || tutorialEnabled === false) {
+    return null;
+  }
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
+
       <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden">
         {/* Close button */}
         <button
