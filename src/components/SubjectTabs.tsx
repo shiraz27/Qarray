@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calculator, Atom, Code, BookOpen, Globe, Beaker, TestTube, FlaskConical, Plus, Edit, Database } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { useLibraryData } from '@/contexts/LibraryDataContext';
 import { MemorizeButton } from '@/components/MemorizeButton';
 import { ManageSubjectDialog } from '@/components/ManageSubjectDialog';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -49,43 +49,33 @@ const getIconForSubject = (logo: string | null, subjectName: string): LucideIcon
 };
 
 export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChange }) => {
+  const { ensureSubjects, invalidateSubjects, getSubjectsFromCache } = useLibraryData();
   const [activeSubject, setActiveSubject] = useState<number | null>(null);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
   const [editingSubjectId, setEditingSubjectId] = useState<number | null>(null);
   const { isModerator, isAdmin } = useUserRole();
 
   useEffect(() => {
-    const fetchSubjects = async () => {
+    const load = async () => {
       if (!classId) return;
-      
+
+      const cached = getSubjectsFromCache(classId);
+      if (cached) {
+        setSubjects(cached);
+        if (cached.length > 0 && !cached.find(s => s.id === activeSubject)) {
+          setActiveSubject(cached[0].id);
+          onSubjectChange?.(cached[0].id);
+        }
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
-        const [primaryRes, commonRes] = await Promise.all([
-          supabase
-            .from('subjects')
-            .select('id, name, logo')
-            .eq('class_id', classId)
-            .eq('deleted', false)
-            .order('name'),
-          supabase
-            .from('subjects')
-            .select('id, name, logo, class_id')
-            .contains('common', [classId])
-            .eq('deleted', false)
-            .order('name'),
-        ]);
-
-        if (primaryRes.error) throw primaryRes.error;
-        if (commonRes.error) throw commonRes.error;
-
-        const primary = primaryRes.data || [];
-        const common = (commonRes.data || []).filter(
-          (c) => !primary.find((p) => p.id === c.id)
-        );
-        const data = [...primary, ...common];
-
+        const data = await ensureSubjects(classId);
         setSubjects(data);
         if (data.length > 0) {
           setActiveSubject(data[0].id);
@@ -98,7 +88,8 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
       }
     };
 
-    fetchSubjects();
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
 
   const handleSubjectClick = (subjectId: number) => {
@@ -123,45 +114,23 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
   };
 
   const handleSuccess = () => {
-    // Refetch subjects
-    const refetch = async () => {
-      if (!classId) return;
-      
-      try {
-        const [primaryRes, commonRes] = await Promise.all([
-          supabase
-            .from('subjects')
-            .select('id, name, logo')
-            .eq('class_id', classId)
-            .eq('deleted', false)
-            .order('name'),
-          supabase
-            .from('subjects')
-            .select('id, name, logo, class_id')
-            .contains('common', [classId])
-            .eq('deleted', false)
-            .order('name'),
-        ]);
+    // Explicit mutation: invalidate cache so next load refreshes.
+    invalidateSubjects(classId);
 
-        if (primaryRes.error) throw primaryRes.error;
-        if (commonRes.error) throw commonRes.error;
-
-        const primary = primaryRes.data || [];
-        const common = (commonRes.data || []).filter(
-          (c) => !primary.find((p) => p.id === c.id)
-        );
-        const data = [...primary, ...common];
-
+    if (!classId) return;
+    setLoading(true);
+    void ensureSubjects(classId)
+      .then((data) => {
         setSubjects(data);
         if (data.length > 0 && !data.find(s => s.id === activeSubject)) {
           setActiveSubject(data[0].id);
           onSubjectChange?.(data[0].id);
         }
-      } catch (error) {
+      })
+      .catch((error) => {
         console.error('Error fetching subjects:', error);
-      }
-    };
-    refetch();
+      })
+      .finally(() => setLoading(false));
   };
 
   if (loading) {
