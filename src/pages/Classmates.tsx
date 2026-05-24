@@ -8,6 +8,8 @@ import { ContentSkeleton } from '@/components/LoadingSkeleton';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { Button } from '@/components/ui/button';
 import qarayLogo from '@/assets/qarray-logo-new.png';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
+
 
 interface StudentStat {
   user_id: string;
@@ -25,7 +27,9 @@ interface StudentStat {
 
 export default function Classmates() {
   const navigate = useNavigate();
+  const { enabled: classesEnabled, loading: classesLoading } = useFeatureFlag('classes');
   const [loading, setLoading] = useState(true);
+
   const [classmates, setClassmates] = useState<StudentStat[]>([]);
   const [schoolmates, setSchoolmates] = useState<StudentStat[]>([]);
   const [currentUserClassId, setCurrentUserClassId] = useState<number | null>(null);
@@ -44,6 +48,12 @@ export default function Classmates() {
   };
 
   useEffect(() => {
+    if (classesLoading) return;
+    if (classesEnabled === false) {
+      setLoading(false);
+      return;
+    }
+
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -54,7 +64,8 @@ export default function Classmates() {
     };
 
     checkAuth();
-  }, [navigate]);
+  }, [navigate, classesLoading, classesEnabled]);
+
 
   const fetchClassmates = async (userId: string) => {
     try {
@@ -271,13 +282,22 @@ export default function Classmates() {
     </Card>
   );
 
-  if (loading) {
+  if (classesLoading || loading) {
     return (
       <div className="min-h-screen bg-background p-4">
         <ContentSkeleton />
       </div>
     );
   }
+
+  if (classesEnabled === false) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Classes feature is disabled.</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
