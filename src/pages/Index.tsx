@@ -38,66 +38,70 @@ const Index: React.FC = () => {
   };
 
   useEffect(() => {
-    // Set up auth state listener
+    let cancelled = false;
+
+    const checkProfileAndSetState = async (session: Session) => {
+      // gate: only run once session exists; also avoid transient redirect while loading
+      setUserProfile(null);
+      setTutorialOpen(false);
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('phone_number, state_id, class_id, full_name, user_type, tutorial_completed, tutorial_step')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (cancelled) return;
+
+      if (error || !profile) {
+        // If we can't fetch the profile record, don't aggressively redirect during transient states.
+        // Let the user continue; future auth/profile updates will handle it.
+        return;
+      }
+
+      const phoneOk = !!profile.phone_number;
+      const stateOk = profile.state_id !== null && profile.state_id !== undefined;
+      const classOk = profile.class_id !== null && profile.class_id !== undefined;
+
+      if (!phoneOk || !stateOk || !classOk) {
+        navigate('/complete-profile');
+        return;
+      }
+
+      setUserProfile({ full_name: profile.full_name, class_id: profile.class_id });
+
+      if (profile.user_type === 'student' && !profile.tutorial_completed) {
+        setTutorialOpen(true);
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        if (!session) {
+      (_event, nextSession) => {
+        setSession(nextSession);
+        if (!nextSession) {
           navigate('/');
-        } else {
-          // Check if profile is complete and fetch user data
-          setTimeout(async () => {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('phone_number, state_id, class_id, full_name, user_type, tutorial_completed, tutorial_step')
-              .eq('user_id', session.user.id)
-              .single();
-            
-            if (!profile || !profile.phone_number || !profile.state_id || !profile.class_id) {
-              navigate('/complete-profile');
-            } else {
-              setUserProfile({ full_name: profile.full_name, class_id: profile.class_id });
-              
-              // Show tutorial for students who haven't completed it
-              if (profile.user_type === 'student' && !profile.tutorial_completed) {
-                setTutorialOpen(true);
-              }
-            }
-          }, 0);
+          return;
         }
+        void checkProfileAndSetState(nextSession);
       }
     );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (!session) {
+    // Initial load: get the current session, but do NOT duplicate the profile fetch
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession(initialSession);
+      if (!initialSession) {
         navigate('/');
       } else {
-        // Check if profile is complete and fetch user data
-        setTimeout(async () => {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('phone_number, state_id, class_id, full_name, user_type, tutorial_completed, tutorial_step')
-            .eq('user_id', session.user.id)
-            .single();
-          
-          if (!profile || !profile.phone_number || !profile.state_id || !profile.class_id) {
-            navigate('/complete-profile');
-          } else {
-            setUserProfile({ full_name: profile.full_name, class_id: profile.class_id });
-            
-            // Show tutorial for students who haven't completed it
-            if (profile.user_type === 'student' && !profile.tutorial_completed) {
-              setTutorialOpen(true);
-            }
-          }
-        }, 0);
+        void checkProfileAndSetState(initialSession);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, [navigate]);
+
 
   if (!session) {
     return null;
