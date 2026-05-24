@@ -9,6 +9,7 @@ import { ThemeProvider } from "next-themes";
 import i18n from "./i18n/config";
 import { UploadManagerProvider } from "./contexts/UploadManagerContext";
 import { UploadStatusIndicator } from "./components/UploadStatusIndicator";
+import { LibraryDataProvider } from "./contexts/LibraryDataContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Landing from "./pages/Landing";
@@ -58,7 +59,8 @@ const App = () => (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <I18nextProvider i18n={i18n}>
         <QueryClientProvider client={queryClient}>
-          <UploadManagerProvider>
+          <LibraryDataProvider>
+            <UploadManagerProvider>
             <TooltipProvider>
               <Toaster />
               <Sonner />
@@ -67,7 +69,8 @@ const App = () => (
                 <UploadStatusIndicator />
               </BrowserRouter>
             </TooltipProvider>
-          </UploadManagerProvider>
+            </UploadManagerProvider>
+          </LibraryDataProvider>
         </QueryClientProvider>
       </I18nextProvider>
     </ThemeProvider>
