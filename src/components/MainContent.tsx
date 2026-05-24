@@ -110,24 +110,29 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
 
     try {
       if (currentlyBookmarked) {
-        await supabase
+        const { error } = await supabase
           .from('bookmarks')
           .delete()
           .eq('user_id', user.id)
-          .eq('chapter_id', chapterId);
+          .eq('content_type', 'chapter')
+          .eq('content_id', chapterId);
 
-        setChapters(prev => prev.map(ch =>
-          ch.id === chapterId ? { ...ch, isBookmarked: false } : ch
-        ));
+        if (error) throw error;
+
+        setChapters(prev =>
+          prev.map(ch => (ch.id === chapterId ? { ...ch, isBookmarked: false } : ch))
+        );
         toast.success(t('bookmarkRemoved') || 'Bookmark removed');
       } else {
-        await supabase
+        const { error } = await supabase
           .from('bookmarks')
-          .insert({ user_id: user.id, chapter_id: chapterId });
+          .insert({ user_id: user.id, content_type: 'chapter', content_id: chapterId });
 
-        setChapters(prev => prev.map(ch =>
-          ch.id === chapterId ? { ...ch, isBookmarked: true } : ch
-        ));
+        if (error) throw error;
+
+        setChapters(prev =>
+          prev.map(ch => (ch.id === chapterId ? { ...ch, isBookmarked: true } : ch))
+        );
         toast.success(t('bookmarkAdded') || 'Bookmark added');
       }
     } catch (error) {

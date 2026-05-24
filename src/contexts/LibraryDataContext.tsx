@@ -212,17 +212,22 @@ export const LibraryDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
           .order('id', { ascending: true });
         if (chaptersError) throw chaptersError;
 
-        // Fetch user's bookmarks if logged in
-        type BookmarkRow = { chapter_id: number };
+        // Fetch user's bookmarked chapters if logged in
+        // NOTE: `bookmarks` is polymorphic across the app (content_type/content_id).
         let bookmarkedChapterIds: number[] = [];
         if (user) {
-          const { data: bookmarksData } = await supabase
+          const { data: bookmarksData, error: bookmarksError } = await supabase
             .from('bookmarks')
-            .select('chapter_id')
-            .eq('user_id', user.id) as { data: BookmarkRow[] | null };
+            .select('content_id')
+            .eq('user_id', user.id)
+            .eq('content_type', 'chapter');
 
-          bookmarkedChapterIds = (bookmarksData || []).map(b => b.chapter_id);
+          if (bookmarksError) throw bookmarksError;
+
+          bookmarkedChapterIds = (bookmarksData || [])
+            .map((b: { content_id: number }) => b.content_id);
         }
+
 
 
         // NOTE: Keeping existing logic (counts + page_count) but caching the final result.
