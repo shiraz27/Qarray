@@ -1,11 +1,18 @@
-# TODO - Complete-profile redirect fix
+# TODO - Watermarking PDFs and Images
 
-- [x] Inspect `src/pages/Index.tsx` redirect logic (done)
-- [x] Remove duplicated profile/session fetch + redirect logic in `Index.tsx`
-- [x] Add a loading/ready gate so we only redirect to `/complete-profile` after profile data is actually fetched
+## Completed
+- [x] Added `src/utils/watermark.ts` with PDF + image watermarking utilities.
 
-- [x] Ensure tutorial dialog logic still works once profile is loaded
-- [x] Run `npm run build` (typecheck script not present)
-- [ ] Smoke test: hard refresh + stale-session scenario
-
+## Next steps
+- [ ] Fix remaining TypeScript/lint issues in `src/utils/watermark.ts` if any.
+- [ ] Wire watermarking into PDF download paths:
+  - [ ] `src/components/MediaPreview.tsx` (PDF download)
+  - [ ] `src/components/PdfInlinePreview.tsx` (download single page + download full/merged)
+- [ ] Wire watermarking into image handling:
+  - [ ] Add an image download button in `src/components/MediaPreview.tsx`.
+  - [ ] Implement image watermarking for download (canvas export).
+  - [ ] Add watermark overlay to image previews in `MediaPreview.tsx` and `MediaPreviewDialog.tsx`.
+- [ ] Ensure “in-browser preview” shows watermark (overlay for images; re-render watermarked PDF pages for PDFs).
+- [ ] Smoke test by downloading a PDF and verifying the downloaded file contains watermark text.
+- [ ] Smoke test by downloading an image and verifying the downloaded file contains watermark text.
 
