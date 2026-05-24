@@ -4,7 +4,8 @@
 - [x] Added `src/utils/watermark.ts` with PDF + image watermarking utilities.
 
 ## Next steps
-- [ ] Wire watermarking into PDF + image preview and downloads (ensures downloaded files are watermarked).
+- [x] Wire watermarking into PDF + image preview and downloads (ensures downloaded files are watermarked).
+
 
 - [ ] Wire watermarking into PDF download paths:
   - [ ] `src/components/MediaPreview.tsx` (PDF download)

@@ -8,6 +8,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { fetchPdfViaProxy, triggerBlobDownload } from '@/utils/pdfMediaFetch';
+import { triggerWatermarkedDownload, watermarkPdfBlob } from '@/utils/watermark';
 
 interface MediaPreviewProps {
   url: string;
@@ -109,7 +110,8 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
               : result.message
           );
         }
-        triggerBlobDownload(result.blob, filename);
+        const watermarked = await watermarkPdfBlob(result.blob);
+        triggerWatermarkedDownload(watermarked, filename);
       } catch (err) {
         toast({
           title: 'Download failed',
@@ -207,18 +209,66 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
           onClick={() => setImageZoomOpen(true)}
           style={{ display: imageLoading || imageError ? 'none' : 'block' }}
         >
-          <img 
-            src={encodedUrl} 
-            alt="Media content" 
-            className="w-full h-full object-cover rounded-lg" 
-            style={{ minHeight: '200px', maxHeight: '500px' }}
-            onLoad={() => setImageLoading(false)}
-            onError={(e) => {
-              console.error('Image failed to load:', encodedUrl);
-              setImageLoading(false);
-              setImageError(true);
-            }}
-          />
+          <div className="relative">
+            <img 
+              src={encodedUrl} 
+              alt="Media content" 
+              className="w-full h-full object-cover rounded-lg" 
+              style={{ minHeight: '200px', maxHeight: '500px' }}
+              onLoad={() => setImageLoading(false)}
+              onError={(e) => {
+                console.error('Image failed to load:', encodedUrl);
+                setImageLoading(false);
+                setImageError(true);
+              }}
+            />
+            {/* watermark overlay (preview only; download is stamped serverlessly) */}
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <span className="whitespace-nowrap select-none -rotate-12 text-[2.5vw] sm:text-[28px] font-black text-black/20 dark:text-white/20">
+                QARRAY
+              </span>
+            </div>
+
+            <div className="absolute top-2 right-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                className="bg-black/40 text-white hover:bg-black/55"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (downloading) return;
+                  setDownloading(true);
+                  try {
+                    const res = await fetch(encodedUrl);
+                    if (!res.ok) throw new Error('Could not download image');
+                    const blob = await res.blob();
+                    const watermarked = await watermarkImageBlob(blob);
+                    const filename = (() => {
+                      try {
+                        const u = new URL(url);
+                        const last = u.pathname.split('/').filter(Boolean).pop();
+                        return last || 'image';
+                      } catch {
+                        return 'image';
+                      }
+                    })();
+                    triggerWatermarkedDownload(watermarked, filename);
+                  } catch (err) {
+                    toast({
+                      title: 'Download failed',
+                      description: err instanceof Error ? err.message : 'Could not watermark/download image',
+                      variant: 'destructive',
+                    });
+                  } finally {
+                    setDownloading(false);
+                  }
+                }}
+              >
+                {downloading ? '…' : 'Download'}
+              </Button>
+            </div>
+          </div>
         </Card>
         
         <Dialog open={imageZoomOpen} onOpenChange={setImageZoomOpen}>

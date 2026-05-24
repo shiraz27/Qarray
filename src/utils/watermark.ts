@@ -124,9 +124,8 @@ export async function watermarkPdfBytes(
     });
   }
 
-  const saved = await pdfDoc.save();
-  // pdf-lib may return Uint8Array whose underlying buffer can be ArrayBufferLike.
-  // Ensure we pass a plain ArrayBuffer to Blob constructors.
+    const saved = await pdfDoc.save();
+
   return saved;
 }
 
