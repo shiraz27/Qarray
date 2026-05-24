@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { CreateMemorizationDialog } from './CreateMemorizationDialog';
 import { StudySessionDialog } from './StudySessionDialog';
 import { useSpacedRepetition } from '@/hooks/useSpacedRepetition';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 
 interface MemorizationsModalProps {
   open: boolean;
@@ -38,13 +39,24 @@ export const MemorizationsModal = ({ open, onClose, subjectId, chapterId }: Memo
   const [studyMemorizationId, setStudyMemorizationId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'mine' | 'subscribed' | 'public'>('mine');
 
+  const { enabled: featureEnabled, loading: featureLoading } = useFeatureFlag('memorizations');
+
   useEffect(() => {
-    if (open) {
-      fetchMemorizations();
-    }
-  }, [open, activeTab, subjectId, chapterId]);
+    if (!open) return;
+    if (featureLoading || featureEnabled === false) return;
+
+    fetchMemorizations();
+  }, [open, activeTab, subjectId, chapterId, featureLoading, featureEnabled]);
+
+  // Hard stop network fetches + UI when disabled
+  if (!open) return null;
+  if (featureLoading || featureEnabled === false) return null;
+
 
   const fetchMemorizations = async () => {
+    // Feature-flag safety net (prevents accidental fetches)
+    if (featureLoading || featureEnabled === false) return;
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -105,9 +117,10 @@ export const MemorizationsModal = ({ open, onClose, subjectId, chapterId }: Memo
 
       // Filter by subscribed if needed
       let filteredMems = memorizationsWithCounts;
-      if (activeTab === 'subscribed') {
+        if (activeTab === 'subscribed') {
         filteredMems = memorizationsWithCounts.filter(m => m.is_subscribed);
       }
+
 
       setMemorizations(filteredMems);
     } catch (error: any) {
