@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLibraryData } from '@/contexts/LibraryDataContext';
-
+import { supabase } from '@/integrations/supabase/client';
+import { resourceChapterFilter } from '@/utils/resourceChapterFilter';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +21,6 @@ import { MemorizationsList } from '@/components/MemorizationsList';
 import { ManageChapterDialog } from '@/components/ManageChapterDialog';
 import { PageCountBadge } from '@/components/PageCountBadge';
 import { useUserRole } from '@/hooks/useUserRole';
-
 
 interface Chapter {
   id: number;
@@ -54,14 +53,10 @@ interface MainContentProps {
 export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClassId = null }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { ensureChapters, invalidateChapters } = useLibraryData();
-   
-  const _unusedBAC = BAC_CLASS_IDS;
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [commonChapters, setCommonChapters] = useState<CommonChapter[]>([]);
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<null | { id: string }>(null);
-
+  const [user, setUser] = useState<any>(null);
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
   const [editingChapterId, setEditingChapterId] = useState<number | null>(null);
   const [classId, setClassId] = useState<number | null>(null);
@@ -71,25 +66,211 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    // Lazy-load only once; bookmarks state is included in cached chapter data.
-    // Keep this for bookmark toggle operations.
-     
     supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user ? { id: user.id as unknown as string } : null);
+      setUser(user);
     });
   }, []);
 
-
   useEffect(() => {
-    const load = async () => {
+    const fetchChapters = async () => {
       if (!subjectId) return;
 
       setLoading(true);
       try {
-        const data = await ensureChapters(subjectId, viewingClassId);
-        setChapters(data.chapters);
-        setCommonChapters(data.commonChapters);
-        setClassId(data.classId);
+        // Fetch subject to get class_id
+        const { data: subjectData } = await supabase
+          .from('subjects')
+          .select('class_id')
+          .eq('id', subjectId)
+          .maybeSingle();
+
+        // For common subjects (class_id is null), fall back to the viewing class
+        const effectiveClassId = subjectData?.class_id ?? viewingClassId;
+        setClassId(effectiveClassId);
+
+        // Fetch chapters
+        const { data: chaptersData, error: chaptersError } = await supabase
+          .from('chapters')
+          .select('id, name')
+          .eq('subject_id', subjectId)
+          .eq('deleted', false)
+          .order('id', { ascending: true });
+
+        if (chaptersError) throw chaptersError;
+
+        // Fetch user's bookmarks if logged in
+        let bookmarkedChapterIds: number[] = [];
+        if (user) {
+          const { data: bookmarksData } = await supabase
+            .from('bookmarks')
+            .select('chapter_id')
+            .eq('user_id', user.id);
+          bookmarkedChapterIds = bookmarksData?.map(b => b.chapter_id) || [];
+        }
+
+        // Fetch counts for each chapter
+        const chaptersWithCounts = await Promise.all(
+          (chaptersData || []).map(async (chapter) => {
+            // Count questions
+            const { count: questionCount } = await supabase
+              .from('questions')
+              .select('*', { count: 'exact', head: true })
+              .eq('chapter_id', chapter.id)
+              .eq('deleted', false);
+
+            // Count answers
+            const { count: answerCount } = await supabase
+              .from('answers')
+              .select('*', { count: 'exact', head: true })
+              .in('question_id', 
+                await supabase
+                  .from('questions')
+                  .select('id')
+                  .eq('chapter_id', chapter.id)
+                  .eq('deleted', false)
+                  .then(res => res.data?.map(q => q.id) || [])
+              )
+              .eq('deleted', false);
+
+            // Count resources
+            const { count: resourceCount } = await supabase
+              .from('resources')
+              .select('*', { count: 'exact', head: true })
+              .or(resourceChapterFilter(chapter.id))
+              .eq('deleted', false);
+
+            // Sum page_count from resources + questions
+            const [{ data: resPages }, { data: qPages }] = await Promise.all([
+              supabase
+                .from('resources')
+                .select('page_count')
+                .or(resourceChapterFilter(chapter.id))
+                .eq('deleted', false),
+              supabase
+                .from('questions')
+                .select('page_count')
+                .eq('chapter_id', chapter.id)
+                .eq('deleted', false),
+            ]);
+            const pageCount =
+              (resPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0) +
+              (qPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0);
+
+            return {
+              id: chapter.id,
+              name: chapter.name,
+              questionCount: questionCount || 0,
+              answerCount: answerCount || 0,
+              resourceCount: resourceCount || 0,
+              pageCount,
+              isBookmarked: bookmarkedChapterIds.includes(chapter.id),
+            };
+          })
+        );
+
+        const sortedChapters = [...chaptersWithCounts].sort((a, b) => {
+          const aGen = a.name.trim().toLowerCase() === 'chapitre général' ? 0 : 1;
+          const bGen = b.name.trim().toLowerCase() === 'chapitre général' ? 0 : 1;
+          return aGen - bGen;
+        });
+        setChapters(sortedChapters);
+
+        // Fetch common chapters from other Bac classes
+        const currentClassId = subjectData?.class_id;
+        const nativeIds = (chaptersData || []).map((c) => c.id);
+        if (
+          currentClassId &&
+          BAC_CLASS_IDS.has(currentClassId) &&
+          nativeIds.length > 0
+        ) {
+          const { data: rawMappings } = await supabase
+            .from('chapter_common_mappings')
+            .select('chapter_id, common_chapter_id')
+            .in('chapter_id', nativeIds);
+          // Build common -> matched native map (lowest native id wins for determinism)
+          const commonToNative = new Map<number, number>();
+          (rawMappings || []).forEach((r: any) => {
+            const existing = commonToNative.get(r.common_chapter_id);
+            if (existing === undefined || r.chapter_id < existing) {
+              commonToNative.set(r.common_chapter_id, r.chapter_id);
+            }
+          });
+          const targetIds = Array.from(commonToNative.keys());
+          let commons: CommonChapter[] = [];
+          if (targetIds.length > 0) {
+            const { data: chRows } = await supabase
+              .from('chapters')
+              .select('id, name, class_id, deleted, classes(name)')
+              .in('id', targetIds)
+              .eq('deleted', false);
+            // native id ordering map (curriculum order)
+            const nativeOrder = new Map<number, number>();
+            (chaptersData || []).forEach((c, idx) => nativeOrder.set(c.id, idx));
+            commons = await Promise.all(
+              (chRows || []).map(async (ch: any) => {
+                const { count: questionCount } = await supabase
+                  .from('questions')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('chapter_id', ch.id)
+                  .eq('deleted', false);
+                const qIds = await supabase
+                  .from('questions')
+                  .select('id')
+                  .eq('chapter_id', ch.id)
+                  .eq('deleted', false)
+                  .then((res) => res.data?.map((q) => q.id) || []);
+                const { count: answerCount } = await supabase
+                  .from('answers')
+                  .select('*', { count: 'exact', head: true })
+                  .in('question_id', qIds)
+                  .eq('deleted', false);
+                const { count: resourceCount } = await supabase
+                  .from('resources')
+                  .select('*', { count: 'exact', head: true })
+                  .or(resourceChapterFilter(ch.id))
+                  .eq('deleted', false);
+                const [{ data: resPages }, { data: qPages }] = await Promise.all([
+                  supabase
+                    .from('resources')
+                    .select('page_count')
+                    .or(resourceChapterFilter(ch.id))
+                    .eq('deleted', false),
+                  supabase
+                    .from('questions')
+                    .select('page_count')
+                    .eq('chapter_id', ch.id)
+                    .eq('deleted', false),
+                ]);
+                const pageCount =
+                  (resPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0) +
+                  (qPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0);
+                return {
+                  id: ch.id,
+                  name: ch.name,
+                  className: ch.classes?.name ?? '',
+                  matchedNativeId: commonToNative.get(ch.id) ?? null,
+                  questionCount: questionCount || 0,
+                  answerCount: answerCount || 0,
+                  resourceCount: resourceCount || 0,
+                  pageCount,
+                };
+              })
+            );
+            commons.sort((a, b) => {
+              const aOrder = a.matchedNativeId !== null
+                ? nativeOrder.get(a.matchedNativeId) ?? Number.MAX_SAFE_INTEGER
+                : Number.MAX_SAFE_INTEGER;
+              const bOrder = b.matchedNativeId !== null
+                ? nativeOrder.get(b.matchedNativeId) ?? Number.MAX_SAFE_INTEGER
+                : Number.MAX_SAFE_INTEGER;
+              if (aOrder !== bOrder) return aOrder - bOrder;
+              return a.id - b.id;
+            });
+          }
+          setCommonChapters(commons);
+        } else {
+          setCommonChapters([]);
+        }
       } catch (error) {
         console.error('Error fetching chapters:', error);
       } finally {
@@ -97,9 +278,8 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
       }
     };
 
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subjectId, viewingClassId]);
+    fetchChapters();
+  }, [subjectId, user]);
 
   const toggleBookmark = async (chapterId: number, currentlyBookmarked: boolean) => {
     if (!user) {
@@ -151,24 +331,99 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
     setEditingChapterId(null);
   };
 
-const handleSuccess = async () => {
-    if (!subjectId) return;
+  const handleSuccess = () => {
+    // Refetch chapters
+    const refetch = async () => {
+      if (!subjectId) return;
+      
+      setLoading(true);
+      try {
+        const { data: chaptersData, error: chaptersError } = await supabase
+          .from('chapters')
+          .select('id, name')
+          .eq('subject_id', subjectId)
+          .eq('deleted', false)
+          .order('name');
 
-    // Explicit mutation: invalidate cached chapters for this subject.
-    invalidateChapters(subjectId);
+        if (chaptersError) throw chaptersError;
 
-    // Optionally refresh UI immediately (only after mutation).
-    setLoading(true);
-    try {
-      const data = await ensureChapters(subjectId, viewingClassId);
-      setChapters(data.chapters);
-      setCommonChapters(data.commonChapters);
-      setClassId(data.classId);
-    } catch (error) {
-      console.error('Error fetching chapters:', error);
-    } finally {
-      setLoading(false);
-    }
+        let bookmarkedChapterIds: number[] = [];
+        if (user) {
+          const { data: bookmarksData } = await supabase
+            .from('bookmarks')
+            .select('chapter_id')
+            .eq('user_id', user.id);
+          bookmarkedChapterIds = bookmarksData?.map(b => b.chapter_id) || [];
+        }
+
+        const chaptersWithCounts = await Promise.all(
+          (chaptersData || []).map(async (chapter) => {
+            const { count: questionCount } = await supabase
+              .from('questions')
+              .select('*', { count: 'exact', head: true })
+              .eq('chapter_id', chapter.id)
+              .eq('deleted', false);
+
+            const { count: answerCount } = await supabase
+              .from('answers')
+              .select('*', { count: 'exact', head: true })
+              .in('question_id', 
+                await supabase
+                  .from('questions')
+                  .select('id')
+                  .eq('chapter_id', chapter.id)
+                  .eq('deleted', false)
+                  .then(res => res.data?.map(q => q.id) || [])
+              )
+              .eq('deleted', false);
+
+            const { count: resourceCount } = await supabase
+              .from('resources')
+              .select('*', { count: 'exact', head: true })
+              .or(resourceChapterFilter(chapter.id))
+              .eq('deleted', false);
+
+            const [{ data: resPages }, { data: qPages }] = await Promise.all([
+              supabase
+                .from('resources')
+                .select('page_count')
+                .or(resourceChapterFilter(chapter.id))
+                .eq('deleted', false),
+              supabase
+                .from('questions')
+                .select('page_count')
+                .eq('chapter_id', chapter.id)
+                .eq('deleted', false),
+            ]);
+            const pageCount =
+              (resPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0) +
+              (qPages || []).reduce((s, r: any) => s + (r.page_count || 0), 0);
+
+            return {
+              id: chapter.id,
+              name: chapter.name,
+              questionCount: questionCount || 0,
+              answerCount: answerCount || 0,
+              resourceCount: resourceCount || 0,
+              pageCount,
+              isBookmarked: bookmarkedChapterIds.includes(chapter.id),
+            };
+          })
+        );
+
+        const sortedChapters = [...chaptersWithCounts].sort((a, b) => {
+          const aGen = a.name.trim().toLowerCase() === 'chapitre général' ? 0 : 1;
+          const bGen = b.name.trim().toLowerCase() === 'chapitre général' ? 0 : 1;
+          return aGen - bGen;
+        });
+        setChapters(sortedChapters);
+      } catch (error) {
+        console.error('Error fetching chapters:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    refetch();
   };
 
   if (!subjectId) {
