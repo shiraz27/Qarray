@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
+
 
 // SuperMemo SM-2 algorithm implementation
 export const calculateNextReview = (
@@ -38,15 +40,28 @@ export const useSpacedRepetition = (memorizationId: number | null) => {
   const [dueReviews, setDueReviews] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
+  const { enabled: featureEnabled, loading: featureLoading } = useFeatureFlag('memorizations');
+
   useEffect(() => {
     if (!memorizationId) {
+      setDueReviews(0);
+      setLoading(false);
+      return;
+    }
+
+    if (featureLoading || featureEnabled === false) {
+      setDueReviews(0);
       setLoading(false);
       return;
     }
 
     const fetchDueReviews = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setDueReviews(0);
+        setLoading(false);
+        return;
+      }
 
       const { count } = await supabase
         .from('flashcard_reviews')
@@ -60,7 +75,8 @@ export const useSpacedRepetition = (memorizationId: number | null) => {
     };
 
     fetchDueReviews();
-  }, [memorizationId]);
+  }, [memorizationId, featureLoading, featureEnabled]);
 
   return { dueReviews, loading };
 };
+
