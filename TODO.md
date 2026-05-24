@@ -6,10 +6,11 @@
 ## Next steps
 - [x] Wire watermarking into PDF + image preview and downloads (ensures downloaded files are watermarked).
 
-
 - [x] Wire watermarking into PDF download paths:
 
-  - [ ] `src/components/MediaPreview.tsx` (PDF download)
+
+  - [x] `src/components/MediaPreview.tsx` (PDF download)
+
   - [ ] `src/components/PdfInlinePreview.tsx` (download single page + download full/merged)
 - [ ] Wire watermarking into image handling:
   - [ ] Add an image download button in `src/components/MediaPreview.tsx`.
