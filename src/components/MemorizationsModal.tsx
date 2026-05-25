@@ -54,9 +54,6 @@ export const MemorizationsModal = ({ open, onClose, subjectId, chapterId }: Memo
 
 
   const fetchMemorizations = async () => {
-    // Feature-flag safety net (prevents accidental fetches)
-    if (featureLoading || featureEnabled === false) return;
-
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
