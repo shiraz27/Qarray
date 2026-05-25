@@ -2,6 +2,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { isPdfUrl, isImageUrl } from '@/utils/mediaTypeUtils';
 import { isSplitPdfManifestUrl, fetchSplitPdfManifest } from '@/utils/splitPdfManifest';
+import { encodeMediaUrl } from '@/utils/mediaToken';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
@@ -16,7 +17,7 @@ async function fetchViaProxy(url: string): Promise<Blob> {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${supabaseKey}`,
     },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ token: encodeMediaUrl(url) }),
   });
   if (!res.ok) throw new Error(`fetch-media failed: ${res.status}`);
   const ct = res.headers.get('Content-Type') || '';

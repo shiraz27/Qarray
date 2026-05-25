@@ -4,6 +4,7 @@ import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { extractMetadataFromOCR, ExtractedMetadata } from '@/utils/metadataExtractor';
 import { extractPdfTextAndOcr } from '@/utils/pdfOcrHelpers';
 import { expandManifestUrls } from '@/utils/splitPdfManifest';
+import { encodeMediaUrl } from '@/utils/mediaToken';
 
 type FileType = 'pdf' | 'image' | 'video' | 'audio' | 'unknown';
 
@@ -27,7 +28,7 @@ async function fetchFileViaProxy(url: string): Promise<Blob> {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${supabaseKey}`,
     },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ token: encodeMediaUrl(url) }),
   });
 
   if (!response.ok) {

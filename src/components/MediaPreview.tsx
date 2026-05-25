@@ -13,6 +13,7 @@ import {
   watermarkImageBlob,
   watermarkPdfBlob,
 } from '@/utils/watermark';
+import { mediaSrc, isMediaToken, tokenInnerPath } from '@/utils/mediaToken';
 
 
 interface MediaPreviewProps {
@@ -21,7 +22,8 @@ interface MediaPreviewProps {
 }
 
 function extractRecordingNumber(url: string): string | undefined {
-  const match = url.match(/recording-(\d+)/);
+  const target = isMediaToken(url) ? tokenInnerPath(url) : url;
+  const match = target.match(/recording-(\d+)/);
   return match ? match[1] : undefined;
 }
 
@@ -32,10 +34,13 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   const [imageError, setImageError] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const { toast } = useToast();
-  
-  // Ensure URL has encoded spaces for proper loading
-  const encodedUrl = url.replace(/ /g, '%20');
-  
+
+  // Internal "browser-loadable" src — always routed through our media proxy so
+  // the storage origin never appears in the DOM or in network requests.
+  const encodedUrl = mediaSrc(url);
+  // For type detection only — never used as a network/href value.
+  const detectionUrl = isMediaToken(url) ? tokenInnerPath(url) : url;
+
   // Check if it's a YouTube URL
   const getYouTubeEmbedUrl = (url: string) => {
     const patterns = [
@@ -53,8 +58,8 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
     return null;
   };
 
-  const youtubeEmbedUrl = getYouTubeEmbedUrl(url);
-  const lowerUrl = url.toLowerCase();
+  const youtubeEmbedUrl = getYouTubeEmbedUrl(detectionUrl);
+  const lowerUrl = detectionUrl.toLowerCase();
 
   // Check if it's a PDF (including Archive.org sanitized URLs)
   const isPdf = lowerUrl.includes('.pdf') || 
@@ -94,7 +99,9 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   if (isPdf) {
     const filename = (() => {
       try {
-        const last = new URL(url).pathname.split('/').filter(Boolean).pop() || 'document.pdf';
+        const last =
+          new URL(detectionUrl).pathname.split('/').filter(Boolean).pop() ||
+          'document.pdf';
         const decoded = decodeURIComponent(last);
         if (/-pdf$/i.test(decoded)) return decoded.replace(/-pdf$/i, '.pdf');
         if (/\.pdf$/i.test(decoded)) return decoded;
@@ -158,17 +165,10 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
                 referrerPolicy="no-referrer"
               >
                 <ExternalLink className="h-4 w-4" />
-                <span className="hidden sm:inline">Open original</span>
+                <span className="hidden sm:inline">Open in tab</span>
               </a>
             </Button>
           </div>
-        </div>
-        <div className="mt-3 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-          <p className="leading-snug">
-            "Open original" goes directly to Archive.org and may be blocked by Chrome or an ad blocker.
-            Use <strong>Download</strong> — it always works through our server.
-          </p>
         </div>
       </Card>
     );
@@ -258,7 +258,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
                       const watermarked = await watermarkImageBlob(blob);
                       const filename = (() => {
                         try {
-                          const u = new URL(url);
+                          const u = new URL(detectionUrl);
                           const last = u.pathname.split('/').filter(Boolean).pop();
                           return last || 'image';
                         } catch {

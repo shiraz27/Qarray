@@ -7,12 +7,21 @@
  *  - Add/Edit forms (initial ocr_status)
  */
 
+import { tokenInnerPath } from '@/utils/mediaToken';
+
+/**
+ * For any URL classifier below, work on the *decoded* path of `arc1://` tokens
+ * so existing `-pdf` / `-png` regex logic keeps matching. Non-token strings
+ * pass through unchanged.
+ */
+const inner = (u: string) => tokenInnerPath(u);
+
 export type MediaType = 'pdf' | 'image' | 'video' | 'audio' | 'unknown';
 
 /** True if the URL looks like a PDF (regular extension or Archive.org `-pdf` style). */
 export function isPdfUrl(url: string): boolean {
   if (!url) return false;
-  const lower = url.toLowerCase();
+  const lower = inner(url).toLowerCase();
   // Split-PDF manifests should be treated as PDFs by the rest of the app
   // (preview, OCR, page count, search badges).
   if (isSplitPdfManifestUrl(url)) return true;
@@ -34,7 +43,7 @@ export function isPdfUrl(url: string): boolean {
  */
 export function isSplitPdfManifestUrl(url: string | null | undefined): boolean {
   if (!url) return false;
-  const lower = url.toLowerCase();
+  const lower = inner(url).toLowerCase();
   return (
     lower.includes('/pages/manifest.json') ||
     lower.includes('/pages/manifest-json') ||
@@ -45,7 +54,7 @@ export function isSplitPdfManifestUrl(url: string | null | undefined): boolean {
 /** True if the URL looks like an image (regular extension or Archive.org `-png` style). */
 export function isImageUrl(url: string): boolean {
   if (!url) return false;
-  const lower = url.toLowerCase();
+  const lower = inner(url).toLowerCase();
   return (
     !!lower.match(/\.(jpg|jpeg|png|gif|webp)/i) ||
     !!lower.match(/-(jpg|jpeg|png|gif|webp)($|[/?#])/i)
@@ -55,7 +64,7 @@ export function isImageUrl(url: string): boolean {
 /** True if the URL looks like a video. */
 export function isVideoUrl(url: string): boolean {
   if (!url) return false;
-  const lower = url.toLowerCase();
+  const lower = inner(url).toLowerCase();
   return (
     !!lower.match(/\.(mp4|webm|mov)/i) ||
     !!lower.match(/-(mp4|webm|mov)($|[/?#])/i) ||
@@ -67,7 +76,7 @@ export function isVideoUrl(url: string): boolean {
 /** True if the URL looks like audio. */
 export function isAudioUrl(url: string): boolean {
   if (!url) return false;
-  const lower = url.toLowerCase();
+  const lower = inner(url).toLowerCase();
   return (
     !!lower.match(/\.(mp3|wav|ogg|m4a)/i) ||
     !!lower.match(/-(mp3|wav|ogg|m4a)($|[/?#])/i)

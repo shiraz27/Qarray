@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
+import { mediaSrc } from '@/utils/mediaToken';
 
 interface MediaPreviewDialogProps {
   open: boolean;
@@ -28,13 +29,14 @@ export const MediaPreviewDialog: React.FC<MediaPreviewDialogProps> = ({
 }) => {
   const renderPreview = () => {
     if (!mediaType || !mediaUrl) return null;
+    const src = mediaSrc(mediaUrl);
 
     switch (mediaType) {
       case 'image':
         return (
           <div className="relative max-w-full max-h-[60vh] w-full">
             <img
-              src={mediaUrl}
+              src={src}
               alt="Preview"
               className="w-full h-full object-contain rounded-lg"
             />
@@ -60,8 +62,8 @@ export const MediaPreviewDialog: React.FC<MediaPreviewDialogProps> = ({
             <div className="text-4xl">🎤</div>
             <p className="text-sm text-muted-foreground">Listen to your recording</p>
             <audio controls className="w-full max-w-md">
-              <source src={mediaUrl} type="audio/webm" />
-              <source src={mediaUrl} type="audio/mpeg" />
+              <source src={src} type="audio/webm" />
+              <source src={src} type="audio/mpeg" />
               Your browser does not support the audio element.
             </audio>
           </div>

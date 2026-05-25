@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.74.0';
+import { encodeMediaUrl } from '../_shared/mediaToken.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -213,6 +214,11 @@ function archiveDownloadUrl(folderPath: string) {
   return `https://archive.org/download/${ITEM}/${folderPath}`;
 }
 
+/** Public-facing URL returned to clients — always an opaque token. */
+function publicMediaUrl(folderPath: string) {
+  return encodeMediaUrl(archiveDownloadUrl(folderPath));
+}
+
 function archiveS3Url(folderPath: string) {
   return `https://s3.us.archive.org/${ITEM}/${folderPath}`;
 }
@@ -261,7 +267,7 @@ async function handleSingle(req: Request): Promise<Response> {
     );
   }
 
-  return jsonResponse({ url: archiveDownloadUrl(folderPath), itemIdentifier: ITEM, fileName });
+  return jsonResponse({ url: publicMediaUrl(folderPath), fileName });
 }
 
 // ---------- Multipart: initiate ----------
@@ -309,7 +315,7 @@ async function handleInitiate(req: Request): Promise<Response> {
   return jsonResponse({
     uploadId: uploadIdMatch[1],
     key: folderPath,
-    finalUrl: archiveDownloadUrl(folderPath),
+    finalUrl: publicMediaUrl(folderPath),
   });
 }
 
@@ -426,7 +432,7 @@ async function handleComplete(req: Request): Promise<Response> {
 
   // Drain body
   await res.text();
-  return jsonResponse({ url: archiveDownloadUrl(key) });
+  return jsonResponse({ url: publicMediaUrl(key) });
 }
 
 // ---------- Multipart: abort ----------

@@ -1,4 +1,5 @@
 import { isSplitPdfManifestUrl } from '@/utils/mediaTypeUtils';
+import { encodeMediaUrl } from '@/utils/mediaToken';
 
 export interface SplitPdfManifestPage {
   n: number;
@@ -31,7 +32,7 @@ export async function fetchSplitPdfManifest(url: string): Promise<SplitPdfManife
       apikey: supabaseKey,
       Authorization: `Bearer ${supabaseKey}`,
     },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ token: encodeMediaUrl(url) }),
   });
 
   if (!res.ok) {

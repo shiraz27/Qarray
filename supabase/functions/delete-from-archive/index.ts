@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { resolveToFetchUrl, logSafeRef } from '../_shared/mediaToken.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,13 +12,19 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Delete from Archive.org initiated');
-    
-    const { fileUrl } = await req.json();
-    
-    if (!fileUrl) {
-      throw new Error('File URL is required');
+    const body = await req.json().catch(() => ({}));
+    // Accept `token` (preferred), or legacy `fileUrl` containing a raw URL.
+    const ref: string | null = body?.token ?? body?.fileUrl ?? null;
+    if (!ref) {
+      throw new Error('Media reference is required');
     }
+
+    const fileUrl = resolveToFetchUrl(ref);
+    if (!fileUrl) {
+      throw new Error('Invalid media reference');
+    }
+
+    console.log('Delete initiated for ref:', logSafeRef(ref));
 
     const accessKey = Deno.env.get('ARCHIVE_ORG_ACCESS_KEY');
     const secretKey = Deno.env.get('ARCHIVE_ORG_SECRET_KEY');
@@ -25,8 +32,6 @@ serve(async (req) => {
     if (!accessKey || !secretKey) {
       throw new Error('Archive.org credentials not configured');
     }
-
-    console.log(`Deleting file: ${fileUrl}`);
 
     // Extract the path from the URL
     // URL format: https://archive.org/download/qarray-educational-content/path/to/file.ext
@@ -53,7 +58,7 @@ serve(async (req) => {
       }
     }
 
-    console.log('File deleted successfully:', fileUrl);
+    console.log('File deleted successfully:', logSafeRef(ref));
 
     return new Response(
       JSON.stringify({ 
