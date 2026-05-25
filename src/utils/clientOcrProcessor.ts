@@ -4,6 +4,7 @@ import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { detectMediaType, mediaTypeFromMime, type MediaType } from '@/utils/mediaTypeUtils';
 import { extractPdfTextAndOcr, type OcrMode } from '@/utils/pdfOcrHelpers';
 import { expandManifestUrls } from '@/utils/splitPdfManifest';
+import { encodeMediaUrl } from '@/utils/mediaToken';
 
 export type { OcrMode };
 
@@ -22,7 +23,7 @@ async function fetchFileViaProxy(url: string): Promise<Blob> {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${supabaseKey}`,
     },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ token: encodeMediaUrl(url) }),
   });
 
   if (!response.ok) {
