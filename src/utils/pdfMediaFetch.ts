@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { encodeMediaUrl } from '@/utils/mediaToken';
 
 export type PdfFetchResult =
   | { kind: 'ok'; blob: Blob }
@@ -32,7 +33,7 @@ export async function fetchPdfViaProxy(url: string): Promise<PdfFetchResult> {
         apikey: supabaseKey,
         Authorization: `Bearer ${session?.access_token || supabaseKey}`,
       },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ token: encodeMediaUrl(url) }),
     });
   } catch (e) {
     return {
