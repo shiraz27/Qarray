@@ -31,9 +31,9 @@ function hexToRgb01(hex: string): { r: number; g: number; b: number } {
 
 export async function getWatermarkText(): Promise<string> {
   try {
-    return 'Qarray.tn -Aqra Blech';
+    return 'Qarray.tn -Aqra Blech- Qarray.tn';
   } catch {
-    return 'Qarray.tn -Aqra Blech';
+    return 'Qarray.tn -Aqra Blech- Qarray.tn';
   }
 }
 
