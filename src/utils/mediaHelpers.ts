@@ -1,3 +1,5 @@
+import { isMediaToken, tokenInnerPath } from '@/utils/mediaToken';
+
 export interface MediaFile {
   url: string;
   type: 'image' | 'video' | 'audio' | 'pdf' | 'unknown';
@@ -5,21 +7,28 @@ export interface MediaFile {
 }
 
 export function extractMediaFromText(text: string): { text: string; media: MediaFile[] } {
-  // Pre-process: encode spaces in URLs before extraction
-  const processedText = text.replace(/(https?:\/\/[^\n]+?)(?=\s*(?:https?:\/\/|$|\n|Attachments:))/g, (match) => 
-    match.replace(/ /g, '%20')
+  // Pre-process: encode spaces in plain http(s) URLs before extraction.
+  // Tokens (arc1://) never contain spaces, so they are safe to leave alone.
+  const processedText = text.replace(/(https?:\/\/[^\n]+?)(?=\s*(?:https?:\/\/|arc1:\/\/|$|\n|Attachments:))/g, (match) =>
+    match.replace(/ /g, '%20'),
   );
-  
-  // Extract URLs from text
-  const urlRegex = /(https?:\/\/[^\s\n]+)/g;
-  const urls = processedText.match(urlRegex) || [];
-  
-  // Remove URLs from text to get clean text
-  const cleanText = processedText.replace(urlRegex, '').replace(/Attachments:\s*/g, '').trim();
-  
-  // Categorize each URL
+
+  // Extract opaque tokens AND raw URLs (legacy data).
+  const tokenOrUrlRegex = /(arc1:\/\/[A-Za-z0-9_-]+|https?:\/\/[^\s\n]+)/g;
+  const urls = processedText.match(tokenOrUrlRegex) || [];
+
+  // Strip extracted refs from the visible text.
+  const cleanText = processedText
+    .replace(tokenOrUrlRegex, '')
+    .replace(/Attachments:\s*/g, '')
+    .trim();
+
   const media: MediaFile[] = urls.map((url): MediaFile => {
-    const lowerUrl = url.toLowerCase();
+    // For type detection, work against the token's *decoded* path so the
+    // existing `-pdf` / `-png` heuristics keep working. For raw URLs this is
+    // a no-op.
+    const detectionTarget = isMediaToken(url) ? tokenInnerPath(url) : url;
+    const lowerUrl = detectionTarget.toLowerCase();
     
     if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
       return {
@@ -65,8 +74,8 @@ export function extractMediaFromText(text: string): { text: string; media: Media
     if (lowerUrl.match(/\.(mp3|wav|webm|ogg|m4a)/i) || 
         lowerUrl.match(/-(mp3|wav|webm|ogg|m4a)($|[/?#])/i) ||
         lowerUrl.includes('audio')) {
-      // Extract recording number for archive.org URLs
-      const recordingMatch = url.match(/recording-(\d+)/);
+      // Extract recording number from the decoded path when present.
+      const recordingMatch = detectionTarget.match(/recording-(\d+)/);
       if (recordingMatch) {
         return {
           url,
@@ -75,7 +84,7 @@ export function extractMediaFromText(text: string): { text: string; media: Media
         };
       }
       
-      const filename = url.split('/').pop() || 'Audio';
+      const filename = detectionTarget.split('/').pop() || 'Audio';
       return {
         url,
         type: 'audio' as const,
