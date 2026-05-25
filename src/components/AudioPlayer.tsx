@@ -3,6 +3,7 @@ import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Card } from '@/components/ui/card';
+import { mediaSrc } from '@/utils/mediaToken';
 
 interface AudioPlayerProps {
   url: string;
@@ -95,7 +96,7 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
 
   return (
     <Card className={`gamified-card p-4 ${className}`}>
-      <audio ref={audioRef} src={url} preload="metadata" />
+      <audio ref={audioRef} src={mediaSrc(url)} preload="metadata" />
       
       <div className="space-y-4">
         {/* Recording Info */}
