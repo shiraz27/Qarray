@@ -13,11 +13,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { fetchPdfViaProxy, triggerBlobDownload } from '@/utils/pdfMediaFetch';
+import { watermarkPdfBlob, triggerWatermarkedDownload } from '@/utils/watermark';
 import {
   isSplitPdfManifestUrl,
   fetchSplitPdfManifest,
   type SplitPdfManifest,
 } from '@/utils/splitPdfManifest';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
+
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
@@ -108,6 +111,7 @@ function SinglePdfView({
   extraDownloadActions,
   downloadIcon,
   downloadTitle,
+  hideOpenOriginal = false,
 }: {
   url: string;
   className?: string;
@@ -118,6 +122,7 @@ function SinglePdfView({
   extraDownloadActions?: React.ReactNode;
   downloadIcon?: React.ReactNode;
   downloadTitle?: string;
+  hideOpenOriginal?: boolean;
 }) {
   const [pages, setPages] = useState<any[]>([]);
   const [scale, setScale] = useState(1);
@@ -180,7 +185,8 @@ function SinglePdfView({
   const handleDownload = async () => {
     if (downloading) return;
     if (blobRef.current) {
-      triggerBlobDownload(blobRef.current, filename);
+      const watermarked = await watermarkPdfBlob(blobRef.current);
+      triggerWatermarkedDownload(watermarked, filename);
       return;
     }
     // Preview never loaded — try to fetch now just for the download.
@@ -190,7 +196,8 @@ function SinglePdfView({
       if (result.kind === 'ok') {
         blobRef.current = result.blob;
         setDownloadReady(true);
-        triggerBlobDownload(result.blob, filename);
+        const watermarked = await watermarkPdfBlob(result.blob);
+        triggerWatermarkedDownload(watermarked, filename);
       } else {
         setError(result.kind === 'unavailable'
           ? 'File still processing — try again in a moment.'
@@ -249,17 +256,19 @@ function SinglePdfView({
             </Button>
             {extraDownloadActions}
           </div>
-          <Button variant="ghost" size="sm" asChild className="gap-1">
-            <a
-              href={url.replace(/ /g, '%20')}
-              target="_blank"
-              rel="noopener noreferrer"
-              referrerPolicy="no-referrer"
-            >
-              <ExternalLink className="h-4 w-4" />
-              <span className="hidden sm:inline">Open original</span>
-            </a>
-          </Button>
+          {!hideOpenOriginal && (
+            <Button variant="ghost" size="sm" asChild className="gap-1">
+              <a
+                href={url.replace(/ /g, '%20')}
+                target="_blank"
+                rel="noopener noreferrer"
+                referrerPolicy="no-referrer"
+              >
+                <ExternalLink className="h-4 w-4" />
+                <span className="hidden sm:inline">Open original</span>
+              </a>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -326,17 +335,44 @@ function SinglePdfView({
   );
 }
 
+
+
+
+/**
+ * Wrapper for split-PDF manifest URLs. Loads the manifest, exposes a page
+ * dropdown, and reuses SinglePdfView to render the selected page.
+ */
+
 export function PdfInlinePreview({ url, className = '' }: PdfInlinePreviewProps) {
+  // Feature flag: allow disabling direct in-browser PDF rendering.
+  // Flag id is expected to exist in Supabase table `feature_flags`.
+  const { enabled: directPdfPreviewEnabled, loading: flagLoading } =
+    useFeatureFlag('direct_pdf_preview');
+
+  const disableInBrowserPreview = !flagLoading && directPdfPreviewEnabled === false;
+
+  if (disableInBrowserPreview) {
+    return <SinglePdfView url={url} className={className} hideOpenOriginal />;
+  }
+
+  if (flagLoading && !isSplitPdfManifestUrl(url)) {
+    return (
+      <Card className={`overflow-hidden ${className}`}>
+        <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading PDF…
+        </div>
+      </Card>
+    );
+  }
+
   if (isSplitPdfManifestUrl(url)) {
     return <SplitPdfPreview url={url} className={className} />;
   }
   return <SinglePdfView url={url} className={className} />;
 }
 
-/**
- * Wrapper for split-PDF manifest URLs. Loads the manifest, exposes a page
- * dropdown, and reuses SinglePdfView to render the selected page.
- */
+
 function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
   const [manifest, setManifest] = useState<SplitPdfManifest | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -387,8 +423,10 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
         bytes.byteOffset,
         bytes.byteOffset + bytes.byteLength,
       ) as ArrayBuffer;
-      triggerBlobDownload(
-        new Blob([buf], { type: 'application/pdf' }),
+      const mergedBlob = new Blob([buf], { type: 'application/pdf' });
+      const watermarked = await watermarkPdfBlob(mergedBlob);
+      triggerWatermarkedDownload(
+        watermarked,
         manifest.originalName || 'document.pdf',
       );
     } catch (e) {

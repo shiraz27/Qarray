@@ -32,13 +32,28 @@ export const MediaPreviewDialog: React.FC<MediaPreviewDialogProps> = ({
     switch (mediaType) {
       case 'image':
         return (
-          <img 
-            src={mediaUrl} 
-            alt="Preview" 
-            className="max-w-full max-h-[60vh] object-contain rounded-lg"
-          />
+          <div className="relative max-w-full max-h-[60vh] w-full">
+            <img
+              src={mediaUrl}
+              alt="Preview"
+              className="w-full h-full object-contain rounded-lg"
+            />
+            {/* watermark overlay (preview only; downloads are stamped) */}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="pointer-events-none absolute top-2 left-0 right-0 flex justify-center">
+                <div className="flex flex-col items-center leading-none">
+                  <div className="text-[10vw] sm:text-[56px] font-black text-black/60 dark:text-white/50 -mt-1 drop-shadow-sm">
+                    Qarray.TN
+                  </div>
+                  <div className="text-[4vw] sm:text-[18px] font-semibold text-black/30 dark:text-white/25 -mt-1">
+                    -IJA AQRA BLECH-
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         );
-      
+
       case 'audio':
         return (
           <div className="flex flex-col items-center gap-4 py-8">
@@ -51,7 +66,7 @@ export const MediaPreviewDialog: React.FC<MediaPreviewDialogProps> = ({
             </audio>
           </div>
         );
-      
+
       case 'pdf':
         return (
           <div className="flex flex-col items-center gap-4 py-8">
@@ -62,7 +77,7 @@ export const MediaPreviewDialog: React.FC<MediaPreviewDialogProps> = ({
             </p>
           </div>
         );
-      
+
       default:
         return null;
     }
@@ -89,17 +104,10 @@ export const MediaPreviewDialog: React.FC<MediaPreviewDialogProps> = ({
           )}
         </div>
         <DialogFooter className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={onDiscard}
-            disabled={isProcessing}
-          >
+          <Button variant="outline" onClick={onDiscard} disabled={isProcessing}>
             Discard
           </Button>
-          <Button 
-            onClick={onKeep}
-            disabled={isProcessing}
-          >
+          <Button onClick={onKeep} disabled={isProcessing}>
             {isProcessing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -114,3 +122,4 @@ export const MediaPreviewDialog: React.FC<MediaPreviewDialogProps> = ({
     </Dialog>
   );
 };
+

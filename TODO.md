@@ -11,14 +11,16 @@
 
   - [x] `src/components/MediaPreview.tsx` (PDF download)
 
-  - [ ] `src/components/PdfInlinePreview.tsx` (download single page + download full/merged)
-- [ ] Wire watermarking into image handling:
-  - [ ] Add an image download button in `src/components/MediaPreview.tsx`.
-  - [ ] Implement image watermarking for download (canvas export).
-  - [ ] Add watermark overlay to image previews in `MediaPreview.tsx` and `MediaPreviewDialog.tsx`.
-- [ ] Ensure “in-browser preview” shows watermark (overlay for images; re-render watermarked PDF pages for PDFs).
-- [ ] Smoke test by downloading a PDF and verifying the downloaded file contains watermark text.
-- [ ] Smoke test by downloading an image and verifying the downloaded file contains watermark text.
+  - [x] `src/components/PdfInlinePreview.tsx` (download single page + download full/merged)
+
+- [x] Wire watermarking into image handling:
+  - [x] Add an image download button in `src/components/MediaPreview.tsx`.
+  - [x] Implement image watermarking for download (canvas export).
+  - [x] Add watermark overlay to image previews in `MediaPreview.tsx` and `MediaPreviewDialog.tsx`.
+- [x] Ensure “in-browser preview” shows watermark (overlay for images; re-render watermarked PDF pages for PDFs).
+- [x] Smoke test by downloading a PDF and verifying the downloaded file contains watermark text.
+- [x] Smoke test by downloading an image and verifying the downloaded file contains watermark text.
+
 
 - [x] (SUBJECTS+CHAPTERS GLOBAL STATE) Find where subjects/chapters are fetched and why subject click causes a refetch/refresh.
   - [x] Search repo for chapters loading (`from('chapters')`, `chapters_rows`, etc.)

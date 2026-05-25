@@ -31,30 +31,12 @@ function hexToRgb01(hex: string): { r: number; g: number; b: number } {
 
 export async function getWatermarkText(): Promise<string> {
   try {
-    const { data } = await supabase.auth.getSession();
-    const user = data.session?.user;
-    if (!user) return 'QARRAY';
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, phone_number')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    const name = (profile?.full_name || '').trim();
-    if (name) return `QARRAY • ${name}`;
-
-    const phone = (profile?.phone_number || '').trim();
-    if (phone) return `QARRAY • ${phone}`;
-
-    const email = (user.email || '').trim();
-    if (email) return `QARRAY • ${email}`;
-
-    return 'QARRAY';
+    return 'Qarray.tn -Aqra Blech';
   } catch {
-    return 'QARRAY';
+    return 'Qarray.tn -Aqra Blech';
   }
 }
+
 
 export function defaultWatermarkOptions(text: string): Required<WatermarkOptions> {
   return {

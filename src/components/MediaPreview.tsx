@@ -8,7 +8,12 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { fetchPdfViaProxy, triggerBlobDownload } from '@/utils/pdfMediaFetch';
-import { triggerWatermarkedDownload, watermarkPdfBlob } from '@/utils/watermark';
+import {
+  triggerWatermarkedDownload,
+  watermarkImageBlob,
+  watermarkPdfBlob,
+} from '@/utils/watermark';
+
 
 interface MediaPreviewProps {
   url: string;
@@ -209,67 +214,78 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
           onClick={() => setImageZoomOpen(true)}
           style={{ display: imageLoading || imageError ? 'none' : 'block' }}
         >
-          <div className="relative">
-            <img 
-              src={encodedUrl} 
-              alt="Media content" 
-              className="w-full h-full object-cover rounded-lg" 
-              style={{ minHeight: '200px', maxHeight: '500px' }}
-              onLoad={() => setImageLoading(false)}
-              onError={(e) => {
-                console.error('Image failed to load:', encodedUrl);
-                setImageLoading(false);
-                setImageError(true);
-              }}
-            />
-            {/* watermark overlay (preview only; download is stamped serverlessly) */}
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <span className="whitespace-nowrap select-none -rotate-12 text-[2.5vw] sm:text-[28px] font-black text-black/20 dark:text-white/20">
-                QARRAY
-              </span>
-            </div>
-
-            <div className="absolute top-2 right-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                className="bg-black/40 text-white hover:bg-black/55"
-                onClick={async (e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (downloading) return;
-                  setDownloading(true);
-                  try {
-                    const res = await fetch(encodedUrl);
-                    if (!res.ok) throw new Error('Could not download image');
-                    const blob = await res.blob();
-                    const watermarked = await watermarkImageBlob(blob);
-                    const filename = (() => {
-                      try {
-                        const u = new URL(url);
-                        const last = u.pathname.split('/').filter(Boolean).pop();
-                        return last || 'image';
-                      } catch {
-                        return 'image';
-                      }
-                    })();
-                    triggerWatermarkedDownload(watermarked, filename);
-                  } catch (err) {
-                    toast({
-                      title: 'Download failed',
-                      description: err instanceof Error ? err.message : 'Could not watermark/download image',
-                      variant: 'destructive',
-                    });
-                  } finally {
-                    setDownloading(false);
-                  }
+            <div className="relative">
+              <img
+                src={encodedUrl}
+                alt="Media content"
+                className="w-full h-full object-cover rounded-lg"
+                style={{ minHeight: '200px', maxHeight: '500px' }}
+                onLoad={() => setImageLoading(false)}
+                onError={(e) => {
+                  console.error('Image failed to load:', encodedUrl);
+                  setImageLoading(false);
+                  setImageError(true);
                 }}
-              >
-                {downloading ? '…' : 'Download'}
-              </Button>
+              />
+
+              {/* watermark overlay (preview only; download is stamped serverlessly) */}
+              <div className="pointer-events-none absolute top-2 left-0 right-0 flex justify-center">
+                <div className="flex flex-col items-center leading-none">
+                  <div className="text-[10vw] sm:text-[56px] font-black text-black/60 dark:text-white/50 -mt-1 drop-shadow-sm">
+                    Qarray.TN
+                  </div>
+                  <div className="text-[4vw] sm:text-[18px] font-semibold text-black/30 dark:text-white/25 -mt-1">
+                    -IJA AQRA BLECH-
+                  </div>
+                </div>
+              </div>
+
+
+              <div className="absolute top-2 right-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="bg-black/40 text-white hover:bg-black/55"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (downloading) return;
+                    setDownloading(true);
+                    try {
+                      const res = await fetch(encodedUrl);
+                      if (!res.ok) throw new Error('Could not download image');
+                      const blob = await res.blob();
+                      const watermarked = await watermarkImageBlob(blob);
+                      const filename = (() => {
+                        try {
+                          const u = new URL(url);
+                          const last = u.pathname.split('/').filter(Boolean).pop();
+                          return last || 'image';
+                        } catch {
+                          return 'image';
+                        }
+                      })();
+                      triggerWatermarkedDownload(watermarked, filename);
+                    } catch (err) {
+                      toast({
+                        title: 'Download failed',
+                        description:
+                          err instanceof Error
+                            ? err.message
+                            : 'Could not watermark/download image',
+                        variant: 'destructive',
+                      });
+                    } finally {
+                      setDownloading(false);
+                    }
+                  }}
+                >
+                  {downloading ? '…' : 'Download'}
+                </Button>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+
         
         <Dialog open={imageZoomOpen} onOpenChange={setImageZoomOpen}>
           <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-none">
@@ -282,14 +298,30 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
               >
                 <X className="h-6 w-6" />
               </Button>
-              <img 
-                src={encodedUrl} 
-                alt="Media content" 
-                className="max-w-full max-h-[90vh] object-contain"
-              />
+              <div className="relative w-full h-full flex items-center justify-center">
+                <img
+                  src={encodedUrl}
+                  alt="Media content"
+                  className="max-w-full max-h-[90vh] object-contain"
+                />
+                {/* watermark overlay (preview only; download is stamped serverlessly) */}
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="pointer-events-none absolute top-2 left-0 right-0 flex justify-center">
+                    <div className="flex flex-col items-center leading-none">
+                      <div className="text-[10vw] sm:text-[56px] font-black text-black/60 dark:text-white/50 -mt-1 drop-shadow-sm">
+                        Qarray.TN
+                      </div>
+                      <div className="text-[4vw] sm:text-[18px] font-semibold text-black/30 dark:text-white/25 -mt-1">
+                        -IJA AQRA BLECH-
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
+
       </>
     );
   }
