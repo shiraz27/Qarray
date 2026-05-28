@@ -2091,6 +2091,15 @@ export default function Statistics() {
                                             />
                                           </TableCell>
                                           <TableCell>
+                                            <SourceLinkCell
+                                              resourceId={resource.id}
+                                              value={resource.source_link ?? null}
+                                              onSaved={(next) => {
+                                                setResources((prev) => prev.map((x) => x.id === resource.id ? { ...x, source_link: next } : x));
+                                              }}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
                                             <MetaCell
                                               variant="typeIds"
                                               value={resource.type_ids ?? []}
