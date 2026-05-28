@@ -2290,6 +2290,7 @@ export default function Statistics() {
                                       <TableHead>Books</TableHead>
                                       <TableHead>Types</TableHead>
                                       <TableHead>Pages</TableHead>
+                                      <TableHead>Per-page</TableHead>
                                       <TableHead>OCR Status</TableHead>
                                       <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
