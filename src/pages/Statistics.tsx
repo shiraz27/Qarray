@@ -2381,6 +2381,20 @@ export default function Statistics() {
                                             />
                                           </TableCell>
                                           <TableCell>
+                                            <PdfSplitCell
+                                              kind="question"
+                                              row={{ id: question.id, data: question.data, chapter_id: question.chapter_id }}
+                                              urls={extractMediaFromText(question.data).media.map((m) => m.url)}
+                                              onChanged={(newText) =>
+                                                setQuestions((prev) =>
+                                                  prev.map((q) =>
+                                                    q.id === question.id ? { ...q, data: newText } : q,
+                                                  ),
+                                                )
+                                              }
+                                            />
+                                          </TableCell>
+                                          <TableCell>
                                             <OcrStatusEditor
                                               table="questions"
                                               rowId={question.id}
