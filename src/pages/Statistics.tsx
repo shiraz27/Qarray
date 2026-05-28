@@ -2386,6 +2386,34 @@ export default function Statistics() {
                                 <SelectItem value="not_applicable">Not Applicable</SelectItem>
                               </SelectContent>
                             </Select>
+                            <Select value={questionWatermarkFilter} onValueChange={setQuestionWatermarkFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Watermark filter" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Watermark</SelectItem>
+                                <SelectItem value="completed">Watermark: Completed</SelectItem>
+                                <SelectItem value="partial">Watermark: Partial</SelectItem>
+                                <SelectItem value="pending">Watermark: Pending</SelectItem>
+                                <SelectItem value="in_progress">Watermark: In progress</SelectItem>
+                                <SelectItem value="failed">Watermark: Failed</SelectItem>
+                                <SelectItem value="not_applicable">Watermark: N/A</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleWatermarkAllQuestions}
+                              disabled={isProcessingWatermarkQuestionBatch}
+                              title="Watermark all eligible questions"
+                            >
+                              {isProcessingWatermarkQuestionBatch ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Stamp className="mr-2 h-4 w-4" />
+                              )}
+                              Watermark all
+                            </Button>
                             <div className="relative flex-1">
                               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                               <Input 
