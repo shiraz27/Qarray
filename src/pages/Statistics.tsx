@@ -88,6 +88,8 @@ interface ResourceRow {
   books?: string[] | null;
   type_ids?: number[] | null;
   page_count?: number | null;
+  watermark_status?: string | null;
+  pages_watermarked?: number | null;
 }
 
 // Track suggested titles from AI extraction
@@ -108,6 +110,8 @@ interface QuestionRow {
   books?: string[] | null;
   type_ids?: number[] | null;
   page_count?: number | null;
+  watermark_status?: string | null;
+  pages_watermarked?: number | null;
 }
 
 interface QuestionOcrStats {
