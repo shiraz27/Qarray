@@ -2606,6 +2606,41 @@ export default function Statistics() {
                                             />
                                           </TableCell>
                                           <TableCell>
+                                            <WatermarkStatusEditor
+                                              table="questions"
+                                              rowId={question.id}
+                                              status={(question.watermark_status ?? 'pending') as WatermarkStatus}
+                                              pagesWatermarked={question.pages_watermarked ?? 0}
+                                              pageCount={question.page_count ?? null}
+                                              onChanged={(next, pages) =>
+                                                setQuestions((prev) =>
+                                                  prev.map((q) =>
+                                                    q.id === question.id
+                                                      ? { ...q, watermark_status: next, pages_watermarked: pages ?? q.pages_watermarked ?? 0 }
+                                                      : q,
+                                                  ),
+                                                )
+                                              }
+                                            />
+                                            {textHasOcrableUrl(question.data) && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 px-2 mt-1"
+                                                onClick={() => handleWatermarkSingleQuestion(question.id)}
+                                                disabled={processingWatermarkQuestionId === question.id}
+                                                title="Watermark this question now"
+                                              >
+                                                {processingWatermarkQuestionId === question.id ? (
+                                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                                ) : (
+                                                  <Stamp className="h-3 w-3 mr-1" />
+                                                )}
+                                                Stamp
+                                              </Button>
+                                            )}
+                                          </TableCell>
+                                          <TableCell>
                                             <OcrTextEditor
                                               table="questions"
                                               rowId={question.id}
