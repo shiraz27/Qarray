@@ -18,6 +18,7 @@ import { useUploadManager } from '@/contexts/UploadManagerContext';
 import { ResourceTypeMultiSelect } from './ResourceTypeMultiSelect';
 import { SharedChaptersMultiSelect } from './SharedChaptersMultiSelect';
 import { useUserRole } from '@/hooks/useUserRole';
+import { MoveToChapterSelect } from './MoveToChapterSelect';
 
 const resourceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title must be less than 100 characters'),
@@ -67,6 +68,7 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
   const [mediaUrls, setMediaUrls] = useState<string[]>(initialData.data);
   const [sharedWith, setSharedWith] = useState<number[]>(initialData.shared_with ?? []);
   const { isModerator } = useUserRole();
+  const [targetChapterId, setTargetChapterId] = useState<number>(chapterId);
   const { getUploadsByCallback } = useUploadManager();
   
   // Generate stable callback ID for tracking uploads
@@ -161,6 +163,9 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
       // Only mods/admins can write shared_with (DB trigger also enforces this).
       if (isModerator) {
         updateData.shared_with = sharedWith;
+        if (targetChapterId && targetChapterId !== chapterId) {
+          updateData.chapter_id = targetChapterId;
+        }
       }
 
       // Only update OCR status if new PDF/image was added
@@ -353,6 +358,25 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
             <SharedChaptersMultiSelect
               value={sharedWith}
               onChange={setSharedWith}
+              excludeChapterId={chapterId}
+            />
+          </div>
+        )}
+
+        {isModerator && (
+          <div className="space-y-2 rounded-md border border-dashed border-border p-3">
+            <FormLabel className="flex items-center gap-2">
+              Move to chapter
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Mod only
+              </span>
+            </FormLabel>
+            <p className="text-xs text-muted-foreground">
+              Permanently moves this resource to another chapter. Shared chapters above are unaffected.
+            </p>
+            <MoveToChapterSelect
+              value={targetChapterId}
+              onChange={setTargetChapterId}
               excludeChapterId={chapterId}
             />
           </div>
