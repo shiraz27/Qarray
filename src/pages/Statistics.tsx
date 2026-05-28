@@ -1933,6 +1933,19 @@ export default function Statistics() {
                                             />
                                           </TableCell>
                                           <TableCell>
+                                            <PdfSplitCell
+                                              kind="resource"
+                                              row={{ id: resource.id, data: resource.data, chapter_id: resource.chapter_id }}
+                                              onChanged={(newData) =>
+                                                setResources((prev) =>
+                                                  prev.map((r) =>
+                                                    r.id === resource.id ? { ...r, data: newData } : r,
+                                                  ),
+                                                )
+                                              }
+                                            />
+                                          </TableCell>
+                                          <TableCell>
                                             <OcrStatusEditor
                                               table="resources"
                                               rowId={resource.id}
