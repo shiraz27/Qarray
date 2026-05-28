@@ -712,6 +712,7 @@ export type Database = {
           school_name: string | null
           school_names: string[]
           shared_with: number[]
+          source_link: string | null
           subject_id: number | null
           teacher_name: string | null
           teacher_names: string[]
@@ -746,6 +747,7 @@ export type Database = {
           school_name?: string | null
           school_names?: string[]
           shared_with?: number[]
+          source_link?: string | null
           subject_id?: number | null
           teacher_name?: string | null
           teacher_names?: string[]
@@ -780,6 +782,7 @@ export type Database = {
           school_name?: string | null
           school_names?: string[]
           shared_with?: number[]
+          source_link?: string | null
           subject_id?: number | null
           teacher_name?: string | null
           teacher_names?: string[]
