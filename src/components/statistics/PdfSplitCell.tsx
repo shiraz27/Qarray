@@ -46,15 +46,32 @@ export function PdfSplitCell(props: Props) {
   const handleMigrate = async () => {
     setRunning(true);
     setError(null);
+    let totalRaster = 0;
+    let totalFailed = 0;
+    const trackProgress = (p: BackfillProgress) => {
+      if (p.rasterizedPages) totalRaster += p.rasterizedPages;
+      if (p.failedPages) totalFailed += p.failedPages;
+      setProgress(p);
+    };
     try {
       if (props.kind === 'resource') {
-        const next = await migrateResourcePdfs(props.row, setProgress);
+        const next = await migrateResourcePdfs(props.row, trackProgress);
         props.onChanged(next);
       } else {
-        const next = await migrateQuestionPdfs(props.row, props.urls, setProgress);
+        const next = await migrateQuestionPdfs(props.row, props.urls, trackProgress);
         props.onChanged(next);
       }
-      toast.success('PDF migrated to per-page');
+      if (totalFailed > 0) {
+        toast.warning(
+          `PDF migrated — ${totalRaster} page(s) rasterized, ${totalFailed} page(s) skipped (unrecoverable source)`,
+        );
+      } else if (totalRaster > 0) {
+        toast.warning(
+          `PDF migrated — ${totalRaster} page(s) rasterized due to malformed source`,
+        );
+      } else {
+        toast.success('PDF migrated to per-page');
+      }
     } catch (e: any) {
       const msg = e?.message || 'Migration failed';
       setError(msg);

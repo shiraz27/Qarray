@@ -1,4 +1,6 @@
 import { PDFDocument } from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import {
   uploadFileToArchiveControlled,
   type ArchiveUploadController,
@@ -7,6 +9,9 @@ import {
   type ArchiveUploadProgress,
 } from '@/utils/archiveMultipartUpload';
 import type { SplitPdfManifest } from '@/utils/splitPdfManifest';
+
+// Idempotent worker config (matches pdfOcrHelpers.ts).
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 /**
  * Split threshold: PDFs with strictly more pages than this used to get split.
@@ -33,24 +38,181 @@ async function readPageCount(file: File): Promise<number> {
   return doc.getPageCount();
 }
 
-export async function splitPdfToPages(file: File): Promise<File[]> {
-  const buf = await file.arrayBuffer();
-  const src = await PDFDocument.load(buf, { ignoreEncryption: true });
-  const total = src.getPageCount();
-  const out: File[] = [];
-  for (let i = 0; i < total; i++) {
-    const dst = await PDFDocument.create();
-    const [copied] = await dst.copyPages(src, [i]);
-    dst.addPage(copied);
-    const bytes = await dst.save();
-    // pdf-lib returns Uint8Array<ArrayBufferLike>; copy into a plain ArrayBuffer
-    // so it satisfies BlobPart in strict TS.
-    const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-    out.push(
-      new File([ab], `${i + 1}.pdf`, { type: 'application/pdf' }),
+/**
+ * Rasterize a single page via pdfjs-dist and wrap it into a 1-page PDF.
+ * Used as a fallback when pdf-lib's `copyPages` throws on malformed sources
+ * (e.g. "Expected instance of PDFDict, but got instance of undefined").
+ * The page loses selectable text but remains viewable and OCR-able.
+ */
+async function rasterizePageToPdf(
+  srcBytes: Uint8Array,
+  pageIndex: number, // 0-based
+): Promise<File> {
+  // pdfjs mutates the buffer it receives; pass a copy.
+  const copy = new Uint8Array(srcBytes);
+  const loadingTask = pdfjsLib.getDocument({ data: copy });
+  const pdf = await loadingTask.promise;
+  try {
+    const page = await pdf.getPage(pageIndex + 1);
+    const viewport = page.getViewport({ scale: 150 / 72 }); // ~150 DPI
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D context unavailable');
+    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+
+    const pngBlob: Blob = await new Promise((resolve, reject) =>
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error('toBlob returned null'))),
+        'image/png',
+      ),
     );
+    const pngBytes = new Uint8Array(await pngBlob.arrayBuffer());
+
+    const dst = await PDFDocument.create();
+    const img = await dst.embedPng(pngBytes);
+    // Preserve original page dimensions (in PDF points) so OCR/coordinates line up.
+    const pageWidth = viewport.width / (150 / 72);
+    const pageHeight = viewport.height / (150 / 72);
+    const p = dst.addPage([pageWidth, pageHeight]);
+    p.drawImage(img, { x: 0, y: 0, width: pageWidth, height: pageHeight });
+    const bytes = await dst.save();
+    const ab = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
+    return new File([ab], `${pageIndex + 1}.pdf`, { type: 'application/pdf' });
+  } finally {
+    try { await pdf.destroy(); } catch { /* ignore */ }
   }
-  return out;
+}
+
+export interface SplitResult {
+  files: File[];
+  rasterizedIndices: number[]; // 0-based
+  failedIndices: number[];     // 0-based
+}
+
+/**
+ * Split a PDF into one File per page. Hardened against malformed sources:
+ *
+ * 1. Primary path: pdf-lib `copyPages` (fast, preserves text).
+ * 2. Per-page fallback: rasterize via pdfjs-dist → 1-page PDF wrapping a PNG.
+ *
+ * Pages that fail both paths are skipped and reported in `failedIndices`.
+ * This is partially backwards-compatible: callers using `await splitPdfToPages(file)`
+ * directly will get `File[]` via the legacy export.
+ */
+export async function splitPdfToPagesDetailed(file: File): Promise<SplitResult> {
+  const buf = await file.arrayBuffer();
+  const srcBytes = new Uint8Array(buf);
+
+  let src: PDFDocument;
+  try {
+    src = await PDFDocument.load(buf, {
+      ignoreEncryption: true,
+      throwOnInvalidObject: false,
+    });
+  } catch (e) {
+    console.error('[split-pdf] pdf-lib load failed, falling back to raster-only', e);
+    // Use pdfjs to determine page count and rasterize every page.
+    const copy = new Uint8Array(srcBytes);
+    const pdf = await pdfjsLib.getDocument({ data: copy }).promise;
+    const total = pdf.numPages;
+    try { await pdf.destroy(); } catch { /* ignore */ }
+    const files: File[] = [];
+    const rasterized: number[] = [];
+    const failed: number[] = [];
+    for (let i = 0; i < total; i++) {
+      try {
+        files.push(await rasterizePageToPdf(srcBytes, i));
+        rasterized.push(i);
+      } catch (err) {
+        console.error(`[split-pdf] raster page ${i + 1} failed`, err);
+        failed.push(i);
+      }
+    }
+    return { files, rasterizedIndices: rasterized, failedIndices: failed };
+  }
+
+  const total = src.getPageCount();
+
+  // Layer 1: try to copy all pages in a single call (more reliable than
+  // re-parsing the page tree N times, and avoids one bad page killing the rest).
+  let bulkCopied: any[] | null = null;
+  try {
+    const tmp = await PDFDocument.create();
+    bulkCopied = await tmp.copyPages(src, Array.from({ length: total }, (_, i) => i));
+  } catch (e) {
+    console.warn('[split-pdf] bulk copyPages failed, will copy per page', e);
+    bulkCopied = null;
+  }
+
+  const out: File[] = [];
+  const rasterized: number[] = [];
+  const failed: number[] = [];
+
+  for (let i = 0; i < total; i++) {
+    let pageFile: File | null = null;
+
+    // Try bulk-copied page first.
+    if (bulkCopied && bulkCopied[i]) {
+      try {
+        const dst = await PDFDocument.create();
+        dst.addPage(bulkCopied[i]);
+        const bytes = await dst.save();
+        const ab = bytes.buffer.slice(
+          bytes.byteOffset,
+          bytes.byteOffset + bytes.byteLength,
+        ) as ArrayBuffer;
+        pageFile = new File([ab], `${i + 1}.pdf`, { type: 'application/pdf' });
+      } catch (e) {
+        console.warn(`[split-pdf] bulk-copied page ${i + 1} failed to save`, e);
+      }
+    }
+
+    // Try per-page copyPages from the original source.
+    if (!pageFile) {
+      try {
+        const dst = await PDFDocument.create();
+        const [copied] = await dst.copyPages(src, [i]);
+        dst.addPage(copied);
+        const bytes = await dst.save();
+        const ab = bytes.buffer.slice(
+          bytes.byteOffset,
+          bytes.byteOffset + bytes.byteLength,
+        ) as ArrayBuffer;
+        pageFile = new File([ab], `${i + 1}.pdf`, { type: 'application/pdf' });
+      } catch (e) {
+        console.warn(`[split-pdf] per-page copyPages failed for page ${i + 1}, rasterizing`, e);
+      }
+    }
+
+    // Final fallback: rasterize.
+    if (!pageFile) {
+      try {
+        pageFile = await rasterizePageToPdf(srcBytes, i);
+        rasterized.push(i);
+      } catch (e) {
+        console.error(`[split-pdf] rasterization fallback failed for page ${i + 1}`, e);
+        failed.push(i);
+      }
+    }
+
+    if (pageFile) out.push(pageFile);
+  }
+
+  return { files: out, rasterizedIndices: rasterized, failedIndices: failed };
+}
+
+/** Backwards-compatible wrapper returning only the files. */
+export async function splitPdfToPages(file: File): Promise<File[]> {
+  const { files, rasterizedIndices, failedIndices } = await splitPdfToPagesDetailed(file);
+  if (rasterizedIndices.length || failedIndices.length) {
+    console.warn('[split-pdf] partial split', { rasterizedIndices, failedIndices });
+  }
+  return files;
 }
 
 /**
