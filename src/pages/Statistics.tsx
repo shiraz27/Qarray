@@ -42,6 +42,7 @@ import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, app
 import { MetaCell, type CellValue } from '@/components/statistics/MetaCell';
 import { OcrStatusEditor, type OcrStatus } from '@/components/statistics/OcrStatusEditor';
 import { OcrTextEditor } from '@/components/statistics/OcrTextEditor';
+import { PdfSplitCell } from '@/components/statistics/PdfSplitCell';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
 interface Stats {
