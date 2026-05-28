@@ -37,6 +37,7 @@ const resourceSchema = z.object({
   school_name: z.string().max(200).optional(),
   teacher_name: z.string().max(200).optional(),
   book: z.string().max(200).optional(),
+  source_link: z.string().max(500).optional(),
 });
 
 type ResourceFormData = z.infer<typeof resourceSchema>;
@@ -114,6 +115,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
       school_name: '',
       teacher_name: '',
       book: '',
+      source_link: '',
     },
   });
 
@@ -463,6 +465,7 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
           institute_id: selectedInstituteId || null,
           book: data.book || null,
           books: data.book ? [data.book] : [],
+          source_link: (isModerator || isAdmin) ? (data.source_link?.trim() || null) : null,
           page_count: await computePageCountFromUrls(mediaUrls).then(r => r.complete ? r.count : null).catch(() => null),
         });
 
