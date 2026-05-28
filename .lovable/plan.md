@@ -1,48 +1,50 @@
 ## Goal
 
-Add a mod-only "Move to chapter" selector to both `EditResourceForm.tsx` and `EditQuestionForm.tsx`. Persists by updating `resources.chapter_id` / `questions.chapter_id`. RLS already allows mods/admins to update either table.
+1. Add the same Class + Subject filter UI from `SharedChaptersMultiSelect` to `MoveToChapterSelect`.
+2. In both components, when a chapter is selected display three tags: **class**, **subject**, **chapter** (instead of the current single chip showing only `chapter · subject`).
 
-## New shared component
+## MoveToChapterSelect changes
 
-`src/components/MoveToChapterSelect.tsx` — single-chapter picker reusing the same UX as `SharedChaptersMultiSelect` (class/subject filter + `search_chapters_normalized` RPC + debounce + hydration of current chapter name), but single-select.
+Mirror `SharedChaptersMultiSelect`'s scope-filter block inside the popover:
 
-Props:
-```ts
-{ value: number | null; onChange: (id: number) => void; excludeChapterId?: number; disabled?: boolean; }
-```
+- Load `classes` (hidden=false) on first open.
+- Load `subjects` filtered by selected class ids.
+- Multi-select class chips + subject chips with "Clear filters".
+- Search RPC `search_chapters_normalized` fanned out per selected subject id (or per class id if no subjects, or a single null/null call when no filters), merged by id — same pattern as the multi-select.
 
-Behavior:
-- Trigger label shows current chapter name + subject (hydrated via `chapters` select like the multi-select does).
-- Clicking an option in the popover sets `value` and closes the popover. No "clear" — moving requires a destination.
-- The current chapter is shown but disabled (`(current chapter)` hint), same pattern as `excludeChapterId` in the existing component.
-
-## EditResourceForm changes
-
-Inside the existing `{isModerator && (...)}` block, add a second dashed-border section directly under the shared-chapters block:
+Also extend the hydration query for the current value to include `class_id` and the class name so we can render the class tag:
 
 ```
-Move to chapter [Mod only]
-This permanently moves the resource to another chapter. Shared chapters are unaffected.
-<MoveToChapterSelect value={targetChapterId} onChange={setTargetChapterId} excludeChapterId={chapterId} />
+.from('chapters').select('id, name, class_id, subjects(name), classes(name)')
 ```
 
-- `targetChapterId` state initialized to `chapterId` prop.
-- In `onSubmit`, when `isModerator && targetChapterId && targetChapterId !== chapterId`, include `chapter_id: targetChapterId` in `updateData`. Otherwise omit (keeps non-mods and no-op safe).
-- On success, since the parent assumes the resource still belongs to the original chapter, surface a toast "Resource moved" and still call `onSuccess()` (parent already refetches).
+Results from `search_chapters_normalized` already include `class_id` + `subject_name`; we'll additionally look up class names from the `classes` list loaded for the filter (cached map) when rendering tags. If a class name isn't cached yet, fall back to `Class #<id>`.
 
-## EditQuestionForm changes
+## Shared tag rendering (both components)
 
-`EditQuestionForm` currently has no shared-chapters UI. Add a new mod-only block (gated by `useUserRole().isModerator`) at the bottom of the form, above the action buttons, with the same `MoveToChapterSelect`. Persist `chapter_id: targetChapterId` in the `questions` update when changed.
+Below the trigger button (replacing the current single Badge row in `SharedChaptersMultiSelect`, and adding to `MoveToChapterSelect`), render for each selected chapter id a small grouped row of three `Badge`s:
 
-Import `useUserRole` (not currently used here).
+```
+[Class: 7ème]  [Subject: Math]  [Chapter: Fractions]
+```
+
+- `MoveToChapterSelect`: one row for the single selected chapter.
+- `SharedChaptersMultiSelect`: one row per selected id (kept inside a `flex-col gap-1.5` list). Keep the existing `X` remove button at the end of each row (only on the multi-select).
+- Use existing `Badge` component, `variant="secondary"` for chapter, `variant="outline"` for class/subject to differentiate.
+- Truncate long names with `max-w-[12rem] truncate`.
+- If class or subject name is missing from cached details, render `Class #id` / `Subject #id` placeholders.
+
+## Class name resolution
+
+Both components already load (or will load) the `classes` list when the popover opens. Promote that to load lazily on mount instead of waiting for `open`, so tags can render class names even before the popover is opened. Alternative for `MoveToChapterSelect`: fetch class name as part of the hydration `.select('classes(name)')` join — simpler, do that. For `SharedChaptersMultiSelect`, extend its existing hydration query the same way to include `classes(name)` and store it in `selectedDetails[id].class_name`.
 
 ## Out of scope
 
-- Bulk move, undo, moving across classes with warnings, updating any denormalized counters, re-running OCR. Just a straight `chapter_id` rewrite.
-- No DB/RLS changes — existing mod/admin UPDATE policies on `resources` and `questions` already cover this.
+- No DB / RLS / persistence changes — purely UI inside the two components.
+- No changes to how `chapter_id` / `shared_with` are written.
+- No filter persistence across opens.
 
 ## Files
 
-- create `src/components/MoveToChapterSelect.tsx`
-- edit `src/components/EditResourceForm.tsx`
-- edit `src/components/EditQuestionForm.tsx`
+- edit `src/components/MoveToChapterSelect.tsx` — add filter block + tag rendering.
+- edit `src/components/SharedChaptersMultiSelect.tsx` — extend hydration with class name + replace single badge with class/subject/chapter tag group.

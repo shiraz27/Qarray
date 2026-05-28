@@ -19,6 +19,7 @@ interface ChapterOption {
   name: string;
   subject_name?: string | null;
   class_id?: number | null;
+  class_name?: string | null;
 }
 
 interface ClassOption { id: number; name: string }
@@ -50,9 +51,9 @@ export const SharedChaptersMultiSelect: React.FC<Props> = ({
   const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<number[]>([]);
 
-  // Load classes once popover opens
+  // Load classes on mount so tags can render class names without opening popover
   useEffect(() => {
-    if (!open || classes.length > 0) return;
+    if (classes.length > 0) return;
     (async () => {
       const { data } = await (supabase as any)
         .from('classes')
@@ -61,7 +62,13 @@ export const SharedChaptersMultiSelect: React.FC<Props> = ({
         .order('id');
       setClasses(((data as any[]) || []).map((c) => ({ id: c.id, name: c.name })));
     })();
-  }, [open, classes.length]);
+  }, []);
+
+  const classNameById = useMemo(() => {
+    const m: Record<number, string> = {};
+    for (const c of classes) m[c.id] = c.name;
+    return m;
+  }, [classes]);
 
   // Load subjects whenever class selection changes
   useEffect(() => {
@@ -105,7 +112,7 @@ export const SharedChaptersMultiSelect: React.FC<Props> = ({
     (async () => {
       const { data } = await (supabase as any)
         .from('chapters')
-        .select('id, name, subject_id, class_id, subjects(name)')
+        .select('id, name, subject_id, class_id, subjects(name), classes(name)')
         .in('id', missing);
       if (data) {
         setSelectedDetails((prev) => {
@@ -116,6 +123,7 @@ export const SharedChaptersMultiSelect: React.FC<Props> = ({
               name: c.name,
               subject_name: c.subjects?.name ?? null,
               class_id: c.class_id,
+              class_name: c.classes?.name ?? null,
             };
           }
           return next;
@@ -343,15 +351,23 @@ export const SharedChaptersMultiSelect: React.FC<Props> = ({
       </Popover>
 
       {value.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-col gap-1.5">
           {value.map((id) => {
             const d = selectedDetails[id];
+            const className =
+              d?.class_name ??
+              (d?.class_id ? classNameById[d.class_id] : null) ??
+              (d?.class_id ? `#${d.class_id}` : '—');
             return (
-              <Badge key={id} variant="secondary" className="gap-1 pr-1">
-                <span className="truncate max-w-[16rem]">
-                  {d?.name ?? `Chapter #${id}`}
-                  {d?.subject_name ? ` · ${d.subject_name}` : ''}
-                </span>
+              <div key={id} className="flex flex-wrap items-center gap-1.5">
+                <Badge variant="outline" className="max-w-[12rem] truncate">
+                  Class: {className}
+                </Badge>
+                <Badge variant="outline" className="max-w-[12rem] truncate">
+                  Subject: {d?.subject_name ?? '—'}
+                </Badge>
+                <Badge variant="secondary" className="max-w-[12rem] truncate gap-1 pr-1">
+                  <span className="truncate">Chapter: {d?.name ?? `#${id}`}</span>
                 <button
                   type="button"
                   onClick={() => toggle(id)}
@@ -361,6 +377,7 @@ export const SharedChaptersMultiSelect: React.FC<Props> = ({
                   <X className="h-3 w-3" />
                 </button>
               </Badge>
+              </div>
             );
           })}
         </div>
