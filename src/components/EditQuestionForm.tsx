@@ -13,6 +13,8 @@ import { Loader2 } from 'lucide-react';
 import { computePageCountFromUrls } from '@/utils/pageCountHelpers';
 import { MediaUploader } from './MediaUploader';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
+import { useUserRole } from '@/hooks/useUserRole';
+import { MoveToChapterSelect } from './MoveToChapterSelect';
 
 const questionSchema = z.object({
   question: z.string().min(10, 'Question must be at least 10 characters').max(500, 'Question must be less than 500 characters'),
@@ -40,6 +42,8 @@ export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { getUploadsByCallback } = useUploadManager();
+  const { isModerator } = useUserRole();
+  const [targetChapterId, setTargetChapterId] = useState<number>(chapterId);
   
   // Generate stable callback ID for tracking uploads
   const callbackId = useMemo(() => `edit-question-${Date.now()}`, []);
@@ -104,15 +108,19 @@ export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
         }
       }
 
+      const updatePayload: any = {
+        data: questionData,
+        type_id: typeId,
+        book: data.book || null,
+        books: data.book ? [data.book] : [],
+        page_count: await computePageCountFromUrls(mediaUrls).then(r => r.complete ? r.count : null).catch(() => null),
+      };
+      if (isModerator && targetChapterId && targetChapterId !== chapterId) {
+        updatePayload.chapter_id = targetChapterId;
+      }
       const { error } = await supabase
         .from('questions')
-        .update({
-          data: questionData,
-          type_id: typeId,
-          book: data.book || null,
-          books: data.book ? [data.book] : [],
-          page_count: await computePageCountFromUrls(mediaUrls).then(r => r.complete ? r.count : null).catch(() => null),
-        })
+        .update(updatePayload)
         .eq('id', questionId);
 
       if (error) throw error;
@@ -173,6 +181,25 @@ export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
             contentId={questionId.toString()}
           />
         </div>
+
+        {isModerator && (
+          <div className="space-y-2 rounded-md border border-dashed border-border p-3">
+            <FormLabel className="flex items-center gap-2">
+              Move to chapter
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Mod only
+              </span>
+            </FormLabel>
+            <p className="text-xs text-muted-foreground">
+              Permanently moves this question to another chapter.
+            </p>
+            <MoveToChapterSelect
+              value={targetChapterId}
+              onChange={setTargetChapterId}
+              excludeChapterId={chapterId}
+            />
+          </div>
+        )}
 
         <div className="flex gap-2 justify-end">
           <Button type="button" variant="outline" onClick={onCancel}>
