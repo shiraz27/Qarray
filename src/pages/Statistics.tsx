@@ -5,6 +5,7 @@ import { Header } from '@/components/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { computePageCountFromUrls, computePageCountFromText, withTimeout } from '@/utils/pageCountHelpers';
 import { normalizedIncludes } from '@/utils/textHelpers';
+import { SourceLinkCell } from '@/components/statistics/SourceLinkCell';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
