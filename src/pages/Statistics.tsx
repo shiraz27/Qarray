@@ -916,6 +916,95 @@ export default function Statistics() {
     });
   };
 
+  // ---------- Watermark handlers ----------
+  const handleWatermarkSingleResource = async (id: number) => {
+    setProcessingWatermarkId(id);
+    try {
+      const result = await processResourceWatermark(id, (p) => {
+        toast.loading(p.message, { id: `wm-r-${id}` });
+      });
+      toast.dismiss(`wm-r-${id}`);
+      result.success ? toast.success(result.message) : toast.error(result.message);
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setProcessingWatermarkId(null);
+    }
+  };
+
+  const handleWatermarkSingleQuestion = async (id: number) => {
+    setProcessingWatermarkQuestionId(id);
+    try {
+      const result = await processQuestionWatermark(id, (p) => {
+        toast.loading(p.message, { id: `wm-q-${id}` });
+      });
+      toast.dismiss(`wm-q-${id}`);
+      result.success ? toast.success(result.message) : toast.error(result.message);
+      fetchQuestions(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setProcessingWatermarkQuestionId(null);
+    }
+  };
+
+  const handleWatermarkAllResources = async () => {
+    const targets = resources.filter((r) => {
+      const s = r.watermark_status ?? 'pending';
+      if (!['pending', 'failed', 'partial'].includes(s)) return false;
+      return urlsHaveOcrable(r.data);
+    });
+    if (targets.length === 0) {
+      toast.info('No resources need watermarking');
+      return;
+    }
+    setIsProcessingWatermarkBatch(true);
+    let ok = 0, ko = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        try {
+          const res = await processResourceWatermark(t.id, (p) => {
+            toast.loading(`[${i + 1}/${targets.length}] ${p.message}`, { id: 'wm-r-batch' });
+          });
+          res.success ? ok++ : ko++;
+        } catch { ko++; }
+      }
+      toast.dismiss('wm-r-batch');
+      toast.success(`Watermark batch: ${ok} ok, ${ko} failed`);
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsProcessingWatermarkBatch(false);
+    }
+  };
+
+  const handleWatermarkAllQuestions = async () => {
+    const targets = questions.filter((q) => {
+      const s = q.watermark_status ?? 'pending';
+      if (!['pending', 'failed', 'partial'].includes(s)) return false;
+      return textHasOcrableUrl(q.data);
+    });
+    if (targets.length === 0) {
+      toast.info('No questions need watermarking');
+      return;
+    }
+    setIsProcessingWatermarkQuestionBatch(true);
+    let ok = 0, ko = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        try {
+          const res = await processQuestionWatermark(t.id, (p) => {
+            toast.loading(`[${i + 1}/${targets.length}] ${p.message}`, { id: 'wm-q-batch' });
+          });
+          res.success ? ok++ : ko++;
+        } catch { ko++; }
+      }
+      toast.dismiss('wm-q-batch');
+      toast.success(`Watermark batch: ${ok} ok, ${ko} failed`);
+      fetchQuestions(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsProcessingWatermarkQuestionBatch(false);
+    }
+  };
+
   // Metadata extraction handlers
   const handleExtractMetadata = async (resourceId: number) => {
     const resource = resources.find(r => r.id === resourceId);
