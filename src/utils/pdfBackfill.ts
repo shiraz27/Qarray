@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { fetchPdfViaProxy } from '@/utils/pdfMediaFetch';
 import {
-  splitPdfToPages,
+  splitPdfToPagesDetailed,
   sanitizeBase,
   shortHash,
   buildAndUploadManifest,
@@ -16,6 +16,10 @@ export interface BackfillProgress {
   totalPages?: number;
   urlIndex?: number;
   urlTotal?: number;
+  /** Pages that fell back to rasterization during the most recent split. */
+  rasterizedPages?: number;
+  /** Pages dropped because both split paths failed. */
+  failedPages?: number;
 }
 
 /** Pick the URLs in a row that are PDFs but NOT already manifest URLs. */
@@ -49,7 +53,19 @@ async function migrateSingleUrl(
   const file = new File([fetched.blob], originalName, { type: 'application/pdf' });
 
   onProgress?.({ phase: 'split' });
-  const pages = await splitPdfToPages(file);
+  const { files: pages, rasterizedIndices, failedIndices } =
+    await splitPdfToPagesDetailed(file);
+  if (rasterizedIndices.length || failedIndices.length) {
+    onProgress?.({
+      phase: 'split',
+      rasterizedPages: rasterizedIndices.length,
+      failedPages: failedIndices.length,
+      totalPages: pages.length + failedIndices.length,
+    });
+  }
+  if (pages.length === 0) {
+    throw new Error('Split failed: no pages could be extracted');
+  }
   const base = `${sanitizeBase(originalName)}-${shortHash()}`;
 
   const archiveOpts = {
