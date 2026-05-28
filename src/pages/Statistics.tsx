@@ -1863,6 +1863,17 @@ export default function Statistics() {
                                 <SelectItem value="not_applicable">Watermark: N/A</SelectItem>
                               </SelectContent>
                             </Select>
+                            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Source filter" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Sources</SelectItem>
+                                <SelectItem value="has_link">Source: Link</SelectItem>
+                                <SelectItem value="has_book_name">Source: Book name</SelectItem>
+                                <SelectItem value="missing">Source: Missing</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <Button
                               size="sm"
                               variant="outline"
