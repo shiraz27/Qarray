@@ -1183,8 +1183,9 @@ export default function Statistics() {
 
   const filteredResources = resources.filter(r => {
     const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
+    const matchesWm = watermarkFilter === 'all' || (r.watermark_status ?? 'pending') === watermarkFilter;
     const matchesSearch = normalizedIncludes(r.title, searchQuery);
-    return matchesFilter && matchesSearch;
+    return matchesFilter && matchesWm && matchesSearch;
   });
 
   const totalPages = Math.ceil(filteredResources.length / itemsPerPage);
@@ -1195,8 +1196,9 @@ export default function Statistics() {
 
   const filteredQuestions = questions.filter(q => {
     const matchesFilter = questionOcrFilter === 'all' || q.ocr_status === questionOcrFilter;
+    const matchesWm = questionWatermarkFilter === 'all' || (q.watermark_status ?? 'pending') === questionWatermarkFilter;
     const matchesSearch = normalizedIncludes(q.data, questionSearchQuery);
-    return matchesFilter && matchesSearch;
+    return matchesFilter && matchesWm && matchesSearch;
   });
 
   const questionTotalPages = Math.ceil(filteredQuestions.length / itemsPerPage);
