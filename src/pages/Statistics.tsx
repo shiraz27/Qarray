@@ -2736,6 +2736,15 @@ export default function Statistics() {
                                             )}
                                           </TableCell>
                                           <TableCell>
+                                            {question.ocr_readability ? (
+                                              <Badge variant="outline" className={readabilityBadgeClass(question.ocr_readability as OcrReadability)}>
+                                                {READABILITY_LABEL[question.ocr_readability as OcrReadability] ?? question.ocr_readability}
+                                              </Badge>
+                                            ) : (
+                                              <Badge variant="outline" className="text-muted-foreground">—</Badge>
+                                            )}
+                                          </TableCell>
+                                          <TableCell>
                                             <OcrTextEditor
                                               table="questions"
                                               rowId={question.id}
