@@ -2010,6 +2010,7 @@ export default function Statistics() {
                                       <TableHead>Pages</TableHead>
                                       <TableHead>Per-page</TableHead>
                                       <TableHead>OCR Status</TableHead>
+                                      <TableHead>Readability</TableHead>
                                       <TableHead>Watermark</TableHead>
                                       <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
