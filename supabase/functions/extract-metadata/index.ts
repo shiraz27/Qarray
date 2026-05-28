@@ -52,7 +52,7 @@ serve(async (req) => {
     console.log(`OCR text length: ${ocrText.length} characters`);
 
     // Prepare the prompt for metadata extraction
-    const systemPrompt = `You are an AI assistant specialized in extracting metadata from educational documents in Algeria (Arabic and French).
+    const systemPrompt = `You are an AI assistant specialized in extracting metadata from educational documents in Tunisia (French is the primary language for scientific subjects; Arabic is used for literary subjects; English appears in English-language coursework).
 
 Your task is to analyze OCR-extracted text from educational documents (exams, homework, lessons) and extract:
 
@@ -94,9 +94,12 @@ Your task is to analyze OCR-extracted text from educational documents (exams, ho
 6. Document Description - Generate a meaningful 2-3 sentence summary that:
    - Describes what the document contains (topics, exercises, exam content)
    - Mentions the educational level/class if detected
-   - Uses the document's primary language (Arabic or French)
+   - Uses the document's primary language. DEFAULT TO FRENCH for scientific
+     subjects (math, physics, chemistry, biology, computer science) unless the
+     OCR text is clearly majority Arabic or majority English.
    - Is helpful for students searching for resources
-   - Example: "فرض مراقبة في مادة الرياضيات يتضمن تمارين حول الدوال والمتتاليات. مناسب لطلاب السنة الثالثة ثانوي شعبة علوم تجريبية."
+   - Example (French scientific, default): "Devoir de contrôle en mathématiques portant sur les fonctions et les suites. Adapté aux élèves de 4ème année secondaire, section sciences expérimentales."
+   - Example (Arabic majority): "فرض مراقبة في مادة الرياضيات يتضمن تمارين حول الدوال والمتتاليات. مناسب لطلاب الرابعة ثانوي شعبة علوم تجريبية."
 
 Important notes:
 - Extract ONLY if you find clear indicators, don't guess

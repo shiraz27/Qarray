@@ -586,6 +586,7 @@ export type Database = {
           deleted: boolean
           id: number
           ocr_processed_at: string | null
+          ocr_readability: string | null
           ocr_status: string | null
           ocr_text: string | null
           page_count: number | null
@@ -611,6 +612,7 @@ export type Database = {
           deleted?: boolean
           id?: number
           ocr_processed_at?: string | null
+          ocr_readability?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
           page_count?: number | null
@@ -636,6 +638,7 @@ export type Database = {
           deleted?: boolean
           id?: number
           ocr_processed_at?: string | null
+          ocr_readability?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
           page_count?: number | null
@@ -704,6 +707,7 @@ export type Database = {
           id: number
           institute_id: string | null
           ocr_processed_at: string | null
+          ocr_readability: string | null
           ocr_status: string | null
           ocr_text: string | null
           page_count: number | null
@@ -739,6 +743,7 @@ export type Database = {
           id?: number
           institute_id?: string | null
           ocr_processed_at?: string | null
+          ocr_readability?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
           page_count?: number | null
@@ -774,6 +779,7 @@ export type Database = {
           id?: number
           institute_id?: string | null
           ocr_processed_at?: string | null
+          ocr_readability?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
           page_count?: number | null

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { computePageCountFromUrls, computePageCountFromText, withTimeout } from '@/utils/pageCountHelpers';
 import { normalizedIncludes } from '@/utils/textHelpers';
 import { SourceLinkCell } from '@/components/statistics/SourceLinkCell';
+import { computeReadability, READABILITY_LABEL, readabilityBadgeClass, type OcrReadability } from '@/utils/ocrReadability';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -78,6 +79,7 @@ interface ResourceRow {
   data: string[];
   ocr_status: string | null;
   ocr_text: string | null;
+  ocr_readability?: string | null;
   chapter_id: number | null;
   chapters?: { name: string };
   resource_types?: { type: string };
@@ -105,6 +107,7 @@ interface QuestionRow {
   data: string;
   ocr_status: string | null;
   ocr_text?: string | null;
+  ocr_readability?: string | null;
   chapter_id: number | null;
   chapters?: { name: string };
   teacher_names?: string[] | null;
@@ -146,6 +149,8 @@ export default function Statistics() {
   const [watermarkFilter, setWatermarkFilter] = useState<string>('all');
   const [questionWatermarkFilter, setQuestionWatermarkFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
+  const [readabilityFilter, setReadabilityFilter] = useState<string>('all');
+  const [questionReadabilityFilter, setQuestionReadabilityFilter] = useState<string>('all');
   const [isProcessingWatermarkBatch, setIsProcessingWatermarkBatch] = useState(false);
   const [isProcessingWatermarkQuestionBatch, setIsProcessingWatermarkQuestionBatch] = useState(false);
   const [processingWatermarkId, setProcessingWatermarkId] = useState<number | null>(null);
@@ -357,7 +362,7 @@ export default function Statistics() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [ocrFilter, watermarkFilter, sourceFilter, searchQuery]);
+  }, [ocrFilter, watermarkFilter, sourceFilter, readabilityFilter, searchQuery]);
 
   useEffect(() => {
     setQuestionCurrentPage(1);
@@ -640,7 +645,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('resources')
-        .select('id, title, description, data, ocr_status, ocr_text, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked, source_link')
+        .select('id, title, description, data, ocr_status, ocr_text, ocr_readability, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked, source_link')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -668,7 +673,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('questions')
-        .select('id, data, ocr_status, ocr_text, chapter_id, chapters(name, subject_id), teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked')
+        .select('id, data, ocr_status, ocr_text, ocr_readability, chapter_id, chapters(name, subject_id), teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -1284,6 +1289,10 @@ export default function Statistics() {
       sourceFilter === 'has_link' ? srcIsUrl :
       sourceFilter === 'has_book_name' ? (!!src && !srcIsUrl) :
       true;
+    const matchesReadability =
+      readabilityFilter === 'all' ? true :
+      readabilityFilter === 'missing' ? !r.ocr_readability :
+      r.ocr_readability === readabilityFilter;
     const q = (searchQuery ?? '').trim();
     const matchesSearch = !q || [
       r.title,
@@ -1292,12 +1301,15 @@ export default function Statistics() {
       r.school_name,
       r.teacher_name,
       r.source_link,
+      r.ocr_readability,
+      r.ocr_status,
+      r.watermark_status,
       ...(r.teacher_names ?? []),
       ...(r.school_names ?? []),
       ...(r.books ?? []),
       String(r.id),
     ].some((f) => normalizedIncludes(f ?? '', q));
-    return matchesFilter && matchesWm && matchesSource && matchesSearch;
+    return matchesFilter && matchesWm && matchesSource && matchesReadability && matchesSearch;
   });
 
   const totalPages = Math.ceil(filteredResources.length / itemsPerPage);
@@ -1309,16 +1321,23 @@ export default function Statistics() {
   const filteredQuestions = questions.filter(q => {
     const matchesFilter = questionOcrFilter === 'all' || q.ocr_status === questionOcrFilter;
     const matchesWm = questionWatermarkFilter === 'all' || (q.watermark_status ?? 'pending') === questionWatermarkFilter;
+    const matchesReadability =
+      questionReadabilityFilter === 'all' ? true :
+      questionReadabilityFilter === 'missing' ? !q.ocr_readability :
+      q.ocr_readability === questionReadabilityFilter;
     const qs = (questionSearchQuery ?? '').trim();
     const matchesSearch = !qs || [
       q.data,
       q.chapters?.name,
+      q.ocr_readability,
+      q.ocr_status,
+      q.watermark_status,
       ...(q.teacher_names ?? []),
       ...(q.school_names ?? []),
       ...(q.books ?? []),
       String(q.id),
     ].some((f) => normalizedIncludes(f ?? '', qs));
-    return matchesFilter && matchesWm && matchesSearch;
+    return matchesFilter && matchesWm && matchesReadability && matchesSearch;
   });
 
   const questionTotalPages = Math.ceil(filteredQuestions.length / itemsPerPage);
@@ -1874,6 +1893,19 @@ export default function Statistics() {
                                 <SelectItem value="missing">Source: Missing</SelectItem>
                               </SelectContent>
                             </Select>
+                            <Select value={readabilityFilter} onValueChange={setReadabilityFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Readability filter" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Readability</SelectItem>
+                                <SelectItem value="high">Readability: High</SelectItem>
+                                <SelectItem value="medium">Readability: Medium</SelectItem>
+                                <SelectItem value="low">Readability: Low</SelectItem>
+                                <SelectItem value="unreadable">Readability: Unreadable</SelectItem>
+                                <SelectItem value="missing">Readability: Missing</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <Button
                               size="sm"
                               variant="outline"
@@ -1978,6 +2010,7 @@ export default function Statistics() {
                                       <TableHead>Pages</TableHead>
                                       <TableHead>Per-page</TableHead>
                                       <TableHead>OCR Status</TableHead>
+                                      <TableHead>Readability</TableHead>
                                       <TableHead>Watermark</TableHead>
                                       <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
@@ -2144,6 +2177,15 @@ export default function Statistics() {
                                                 )
                                               }
                                             />
+                                          </TableCell>
+                                          <TableCell>
+                                            {resource.ocr_readability ? (
+                                              <Badge variant="outline" className={readabilityBadgeClass(resource.ocr_readability as OcrReadability)}>
+                                                {READABILITY_LABEL[resource.ocr_readability as OcrReadability] ?? resource.ocr_readability}
+                                              </Badge>
+                                            ) : (
+                                              <Badge variant="outline" className="text-muted-foreground">—</Badge>
+                                            )}
                                           </TableCell>
                                           <TableCell>
                                             <WatermarkStatusEditor
@@ -2555,6 +2597,7 @@ export default function Statistics() {
                                       <TableHead>Per-page</TableHead>
                                       <TableHead>OCR Status</TableHead>
                                       <TableHead>Watermark</TableHead>
+                                      <TableHead>Readability</TableHead>
                                       <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -2690,6 +2733,15 @@ export default function Statistics() {
                                                 )}
                                                 Stamp
                                               </Button>
+                                            )}
+                                          </TableCell>
+                                          <TableCell>
+                                            {question.ocr_readability ? (
+                                              <Badge variant="outline" className={readabilityBadgeClass(question.ocr_readability as OcrReadability)}>
+                                                {READABILITY_LABEL[question.ocr_readability as OcrReadability] ?? question.ocr_readability}
+                                              </Badge>
+                                            ) : (
+                                              <Badge variant="outline" className="text-muted-foreground">—</Badge>
                                             )}
                                           </TableCell>
                                           <TableCell>
