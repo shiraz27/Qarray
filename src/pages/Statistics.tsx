@@ -141,6 +141,12 @@ export default function Statistics() {
   const [selectedChapter, setSelectedChapter] = useState<string>('all');
   const [ocrFilter, setOcrFilter] = useState<string>('all');
   const [questionOcrFilter, setQuestionOcrFilter] = useState<string>('all');
+  const [watermarkFilter, setWatermarkFilter] = useState<string>('all');
+  const [questionWatermarkFilter, setQuestionWatermarkFilter] = useState<string>('all');
+  const [isProcessingWatermarkBatch, setIsProcessingWatermarkBatch] = useState(false);
+  const [isProcessingWatermarkQuestionBatch, setIsProcessingWatermarkQuestionBatch] = useState(false);
+  const [processingWatermarkId, setProcessingWatermarkId] = useState<number | null>(null);
+  const [processingWatermarkQuestionId, setProcessingWatermarkQuestionId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [questionSearchQuery, setQuestionSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
