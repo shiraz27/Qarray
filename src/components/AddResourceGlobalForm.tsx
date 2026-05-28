@@ -948,6 +948,25 @@ export const AddResourceGlobalForm: React.FC<AddResourceGlobalFormProps> = ({
           )}
         />
 
+        {(isModerator || isAdmin) && (
+          <FormField
+            control={form.control}
+            name="source_link"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Source (Mod/Admin only)</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="🔗 Original link or book name (e.g. https://… or 'Manuel scolaire 9ème')"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         <FormField
           control={form.control}
           name="with_correction"
