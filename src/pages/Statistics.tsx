@@ -1973,6 +1973,7 @@ export default function Statistics() {
                                       <TableHead>Teachers</TableHead>
                                       <TableHead>Schools</TableHead>
                                       <TableHead>Books</TableHead>
+                                     <TableHead>From</TableHead>
                                       <TableHead>Types</TableHead>
                                       <TableHead>Pages</TableHead>
                                       <TableHead>Per-page</TableHead>
