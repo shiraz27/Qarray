@@ -43,10 +43,15 @@ export async function fetchPdfViaProxy(url: string): Promise<PdfFetchResult> {
   }
 
   const contentType = res.headers.get('Content-Type') || '';
+  const proxyResult = (res.headers.get('X-Proxy-Result') || '').toLowerCase();
 
   // The proxy uses HTTP 200 + JSON `{ unavailable: true }` for retryable
-  // upstream misses (Archive.org propagation).
-  if (contentType.includes('application/json')) {
+  // upstream misses (Archive.org propagation). Only treat a JSON body as the
+  // wrapper envelope when the proxy explicitly tagged it as `wrapped` —
+  // otherwise it's upstream content (e.g. an Archive.org HTML/JSON
+  // interstitial) we should surface as "still processing" instead of
+  // misreporting as a hard proxy error.
+  if (proxyResult === 'wrapped' && contentType.includes('application/json')) {
     try {
       const payload = await res.json();
       if (payload?.unavailable) {
@@ -54,11 +59,27 @@ export async function fetchPdfViaProxy(url: string): Promise<PdfFetchResult> {
       }
       return {
         kind: 'error',
-        message: payload?.error || `Proxy error (${res.status})`,
+        message: payload?.error || "Couldn't load file. Please try again.",
       };
     } catch {
-      return { kind: 'error', message: `Proxy returned invalid JSON` };
+      return { kind: 'error', message: 'Proxy returned invalid JSON' };
     }
+  }
+
+  // Defensive: an older proxy deployment, or an upstream that slipped through
+  // with a textual content-type, would otherwise be treated as the PDF blob
+  // and crash pdfjs. Surface as soft-unavailable so the Retry UI shows.
+  if (
+    proxyResult !== 'upstream' &&
+    (contentType.includes('application/json') ||
+      contentType.startsWith('text/html') ||
+      contentType.startsWith('text/xml') ||
+      contentType.startsWith('application/xml'))
+  ) {
+    return {
+      kind: 'unavailable',
+      message: 'Source not ready yet — please retry shortly.',
+    };
   }
 
   if (!res.ok) {
