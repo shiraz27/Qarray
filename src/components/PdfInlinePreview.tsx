@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { fetchPdfViaProxy, triggerBlobDownload } from '@/utils/pdfMediaFetch';
 import { watermarkPdfBlob, triggerWatermarkedDownload } from '@/utils/watermark';
+import { mediaSrc } from '@/utils/mediaToken';
 import {
   isSplitPdfManifestUrl,
   fetchSplitPdfManifest,
