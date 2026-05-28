@@ -27,6 +27,9 @@ export function PdfSplitCell(props: Props) {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<BackfillProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const warningsRef =
+    // collect raster/failed counts across all URLs in this run
+    (typeof window !== 'undefined' ? { current: { raster: 0, failed: 0 } } : { current: { raster: 0, failed: 0 } });
 
   const urls = props.kind === 'resource' ? props.row.data : props.urls;
 
@@ -46,15 +49,32 @@ export function PdfSplitCell(props: Props) {
   const handleMigrate = async () => {
     setRunning(true);
     setError(null);
+    let totalRaster = 0;
+    let totalFailed = 0;
+    const trackProgress = (p: BackfillProgress) => {
+      if (p.rasterizedPages) totalRaster += p.rasterizedPages;
+      if (p.failedPages) totalFailed += p.failedPages;
+      setProgress(p);
+    };
     try {
       if (props.kind === 'resource') {
-        const next = await migrateResourcePdfs(props.row, setProgress);
+        const next = await migrateResourcePdfs(props.row, trackProgress);
         props.onChanged(next);
       } else {
-        const next = await migrateQuestionPdfs(props.row, props.urls, setProgress);
+        const next = await migrateQuestionPdfs(props.row, props.urls, trackProgress);
         props.onChanged(next);
       }
-      toast.success('PDF migrated to per-page');
+      if (totalFailed > 0) {
+        toast.warning(
+          `PDF migrated — ${totalRaster} page(s) rasterized, ${totalFailed} page(s) skipped (unrecoverable source)`,
+        );
+      } else if (totalRaster > 0) {
+        toast.warning(
+          `PDF migrated — ${totalRaster} page(s) rasterized due to malformed source`,
+        );
+      } else {
+        toast.success('PDF migrated to per-page');
+      }
     } catch (e: any) {
       const msg = e?.message || 'Migration failed';
       setError(msg);
