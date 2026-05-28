@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { computePageCountFromUrls, computePageCountFromText, withTimeout } from '@/utils/pageCountHelpers';
 import { normalizedIncludes } from '@/utils/textHelpers';
 import { SourceLinkCell } from '@/components/statistics/SourceLinkCell';
+import { computeReadability, READABILITY_LABEL, readabilityBadgeClass, type OcrReadability } from '@/utils/ocrReadability';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -78,6 +79,7 @@ interface ResourceRow {
   data: string[];
   ocr_status: string | null;
   ocr_text: string | null;
+  ocr_readability?: string | null;
   chapter_id: number | null;
   chapters?: { name: string };
   resource_types?: { type: string };
@@ -105,6 +107,7 @@ interface QuestionRow {
   data: string;
   ocr_status: string | null;
   ocr_text?: string | null;
+  ocr_readability?: string | null;
   chapter_id: number | null;
   chapters?: { name: string };
   teacher_names?: string[] | null;
@@ -146,6 +149,8 @@ export default function Statistics() {
   const [watermarkFilter, setWatermarkFilter] = useState<string>('all');
   const [questionWatermarkFilter, setQuestionWatermarkFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
+  const [readabilityFilter, setReadabilityFilter] = useState<string>('all');
+  const [questionReadabilityFilter, setQuestionReadabilityFilter] = useState<string>('all');
   const [isProcessingWatermarkBatch, setIsProcessingWatermarkBatch] = useState(false);
   const [isProcessingWatermarkQuestionBatch, setIsProcessingWatermarkQuestionBatch] = useState(false);
   const [processingWatermarkId, setProcessingWatermarkId] = useState<number | null>(null);
@@ -357,7 +362,7 @@ export default function Statistics() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [ocrFilter, watermarkFilter, sourceFilter, searchQuery]);
+  }, [ocrFilter, watermarkFilter, sourceFilter, readabilityFilter, searchQuery]);
 
   useEffect(() => {
     setQuestionCurrentPage(1);
