@@ -8,10 +8,13 @@ import {
 } from '@/utils/archiveMultipartUpload';
 import type { SplitPdfManifest } from '@/utils/splitPdfManifest';
 
-/** Split threshold: PDFs with strictly more pages than this get split. */
+/**
+ * Split threshold: PDFs with strictly more pages than this used to get split.
+ * Kept for easy revert — currently UNUSED because every PDF is force-split.
+ */
 export const SPLIT_PAGE_THRESHOLD = 3;
 
-function sanitizeBase(s: string): string {
+export function sanitizeBase(s: string): string {
   return s
     .replace(/\.pdf$/i, '')
     .replace(/[^a-z0-9]+/gi, '-')
@@ -20,7 +23,7 @@ function sanitizeBase(s: string): string {
     .slice(0, 60) || 'doc';
 }
 
-function shortHash(): string {
+export function shortHash(): string {
   return Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
 }
 
@@ -30,7 +33,7 @@ async function readPageCount(file: File): Promise<number> {
   return doc.getPageCount();
 }
 
-async function splitPdfToPages(file: File): Promise<File[]> {
+export async function splitPdfToPages(file: File): Promise<File[]> {
   const buf = await file.arrayBuffer();
   const src = await PDFDocument.load(buf, { ignoreEncryption: true });
   const total = src.getPageCount();
@@ -48,6 +51,45 @@ async function splitPdfToPages(file: File): Promise<File[]> {
     );
   }
   return out;
+}
+
+/**
+ * Build a split-PDF manifest JSON and upload it to the same Archive.org item
+ * folder as the pages. Returns the manifest URL.
+ */
+export async function buildAndUploadManifest(params: {
+  base: string;
+  pageUrls: string[];
+  originalName: string;
+  options: ArchiveUploadOptions;
+}): Promise<{ url: string }> {
+  const { base, pageUrls, originalName, options } = params;
+  const manifest: SplitPdfManifest = {
+    version: 1,
+    kind: 'split-pdf',
+    originalName,
+    totalPages: pageUrls.length,
+    createdAt: new Date().toISOString(),
+    pages: pageUrls.map((url, i) => ({ n: i + 1, url })),
+  };
+  const manifestBlob = new Blob([JSON.stringify(manifest, null, 2)], {
+    type: 'application/json',
+  });
+  const manifestFile = new File([manifestBlob], 'manifest.json', {
+    type: 'application/json',
+  });
+  const handle = uploadFileToArchiveControlled(
+    manifestFile,
+    {
+      ...options,
+      fileName: 'manifest.json',
+      subPath: `${base}/pages/manifest.json`,
+      // fileType 'pdf' keeps the same archive item mediatype as the pages.
+      fileType: 'pdf',
+    },
+    undefined,
+  );
+  return handle.promise;
 }
 
 export interface PdfSplitUploadHandle {
@@ -83,18 +125,29 @@ export function uploadPdfMaybeSplit(
   const promise = (async (): Promise<{ url: string }> => {
     // 1. Decide whether to split. Failure to parse falls back to single upload.
     let pageCount = 0;
+    let parseFailed = false;
     try {
       pageCount = await readPageCount(file);
     } catch (e) {
       console.warn('[split-pdf] page count failed, uploading as single file:', e);
+      parseFailed = true;
     }
 
-    if (pageCount <= SPLIT_PAGE_THRESHOLD) {
+    // Force-split every PDF. Single-file fallback only when pdf-lib couldn't
+    // parse the file at all (corrupt/encrypted).
+    if (parseFailed || pageCount < 1) {
       const handle = uploadFileToArchiveControlled(file, options, onProgress);
       activeController = handle.controller;
       if (cancelled) handle.controller.cancel();
       return handle.promise;
     }
+    // --- Legacy threshold path, kept commented for easy revert ---
+    // if (pageCount <= SPLIT_PAGE_THRESHOLD) {
+    //   const handle = uploadFileToArchiveControlled(file, options, onProgress);
+    //   activeController = handle.controller;
+    //   if (cancelled) handle.controller.cancel();
+    //   return handle.promise;
+    // }
 
     // 2. Split.
     onProgress?.({ loaded: 0, total: file.size, ratio: 0 });
@@ -139,35 +192,12 @@ export function uploadPdfMaybeSplit(
 
     // 4. Build & upload manifest.
     if (cancelled) throw new DOMException('Upload cancelled', 'AbortError');
-    const manifest: SplitPdfManifest = {
-      version: 1,
-      kind: 'split-pdf',
+    const { url: manifestUrl } = await buildAndUploadManifest({
+      base,
+      pageUrls,
       originalName: file.name,
-      totalPages: N,
-      createdAt: new Date().toISOString(),
-      pages: pageUrls.map((url, i) => ({ n: i + 1, url })),
-    };
-    const manifestBlob = new Blob([JSON.stringify(manifest, null, 2)], {
-      type: 'application/json',
+      options,
     });
-    const manifestFile = new File([manifestBlob], 'manifest.json', {
-      type: 'application/json',
-    });
-    const manifestHandle = uploadFileToArchiveControlled(
-      manifestFile,
-      {
-        ...options,
-        fileName: 'manifest.json',
-        // Keep the leaf as `manifest.json` so the URL detection regex matches.
-        subPath: `${base}/pages/manifest.json`,
-        // fileType 'pdf' keeps the same archive item mediatype as the pages,
-        // so everything stays in the same Archive.org item.
-        fileType: 'pdf',
-      },
-      undefined,
-    );
-    activeController = manifestHandle.controller;
-    const { url: manifestUrl } = await manifestHandle.promise;
 
     onProgress?.({ loaded: file.size, total: file.size, ratio: 1 });
     return { url: manifestUrl };
