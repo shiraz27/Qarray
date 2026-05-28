@@ -43,6 +43,9 @@ import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, app
 import { MetaCell, type CellValue } from '@/components/statistics/MetaCell';
 import { OcrStatusEditor, type OcrStatus } from '@/components/statistics/OcrStatusEditor';
 import { OcrTextEditor } from '@/components/statistics/OcrTextEditor';
+import { WatermarkStatusEditor, type WatermarkStatus } from '@/components/statistics/WatermarkStatusEditor';
+import { processResourceWatermark, processQuestionWatermark } from '@/utils/clientWatermarkProcessor';
+import { Stamp } from 'lucide-react';
 import { PdfSplitCell } from '@/components/statistics/PdfSplitCell';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
