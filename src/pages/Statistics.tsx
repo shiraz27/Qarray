@@ -354,11 +354,11 @@ export default function Statistics() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [ocrFilter, searchQuery]);
+  }, [ocrFilter, watermarkFilter, searchQuery]);
 
   useEffect(() => {
     setQuestionCurrentPage(1);
-  }, [questionOcrFilter, questionSearchQuery]);
+  }, [questionOcrFilter, questionWatermarkFilter, questionSearchQuery]);
 
   useEffect(() => {
     if (selectedClass !== 'all') {
