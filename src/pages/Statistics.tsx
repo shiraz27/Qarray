@@ -5,6 +5,7 @@ import { Header } from '@/components/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { computePageCountFromUrls, computePageCountFromText, withTimeout } from '@/utils/pageCountHelpers';
 import { normalizedIncludes } from '@/utils/textHelpers';
+import { SourceLinkCell } from '@/components/statistics/SourceLinkCell';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -90,6 +91,7 @@ interface ResourceRow {
   page_count?: number | null;
   watermark_status?: string | null;
   pages_watermarked?: number | null;
+  source_link?: string | null;
 }
 
 // Track suggested titles from AI extraction
@@ -143,6 +145,7 @@ export default function Statistics() {
   const [questionOcrFilter, setQuestionOcrFilter] = useState<string>('all');
   const [watermarkFilter, setWatermarkFilter] = useState<string>('all');
   const [questionWatermarkFilter, setQuestionWatermarkFilter] = useState<string>('all');
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [isProcessingWatermarkBatch, setIsProcessingWatermarkBatch] = useState(false);
   const [isProcessingWatermarkQuestionBatch, setIsProcessingWatermarkQuestionBatch] = useState(false);
   const [processingWatermarkId, setProcessingWatermarkId] = useState<number | null>(null);
@@ -354,7 +357,7 @@ export default function Statistics() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [ocrFilter, watermarkFilter, searchQuery]);
+  }, [ocrFilter, watermarkFilter, sourceFilter, searchQuery]);
 
   useEffect(() => {
     setQuestionCurrentPage(1);
@@ -637,7 +640,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('resources')
-        .select('id, title, description, data, ocr_status, ocr_text, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked')
+        .select('id, title, description, data, ocr_status, ocr_text, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked, source_link')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -1273,8 +1276,28 @@ export default function Statistics() {
   const filteredResources = resources.filter(r => {
     const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
     const matchesWm = watermarkFilter === 'all' || (r.watermark_status ?? 'pending') === watermarkFilter;
-    const matchesSearch = normalizedIncludes(r.title, searchQuery);
-    return matchesFilter && matchesWm && matchesSearch;
+    const src = r.source_link ?? '';
+    const srcIsUrl = /^https?:\/\//i.test(src);
+    const matchesSource =
+      sourceFilter === 'all' ? true :
+      sourceFilter === 'missing' ? !src :
+      sourceFilter === 'has_link' ? srcIsUrl :
+      sourceFilter === 'has_book_name' ? (!!src && !srcIsUrl) :
+      true;
+    const q = (searchQuery ?? '').trim();
+    const matchesSearch = !q || [
+      r.title,
+      r.description,
+      r.chapters?.name,
+      r.school_name,
+      r.teacher_name,
+      r.source_link,
+      ...(r.teacher_names ?? []),
+      ...(r.school_names ?? []),
+      ...(r.books ?? []),
+      String(r.id),
+    ].some((f) => normalizedIncludes(f ?? '', q));
+    return matchesFilter && matchesWm && matchesSource && matchesSearch;
   });
 
   const totalPages = Math.ceil(filteredResources.length / itemsPerPage);
@@ -1286,7 +1309,15 @@ export default function Statistics() {
   const filteredQuestions = questions.filter(q => {
     const matchesFilter = questionOcrFilter === 'all' || q.ocr_status === questionOcrFilter;
     const matchesWm = questionWatermarkFilter === 'all' || (q.watermark_status ?? 'pending') === questionWatermarkFilter;
-    const matchesSearch = normalizedIncludes(q.data, questionSearchQuery);
+    const qs = (questionSearchQuery ?? '').trim();
+    const matchesSearch = !qs || [
+      q.data,
+      q.chapters?.name,
+      ...(q.teacher_names ?? []),
+      ...(q.school_names ?? []),
+      ...(q.books ?? []),
+      String(q.id),
+    ].some((f) => normalizedIncludes(f ?? '', qs));
     return matchesFilter && matchesWm && matchesSearch;
   });
 
@@ -1832,6 +1863,17 @@ export default function Statistics() {
                                 <SelectItem value="not_applicable">Watermark: N/A</SelectItem>
                               </SelectContent>
                             </Select>
+                            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Source filter" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Sources</SelectItem>
+                                <SelectItem value="has_link">Source: Link</SelectItem>
+                                <SelectItem value="has_book_name">Source: Book name</SelectItem>
+                                <SelectItem value="missing">Source: Missing</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <Button
                               size="sm"
                               variant="outline"
@@ -1931,6 +1973,7 @@ export default function Statistics() {
                                       <TableHead>Teachers</TableHead>
                                       <TableHead>Schools</TableHead>
                                       <TableHead>Books</TableHead>
+                                     <TableHead>From</TableHead>
                                       <TableHead>Types</TableHead>
                                       <TableHead>Pages</TableHead>
                                       <TableHead>Per-page</TableHead>
@@ -2045,6 +2088,15 @@ export default function Statistics() {
                                               canSuggest={!!resource.ocr_text}
                                               onSuggest={() => suggestCellValue('resource', resource, 'books')}
                                               onSave={(v) => saveResourceCell(resource, 'books', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <SourceLinkCell
+                                              resourceId={resource.id}
+                                              value={resource.source_link ?? null}
+                                              onSaved={(next) => {
+                                                setResources((prev) => prev.map((x) => x.id === resource.id ? { ...x, source_link: next } : x));
+                                              }}
                                             />
                                           </TableCell>
                                           <TableCell>
