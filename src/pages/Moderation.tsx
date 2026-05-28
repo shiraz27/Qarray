@@ -14,6 +14,7 @@ import { CheckCircle2, XCircle, BookOpen, MessageCircle, Brain, FileText, Extern
 import { AdminDeleteTab } from '@/components/AdminDeleteTab';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Navigate, Link } from 'react-router-dom';
+import { mediaSrc } from '@/utils/mediaToken';
 
 type ContentType = 'questions' | 'answers' | 'resources' | 'memorizations' | 'teachers' | 'users' | 'settings' | 'delete';
 
@@ -593,7 +594,7 @@ export default function Moderation() {
                                 {item.teacher_documents.map((doc, idx) => (
                                   <a
                                     key={idx}
-                                    href={doc}
+                                    href={mediaSrc(doc)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex items-center gap-2 text-sm text-primary hover:underline"
