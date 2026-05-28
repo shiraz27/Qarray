@@ -38,10 +38,12 @@ import { processResourceOCR } from '@/utils/clientOcrProcessor';
 import type { OcrMode } from '@/utils/pdfOcrHelpers';
 import { isPdfUrl, isImageUrl, urlsHaveOcrable, textHasOcrableUrl } from '@/utils/mediaTypeUtils';
 import { processQuestionOCR } from '@/utils/clientQuestionOcrProcessor';
+import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, applySuggestedTitle, extractMetadataFromOCR, type ExtractedMetadata, type MetadataField } from '@/utils/metadataExtractor';
 import { MetaCell, type CellValue } from '@/components/statistics/MetaCell';
 import { OcrStatusEditor, type OcrStatus } from '@/components/statistics/OcrStatusEditor';
 import { OcrTextEditor } from '@/components/statistics/OcrTextEditor';
+import { PdfSplitCell } from '@/components/statistics/PdfSplitCell';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
 interface Stats {
@@ -1799,6 +1801,7 @@ export default function Statistics() {
                                       <TableHead>Books</TableHead>
                                       <TableHead>Types</TableHead>
                                       <TableHead>Pages</TableHead>
+                                      <TableHead>Per-page</TableHead>
                                       <TableHead>OCR Status</TableHead>
                                       <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
@@ -1928,6 +1931,19 @@ export default function Statistics() {
                                               canSuggest={false}
                                               onSuggest={() => suggestCellValue('resource', resource, 'pages')}
                                               onSave={(v) => saveResourceCell(resource, 'pages', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <PdfSplitCell
+                                              kind="resource"
+                                              row={{ id: resource.id, data: resource.data, chapter_id: resource.chapter_id }}
+                                              onChanged={(newData) =>
+                                                setResources((prev) =>
+                                                  prev.map((r) =>
+                                                    r.id === resource.id ? { ...r, data: newData } : r,
+                                                  ),
+                                                )
+                                              }
                                             />
                                           </TableCell>
                                           <TableCell>
@@ -2288,6 +2304,7 @@ export default function Statistics() {
                                       <TableHead>Books</TableHead>
                                       <TableHead>Types</TableHead>
                                       <TableHead>Pages</TableHead>
+                                      <TableHead>Per-page</TableHead>
                                       <TableHead>OCR Status</TableHead>
                                       <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
@@ -2361,6 +2378,20 @@ export default function Statistics() {
                                               canSuggest={false}
                                               onSuggest={() => suggestCellValue('question', { id: question.id, ocr_text: question.ocr_text ?? null }, 'pages')}
                                               onSave={(v) => saveQuestionCell(question, 'pages', v)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <PdfSplitCell
+                                              kind="question"
+                                              row={{ id: question.id, data: question.data, chapter_id: question.chapter_id }}
+                                              urls={extractMediaFromText(question.data).media.map((m) => m.url)}
+                                              onChanged={(newText) =>
+                                                setQuestions((prev) =>
+                                                  prev.map((q) =>
+                                                    q.id === question.id ? { ...q, data: newText } : q,
+                                                  ),
+                                                )
+                                              }
                                             />
                                           </TableCell>
                                           <TableCell>
