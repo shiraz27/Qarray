@@ -27,9 +27,6 @@ export function PdfSplitCell(props: Props) {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<BackfillProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const warningsRef =
-    // collect raster/failed counts across all URLs in this run
-    (typeof window !== 'undefined' ? { current: { raster: 0, failed: 0 } } : { current: { raster: 0, failed: 0 } });
 
   const urls = props.kind === 'resource' ? props.row.data : props.urls;
 
