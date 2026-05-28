@@ -1,50 +1,39 @@
-## Goal
+## Root cause
 
-1. Add the same Class + Subject filter UI from `SharedChaptersMultiSelect` to `MoveToChapterSelect`.
-2. In both components, when a chapter is selected display three tags: **class**, **subject**, **chapter** (instead of the current single chip showing only `chapter · subject`).
+`PdfInlinePreview` calls `fetchPdfViaProxy` → `fetch-media` edge function. The frontend logic:
 
-## MoveToChapterSelect changes
-
-Mirror `SharedChaptersMultiSelect`'s scope-filter block inside the popover:
-
-- Load `classes` (hidden=false) on first open.
-- Load `subjects` filtered by selected class ids.
-- Multi-select class chips + subject chips with "Clear filters".
-- Search RPC `search_chapters_normalized` fanned out per selected subject id (or per class id if no subjects, or a single null/null call when no filters), merged by id — same pattern as the multi-select.
-
-Also extend the hydration query for the current value to include `class_id` and the class name so we can render the class tag:
-
-```
-.from('chapters').select('id, name, class_id, subjects(name), classes(name)')
+```ts
+if (contentType.includes('application/json')) {
+  if (payload?.unavailable) return { kind: 'unavailable', ... };
+  return { kind: 'error', message: payload?.error || `Proxy error (${res.status})` };
+}
 ```
 
-Results from `search_chapters_normalized` already include `class_id` + `subject_name`; we'll additionally look up class names from the `classes` list loaded for the filter (cached map) when rendering tags. If a class name isn't cached yet, fall back to `Class #<id>`.
+The proxy itself only emits JSON in three shapes (`{unavailable, error}` at 200, `{error}` at 400/500), each always populating `error`. So `Proxy error (200)` only surfaces when the JSON came from **upstream Archive.org**, not from our wrapper — the proxy currently streams upstream `Content-Type` unchanged. Intermittent because Archive.org occasionally responds 200 with an HTML/JSON interstitial for files that are still propagating.
 
-## Shared tag rendering (both components)
+## Fix
 
-Below the trigger button (replacing the current single Badge row in `SharedChaptersMultiSelect`, and adding to `MoveToChapterSelect`), render for each selected chapter id a small grouped row of three `Badge`s:
+Disambiguate "our wrapper JSON" from "upstream JSON" using a header, and wrap non-binary upstream responses so the existing Retry UI shows instead of a cryptic error.
 
-```
-[Class: 7ème]  [Subject: Math]  [Chapter: Fractions]
-```
+### 1. `supabase/functions/fetch-media/index.ts`
 
-- `MoveToChapterSelect`: one row for the single selected chapter.
-- `SharedChaptersMultiSelect`: one row per selected id (kept inside a `flex-col gap-1.5` list). Keep the existing `X` remove button at the end of each row (only on the multi-select).
-- Use existing `Badge` component, `variant="secondary"` for chapter, `variant="outline"` for class/subject to differentiate.
-- Truncate long names with `max-w-[12rem] truncate`.
-- If class or subject name is missing from cached details, render `Class #id` / `Subject #id` placeholders.
+- Add header `X-Proxy-Result: wrapped` to every JSON envelope response (400 invalid token, 200 unavailable, 500 catch-all).
+- After a successful `fetchWithRetry`, sniff upstream `Content-Type`. If it starts with `application/json`, `text/html`, `text/xml`, or `application/xml` (i.e. clearly not the binary we asked for), treat as a soft-unavailable: return our standard wrapper at HTTP 200 with `{ unavailable: true, upstreamStatus: 200, upstreamContentType, error: 'Source not ready yet — please retry shortly.' }` and `X-Proxy-Result: wrapped`. Don't read the upstream body (just drop it).
+- For genuine binary passthrough, add header `X-Proxy-Result: upstream` so the frontend can tell.
 
-## Class name resolution
+### 2. `src/utils/pdfMediaFetch.ts`
 
-Both components already load (or will load) the `classes` list when the popover opens. Promote that to load lazily on mount instead of waiting for `open`, so tags can render class names even before the popover is opened. Alternative for `MoveToChapterSelect`: fetch class name as part of the hydration `.select('classes(name)')` join — simpler, do that. For `SharedChaptersMultiSelect`, extend its existing hydration query the same way to include `classes(name)` and store it in `selectedDetails[id].class_name`.
+- Read `X-Proxy-Result` from the response.
+- Only interpret the body as the wrapper envelope when `X-Proxy-Result === 'wrapped'`. In that branch keep current behaviour: `unavailable` → `{kind: 'unavailable'}`, else `{kind: 'error', message: payload.error || 'Couldn't load file. Please try again.'}` (no more "Proxy error (200)" string).
+- If the header is missing/`upstream` and the body content-type is JSON/text (i.e. not binary), return `{ kind: 'unavailable', message: 'Source not ready yet — please retry shortly.' }` so `PdfInlinePreview` shows its existing "File still processing — Retry" panel instead of a hard error. This also covers the case of an older deployed edge function until the new version rolls out.
+- Binary path unchanged.
 
-## Out of scope
+## Scope
 
-- No DB / RLS / persistence changes — purely UI inside the two components.
-- No changes to how `chapter_id` / `shared_with` are written.
-- No filter persistence across opens.
+- No DB / RLS / component changes. `PdfInlinePreview` already renders the `unavailable` state with a Retry button — that's exactly what users should see for this transient case.
+- Other callers (`pdfSplitUpload`, `pdfBackfill`, `clientOcrProcessor`, etc.) use the same util and benefit automatically.
 
 ## Files
 
-- edit `src/components/MoveToChapterSelect.tsx` — add filter block + tag rendering.
-- edit `src/components/SharedChaptersMultiSelect.tsx` — extend hydration with class name + replace single badge with class/subject/chapter tag group.
+- edit `supabase/functions/fetch-media/index.ts`
+- edit `src/utils/pdfMediaFetch.ts`

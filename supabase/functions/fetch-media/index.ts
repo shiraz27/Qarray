@@ -3,8 +3,12 @@ import { resolveToFetchUrl, logSafeRef } from '../_shared/mediaToken.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range',
-  'Access-Control-Expose-Headers': 'content-length, content-range, accept-ranges, content-type',
+  'Access-Control-Expose-Headers':
+    'content-length, content-range, accept-ranges, content-type, x-proxy-result',
 };
+
+const WRAPPED_HEADER = { 'X-Proxy-Result': 'wrapped' };
+const UPSTREAM_HEADER = { 'X-Proxy-Result': 'upstream' };
 
 // Retry with exponential backoff for Archive.org files that need processing time
 // Result type to distinguish between retriable and permanent failures
@@ -101,7 +105,14 @@ Deno.serve(async (req) => {
     if (!resolved) {
       return new Response(
         JSON.stringify({ error: 'Invalid or missing media token' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            ...WRAPPED_HEADER,
+            'Content-Type': 'application/json',
+          },
+        },
       );
     }
 
@@ -130,7 +141,11 @@ Deno.serve(async (req) => {
         }),
         {
           status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: {
+            ...corsHeaders,
+            ...WRAPPED_HEADER,
+            'Content-Type': 'application/json',
+          },
         }
       );
     }
@@ -138,8 +153,46 @@ Deno.serve(async (req) => {
     // Stream upstream body through (preserves Content-Length / Content-Range
     // so the browser can show progress and seek inside audio/video).
     const upstream = result.response;
+    const upstreamCT = (upstream.headers.get('Content-Type') || '').toLowerCase();
+
+    // Archive.org occasionally answers 200 with an HTML/JSON/XML interstitial
+    // (item still propagating, S3-style error, redirect page) instead of the
+    // expected binary. Treat that as a soft-unavailable wrapped response so
+    // the frontend can show its Retry UI instead of trying to render the
+    // payload as a PDF/image.
+    const looksTextual =
+      upstreamCT.startsWith('application/json') ||
+      upstreamCT.startsWith('text/html') ||
+      upstreamCT.startsWith('text/xml') ||
+      upstreamCT.startsWith('application/xml');
+    if (looksTextual) {
+      try {
+        await upstream.body?.cancel();
+      } catch {
+        /* ignore */
+      }
+      console.warn(`Upstream returned non-binary content-type: ${upstreamCT}`);
+      return new Response(
+        JSON.stringify({
+          unavailable: true,
+          upstreamStatus: upstream.status,
+          upstreamContentType: upstreamCT,
+          error: 'Source not ready yet — please retry shortly.',
+        }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            ...WRAPPED_HEADER,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    }
+
     const passthrough: Record<string, string> = {
       ...corsHeaders,
+      ...UPSTREAM_HEADER,
       'Content-Type': upstream.headers.get('Content-Type') || 'application/octet-stream',
     };
     const len = upstream.headers.get('Content-Length');
@@ -159,7 +212,11 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: message }),
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: {
+          ...corsHeaders,
+          ...WRAPPED_HEADER,
+          'Content-Type': 'application/json',
+        },
       }
     );
   }
