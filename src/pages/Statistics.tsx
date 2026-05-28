@@ -90,6 +90,7 @@ interface ResourceRow {
   page_count?: number | null;
   watermark_status?: string | null;
   pages_watermarked?: number | null;
+  source_link?: string | null;
 }
 
 // Track suggested titles from AI extraction
