@@ -1893,6 +1893,19 @@ export default function Statistics() {
                                 <SelectItem value="missing">Source: Missing</SelectItem>
                               </SelectContent>
                             </Select>
+                            <Select value={readabilityFilter} onValueChange={setReadabilityFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Readability filter" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Readability</SelectItem>
+                                <SelectItem value="high">Readability: High</SelectItem>
+                                <SelectItem value="medium">Readability: Medium</SelectItem>
+                                <SelectItem value="low">Readability: Low</SelectItem>
+                                <SelectItem value="unreadable">Readability: Unreadable</SelectItem>
+                                <SelectItem value="missing">Readability: Missing</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <Button
                               size="sm"
                               variant="outline"
