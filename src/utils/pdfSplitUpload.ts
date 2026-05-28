@@ -34,8 +34,45 @@ export function shortHash(): string {
 
 async function readPageCount(file: File): Promise<number> {
   const buf = await file.arrayBuffer();
-  const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
+  const bytes = new Uint8Array(buf);
+
+  // Prefer pdfjs for counting. pdf-lib can successfully load malformed PDFs
+  // and then throw "Expected instance of PDFDict2..." when walking pages.
+  try {
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(bytes) }).promise;
+    const count = pdf.numPages;
+    try { await pdf.destroy(); } catch { /* ignore */ }
+    return count;
+  } catch (pdfjsError) {
+    console.warn('[split-pdf] pdfjs page count failed, trying pdf-lib', pdfjsError);
+  }
+
+  const doc = await PDFDocument.load(bytes, {
+    ignoreEncryption: true,
+    throwOnInvalidObject: false,
+  });
   return doc.getPageCount();
+}
+
+async function rasterizeAllPages(srcBytes: Uint8Array): Promise<SplitResult> {
+  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(srcBytes) });
+  const pdf = await loadingTask.promise;
+  const total = pdf.numPages;
+  try { await pdf.destroy(); } catch { /* ignore */ }
+
+  const files: File[] = [];
+  const rasterized: number[] = [];
+  const failed: number[] = [];
+  for (let i = 0; i < total; i++) {
+    try {
+      files.push(await rasterizePageToPdf(srcBytes, i));
+      rasterized.push(i);
+    } catch (err) {
+      console.error(`[split-pdf] raster page ${i + 1} failed`, err);
+      failed.push(i);
+    }
+  }
+  return { files, rasterizedIndices: rasterized, failedIndices: failed };
 }
 
 /**
@@ -116,27 +153,16 @@ export async function splitPdfToPagesDetailed(file: File): Promise<SplitResult> 
     });
   } catch (e) {
     console.error('[split-pdf] pdf-lib load failed, falling back to raster-only', e);
-    // Use pdfjs to determine page count and rasterize every page.
-    const copy = new Uint8Array(srcBytes);
-    const pdf = await pdfjsLib.getDocument({ data: copy }).promise;
-    const total = pdf.numPages;
-    try { await pdf.destroy(); } catch { /* ignore */ }
-    const files: File[] = [];
-    const rasterized: number[] = [];
-    const failed: number[] = [];
-    for (let i = 0; i < total; i++) {
-      try {
-        files.push(await rasterizePageToPdf(srcBytes, i));
-        rasterized.push(i);
-      } catch (err) {
-        console.error(`[split-pdf] raster page ${i + 1} failed`, err);
-        failed.push(i);
-      }
-    }
-    return { files, rasterizedIndices: rasterized, failedIndices: failed };
+    return rasterizeAllPages(srcBytes);
   }
 
-  const total = src.getPageCount();
+  let total: number;
+  try {
+    total = src.getPageCount();
+  } catch (e) {
+    console.error('[split-pdf] pdf-lib page tree failed, falling back to raster-only', e);
+    return rasterizeAllPages(srcBytes);
+  }
 
   // Layer 1: try to copy all pages in a single call (more reliable than
   // re-parsing the page tree N times, and avoids one bad page killing the rest).
