@@ -589,6 +589,7 @@ export type Database = {
           ocr_status: string | null
           ocr_text: string | null
           page_count: number | null
+          pages_watermarked: number
           resource_id: number | null
           school_names: string[]
           teacher_names: string[]
@@ -596,6 +597,9 @@ export type Database = {
           type_ids: number[] | null
           updated_at: string | null
           verified: boolean
+          watermark_error: string | null
+          watermark_processed_at: string | null
+          watermark_status: string
         }
         Insert: {
           book?: string | null
@@ -610,6 +614,7 @@ export type Database = {
           ocr_status?: string | null
           ocr_text?: string | null
           page_count?: number | null
+          pages_watermarked?: number
           resource_id?: number | null
           school_names?: string[]
           teacher_names?: string[]
@@ -617,6 +622,9 @@ export type Database = {
           type_ids?: number[] | null
           updated_at?: string | null
           verified?: boolean
+          watermark_error?: string | null
+          watermark_processed_at?: string | null
+          watermark_status?: string
         }
         Update: {
           book?: string | null
@@ -631,6 +639,7 @@ export type Database = {
           ocr_status?: string | null
           ocr_text?: string | null
           page_count?: number | null
+          pages_watermarked?: number
           resource_id?: number | null
           school_names?: string[]
           teacher_names?: string[]
@@ -638,6 +647,9 @@ export type Database = {
           type_ids?: number[] | null
           updated_at?: string | null
           verified?: boolean
+          watermark_error?: string | null
+          watermark_processed_at?: string | null
+          watermark_status?: string
         }
         Relationships: [
           {
@@ -695,6 +707,7 @@ export type Database = {
           ocr_status: string | null
           ocr_text: string | null
           page_count: number | null
+          pages_watermarked: number
           published_by: string | null
           school_name: string | null
           school_names: string[]
@@ -707,6 +720,9 @@ export type Database = {
           type_ids: number[] | null
           updated_at: string | null
           verified: boolean
+          watermark_error: string | null
+          watermark_processed_at: string | null
+          watermark_status: string
           with_correction: boolean
         }
         Insert: {
@@ -725,6 +741,7 @@ export type Database = {
           ocr_status?: string | null
           ocr_text?: string | null
           page_count?: number | null
+          pages_watermarked?: number
           published_by?: string | null
           school_name?: string | null
           school_names?: string[]
@@ -737,6 +754,9 @@ export type Database = {
           type_ids?: number[] | null
           updated_at?: string | null
           verified?: boolean
+          watermark_error?: string | null
+          watermark_processed_at?: string | null
+          watermark_status?: string
           with_correction?: boolean
         }
         Update: {
@@ -755,6 +775,7 @@ export type Database = {
           ocr_status?: string | null
           ocr_text?: string | null
           page_count?: number | null
+          pages_watermarked?: number
           published_by?: string | null
           school_name?: string | null
           school_names?: string[]
@@ -767,6 +788,9 @@ export type Database = {
           type_ids?: number[] | null
           updated_at?: string | null
           verified?: boolean
+          watermark_error?: string | null
+          watermark_processed_at?: string | null
+          watermark_status?: string
           with_correction?: boolean
         }
         Relationships: [

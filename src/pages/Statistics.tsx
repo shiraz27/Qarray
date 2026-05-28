@@ -43,6 +43,9 @@ import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, app
 import { MetaCell, type CellValue } from '@/components/statistics/MetaCell';
 import { OcrStatusEditor, type OcrStatus } from '@/components/statistics/OcrStatusEditor';
 import { OcrTextEditor } from '@/components/statistics/OcrTextEditor';
+import { WatermarkStatusEditor, type WatermarkStatus } from '@/components/statistics/WatermarkStatusEditor';
+import { processResourceWatermark, processQuestionWatermark } from '@/utils/clientWatermarkProcessor';
+import { Stamp } from 'lucide-react';
 import { PdfSplitCell } from '@/components/statistics/PdfSplitCell';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
@@ -85,6 +88,8 @@ interface ResourceRow {
   books?: string[] | null;
   type_ids?: number[] | null;
   page_count?: number | null;
+  watermark_status?: string | null;
+  pages_watermarked?: number | null;
 }
 
 // Track suggested titles from AI extraction
@@ -105,6 +110,8 @@ interface QuestionRow {
   books?: string[] | null;
   type_ids?: number[] | null;
   page_count?: number | null;
+  watermark_status?: string | null;
+  pages_watermarked?: number | null;
 }
 
 interface QuestionOcrStats {
@@ -134,6 +141,12 @@ export default function Statistics() {
   const [selectedChapter, setSelectedChapter] = useState<string>('all');
   const [ocrFilter, setOcrFilter] = useState<string>('all');
   const [questionOcrFilter, setQuestionOcrFilter] = useState<string>('all');
+  const [watermarkFilter, setWatermarkFilter] = useState<string>('all');
+  const [questionWatermarkFilter, setQuestionWatermarkFilter] = useState<string>('all');
+  const [isProcessingWatermarkBatch, setIsProcessingWatermarkBatch] = useState(false);
+  const [isProcessingWatermarkQuestionBatch, setIsProcessingWatermarkQuestionBatch] = useState(false);
+  const [processingWatermarkId, setProcessingWatermarkId] = useState<number | null>(null);
+  const [processingWatermarkQuestionId, setProcessingWatermarkQuestionId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [questionSearchQuery, setQuestionSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -341,11 +354,11 @@ export default function Statistics() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [ocrFilter, searchQuery]);
+  }, [ocrFilter, watermarkFilter, searchQuery]);
 
   useEffect(() => {
     setQuestionCurrentPage(1);
-  }, [questionOcrFilter, questionSearchQuery]);
+  }, [questionOcrFilter, questionWatermarkFilter, questionSearchQuery]);
 
   useEffect(() => {
     if (selectedClass !== 'all') {
@@ -624,7 +637,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('resources')
-        .select('id, title, description, data, ocr_status, ocr_text, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count')
+        .select('id, title, description, data, ocr_status, ocr_text, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -652,7 +665,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('questions')
-        .select('id, data, ocr_status, ocr_text, chapter_id, chapters(name, subject_id), teacher_names, school_names, books, type_ids, page_count')
+        .select('id, data, ocr_status, ocr_text, chapter_id, chapters(name, subject_id), teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -901,6 +914,95 @@ export default function Statistics() {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  // ---------- Watermark handlers ----------
+  const handleWatermarkSingleResource = async (id: number) => {
+    setProcessingWatermarkId(id);
+    try {
+      const result = await processResourceWatermark(id, (p) => {
+        toast.loading(p.message, { id: `wm-r-${id}` });
+      });
+      toast.dismiss(`wm-r-${id}`);
+      result.success ? toast.success(result.message) : toast.error(result.message);
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setProcessingWatermarkId(null);
+    }
+  };
+
+  const handleWatermarkSingleQuestion = async (id: number) => {
+    setProcessingWatermarkQuestionId(id);
+    try {
+      const result = await processQuestionWatermark(id, (p) => {
+        toast.loading(p.message, { id: `wm-q-${id}` });
+      });
+      toast.dismiss(`wm-q-${id}`);
+      result.success ? toast.success(result.message) : toast.error(result.message);
+      fetchQuestions(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setProcessingWatermarkQuestionId(null);
+    }
+  };
+
+  const handleWatermarkAllResources = async () => {
+    const targets = resources.filter((r) => {
+      const s = r.watermark_status ?? 'pending';
+      if (!['pending', 'failed', 'partial'].includes(s)) return false;
+      return urlsHaveOcrable(r.data);
+    });
+    if (targets.length === 0) {
+      toast.info('No resources need watermarking');
+      return;
+    }
+    setIsProcessingWatermarkBatch(true);
+    let ok = 0, ko = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        try {
+          const res = await processResourceWatermark(t.id, (p) => {
+            toast.loading(`[${i + 1}/${targets.length}] ${p.message}`, { id: 'wm-r-batch' });
+          });
+          res.success ? ok++ : ko++;
+        } catch { ko++; }
+      }
+      toast.dismiss('wm-r-batch');
+      toast.success(`Watermark batch: ${ok} ok, ${ko} failed`);
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsProcessingWatermarkBatch(false);
+    }
+  };
+
+  const handleWatermarkAllQuestions = async () => {
+    const targets = questions.filter((q) => {
+      const s = q.watermark_status ?? 'pending';
+      if (!['pending', 'failed', 'partial'].includes(s)) return false;
+      return textHasOcrableUrl(q.data);
+    });
+    if (targets.length === 0) {
+      toast.info('No questions need watermarking');
+      return;
+    }
+    setIsProcessingWatermarkQuestionBatch(true);
+    let ok = 0, ko = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        try {
+          const res = await processQuestionWatermark(t.id, (p) => {
+            toast.loading(`[${i + 1}/${targets.length}] ${p.message}`, { id: 'wm-q-batch' });
+          });
+          res.success ? ok++ : ko++;
+        } catch { ko++; }
+      }
+      toast.dismiss('wm-q-batch');
+      toast.success(`Watermark batch: ${ok} ok, ${ko} failed`);
+      fetchQuestions(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsProcessingWatermarkQuestionBatch(false);
+    }
   };
 
   // Metadata extraction handlers
@@ -1170,8 +1272,9 @@ export default function Statistics() {
 
   const filteredResources = resources.filter(r => {
     const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
+    const matchesWm = watermarkFilter === 'all' || (r.watermark_status ?? 'pending') === watermarkFilter;
     const matchesSearch = normalizedIncludes(r.title, searchQuery);
-    return matchesFilter && matchesSearch;
+    return matchesFilter && matchesWm && matchesSearch;
   });
 
   const totalPages = Math.ceil(filteredResources.length / itemsPerPage);
@@ -1182,8 +1285,9 @@ export default function Statistics() {
 
   const filteredQuestions = questions.filter(q => {
     const matchesFilter = questionOcrFilter === 'all' || q.ocr_status === questionOcrFilter;
+    const matchesWm = questionWatermarkFilter === 'all' || (q.watermark_status ?? 'pending') === questionWatermarkFilter;
     const matchesSearch = normalizedIncludes(q.data, questionSearchQuery);
-    return matchesFilter && matchesSearch;
+    return matchesFilter && matchesWm && matchesSearch;
   });
 
   const questionTotalPages = Math.ceil(filteredQuestions.length / itemsPerPage);
@@ -1714,6 +1818,34 @@ export default function Statistics() {
                                 <SelectItem value="not_applicable">Not Applicable</SelectItem>
                               </SelectContent>
                             </Select>
+                            <Select value={watermarkFilter} onValueChange={setWatermarkFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Watermark filter" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Watermark</SelectItem>
+                                <SelectItem value="completed">Watermark: Completed</SelectItem>
+                                <SelectItem value="partial">Watermark: Partial</SelectItem>
+                                <SelectItem value="pending">Watermark: Pending</SelectItem>
+                                <SelectItem value="in_progress">Watermark: In progress</SelectItem>
+                                <SelectItem value="failed">Watermark: Failed</SelectItem>
+                                <SelectItem value="not_applicable">Watermark: N/A</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleWatermarkAllResources}
+                              disabled={isProcessingWatermarkBatch}
+                              title="Watermark all eligible resources"
+                            >
+                              {isProcessingWatermarkBatch ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Stamp className="mr-2 h-4 w-4" />
+                              )}
+                              Watermark all
+                            </Button>
                             <div className="relative flex-1">
                               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                               <Input 
@@ -1803,6 +1935,7 @@ export default function Statistics() {
                                       <TableHead>Pages</TableHead>
                                       <TableHead>Per-page</TableHead>
                                       <TableHead>OCR Status</TableHead>
+                                      <TableHead>Watermark</TableHead>
                                       <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -1959,6 +2092,41 @@ export default function Statistics() {
                                                 )
                                               }
                                             />
+                                          </TableCell>
+                                          <TableCell>
+                                            <WatermarkStatusEditor
+                                              table="resources"
+                                              rowId={resource.id}
+                                              status={(resource.watermark_status ?? 'pending') as WatermarkStatus}
+                                              pagesWatermarked={resource.pages_watermarked ?? 0}
+                                              pageCount={resource.page_count ?? null}
+                                              onChanged={(next, pages) =>
+                                                setResources((prev) =>
+                                                  prev.map((r) =>
+                                                    r.id === resource.id
+                                                      ? { ...r, watermark_status: next, pages_watermarked: pages ?? r.pages_watermarked ?? 0 }
+                                                      : r,
+                                                  ),
+                                                )
+                                              }
+                                            />
+                                            {urlsHaveOcrable(resource.data) && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 px-2 mt-1"
+                                                onClick={() => handleWatermarkSingleResource(resource.id)}
+                                                disabled={processingWatermarkId === resource.id}
+                                                title="Watermark this resource now"
+                                              >
+                                                {processingWatermarkId === resource.id ? (
+                                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                                ) : (
+                                                  <Stamp className="h-3 w-3 mr-1" />
+                                                )}
+                                                Stamp
+                                              </Button>
+                                            )}
                                           </TableCell>
                                           <TableCell>
                                             <OcrTextEditor
@@ -2218,6 +2386,34 @@ export default function Statistics() {
                                 <SelectItem value="not_applicable">Not Applicable</SelectItem>
                               </SelectContent>
                             </Select>
+                            <Select value={questionWatermarkFilter} onValueChange={setQuestionWatermarkFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Watermark filter" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Watermark</SelectItem>
+                                <SelectItem value="completed">Watermark: Completed</SelectItem>
+                                <SelectItem value="partial">Watermark: Partial</SelectItem>
+                                <SelectItem value="pending">Watermark: Pending</SelectItem>
+                                <SelectItem value="in_progress">Watermark: In progress</SelectItem>
+                                <SelectItem value="failed">Watermark: Failed</SelectItem>
+                                <SelectItem value="not_applicable">Watermark: N/A</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleWatermarkAllQuestions}
+                              disabled={isProcessingWatermarkQuestionBatch}
+                              title="Watermark all eligible questions"
+                            >
+                              {isProcessingWatermarkQuestionBatch ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Stamp className="mr-2 h-4 w-4" />
+                              )}
+                              Watermark all
+                            </Button>
                             <div className="relative flex-1">
                               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                               <Input 
