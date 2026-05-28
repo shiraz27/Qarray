@@ -2179,6 +2179,15 @@ export default function Statistics() {
                                             />
                                           </TableCell>
                                           <TableCell>
+                                            {resource.ocr_readability ? (
+                                              <Badge variant="outline" className={readabilityBadgeClass(resource.ocr_readability as OcrReadability)}>
+                                                {READABILITY_LABEL[resource.ocr_readability as OcrReadability] ?? resource.ocr_readability}
+                                              </Badge>
+                                            ) : (
+                                              <Badge variant="outline" className="text-muted-foreground">—</Badge>
+                                            )}
+                                          </TableCell>
+                                          <TableCell>
                                             <WatermarkStatusEditor
                                               table="resources"
                                               rowId={resource.id}
