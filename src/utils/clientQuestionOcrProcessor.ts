@@ -2,9 +2,15 @@ import { createWorker } from 'tesseract.js';
 import { supabase } from '@/integrations/supabase/client';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { detectMediaType, mediaTypeFromMime, type MediaType } from '@/utils/mediaTypeUtils';
-import { extractPdfTextAndOcr, type OcrMode } from '@/utils/pdfOcrHelpers';
+import {
+  extractPdfTextAndOcr,
+  detectOcrLanguage,
+  DEFAULT_OCR_LANGS,
+  type OcrMode,
+} from '@/utils/pdfOcrHelpers';
 import { expandManifestUrls } from '@/utils/splitPdfManifest';
 import { encodeMediaUrl } from '@/utils/mediaToken';
+import { computeReadability } from '@/utils/ocrReadability';
 
 type FileType = MediaType;
 
@@ -45,19 +51,61 @@ async function fetchFileViaProxy(url: string): Promise<Blob> {
 
 const detectFileType = detectMediaType;
 
-/**
- * Extract text from image using Tesseract.js OCR
- */
-async function extractImageText(blob: Blob): Promise<string> {
-  const worker = await createWorker('eng+ara'); // English + Arabic
-
+/** Upscale small images so Tesseract has enough pixels per glyph. */
+async function maybeUpscale(blob: Blob): Promise<Blob> {
   try {
-    const {
-      data: { text },
-    } = await worker.recognize(blob);
-    return text.trim();
+    const bitmap = await createImageBitmap(blob);
+    if (bitmap.width >= 1000) { bitmap.close?.(); return blob; }
+    const scale = 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width * scale;
+    canvas.height = bitmap.height * scale;
+    const ctx = canvas.getContext('2d')!;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
+    return await new Promise<Blob>((resolve) => {
+      canvas.toBlob((b) => resolve(b ?? blob), 'image/png');
+    });
+  } catch {
+    return blob;
+  }
+}
+
+/** French-default standalone image OCR with majority-script switching. */
+async function extractImageText(blob: Blob): Promise<string> {
+  const prepared = await maybeUpscale(blob);
+  let langs = DEFAULT_OCR_LANGS;
+  let worker = await createWorker(langs);
+  try {
+    try {
+      await (worker as any).setParameters?.({
+        preserve_interword_spaces: '1',
+        user_defined_dpi: '300',
+        tessedit_pageseg_mode: '6',
+      });
+    } catch { /* ignore */ }
+    const first = await worker.recognize(prepared);
+    const text1 = (first.data.text || '').trim();
+    const { langs: bestLangs, label } = detectOcrLanguage(text1);
+    if (bestLangs !== langs) {
+      langs = bestLangs;
+      try { await worker.terminate(); } catch { /* ignore */ }
+      worker = await createWorker(langs);
+      try {
+        await (worker as any).setParameters?.({
+          preserve_interword_spaces: '1',
+          user_defined_dpi: '300',
+          tessedit_pageseg_mode: '6',
+        });
+      } catch { /* ignore */ }
+      const second = await worker.recognize(prepared);
+      return `[image langs: ${langs} | detected: ${label}]\n${(second.data.text || '').trim()}`;
+    }
+    return `[image langs: ${langs} | detected: ${label}]\n${text1}`;
   } finally {
-    await worker.terminate();
+    try { await worker.terminate(); } catch { /* ignore */ }
   }
 }
 
@@ -217,6 +265,7 @@ export async function processQuestionOCR(
       .update({
         ocr_status: ocrStatus,
         ocr_text: ocrText,
+        ocr_readability: computeReadability(ocrText),
         ocr_processed_at: new Date().toISOString(),
       })
       .eq('id', questionId);
@@ -231,6 +280,7 @@ export async function processQuestionOCR(
       .update({
         ocr_status: 'failed',
         ocr_text: `Error: ${error.message}`,
+        ocr_readability: 'unreadable',
         ocr_processed_at: new Date().toISOString(),
       })
       .eq('id', questionId);
