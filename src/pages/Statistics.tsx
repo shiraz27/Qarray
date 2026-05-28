@@ -1289,6 +1289,10 @@ export default function Statistics() {
       sourceFilter === 'has_link' ? srcIsUrl :
       sourceFilter === 'has_book_name' ? (!!src && !srcIsUrl) :
       true;
+    const matchesReadability =
+      readabilityFilter === 'all' ? true :
+      readabilityFilter === 'missing' ? !r.ocr_readability :
+      r.ocr_readability === readabilityFilter;
     const q = (searchQuery ?? '').trim();
     const matchesSearch = !q || [
       r.title,
@@ -1297,12 +1301,15 @@ export default function Statistics() {
       r.school_name,
       r.teacher_name,
       r.source_link,
+      r.ocr_readability,
+      r.ocr_status,
+      r.watermark_status,
       ...(r.teacher_names ?? []),
       ...(r.school_names ?? []),
       ...(r.books ?? []),
       String(r.id),
     ].some((f) => normalizedIncludes(f ?? '', q));
-    return matchesFilter && matchesWm && matchesSource && matchesSearch;
+    return matchesFilter && matchesWm && matchesSource && matchesReadability && matchesSearch;
   });
 
   const totalPages = Math.ceil(filteredResources.length / itemsPerPage);
@@ -1314,16 +1321,23 @@ export default function Statistics() {
   const filteredQuestions = questions.filter(q => {
     const matchesFilter = questionOcrFilter === 'all' || q.ocr_status === questionOcrFilter;
     const matchesWm = questionWatermarkFilter === 'all' || (q.watermark_status ?? 'pending') === questionWatermarkFilter;
+    const matchesReadability =
+      questionReadabilityFilter === 'all' ? true :
+      questionReadabilityFilter === 'missing' ? !q.ocr_readability :
+      q.ocr_readability === questionReadabilityFilter;
     const qs = (questionSearchQuery ?? '').trim();
     const matchesSearch = !qs || [
       q.data,
       q.chapters?.name,
+      q.ocr_readability,
+      q.ocr_status,
+      q.watermark_status,
       ...(q.teacher_names ?? []),
       ...(q.school_names ?? []),
       ...(q.books ?? []),
       String(q.id),
     ].some((f) => normalizedIncludes(f ?? '', qs));
-    return matchesFilter && matchesWm && matchesSearch;
+    return matchesFilter && matchesWm && matchesReadability && matchesSearch;
   });
 
   const questionTotalPages = Math.ceil(filteredQuestions.length / itemsPerPage);
