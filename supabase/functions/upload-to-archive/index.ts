@@ -270,6 +270,50 @@ async function handleSingle(req: Request): Promise<Response> {
   return jsonResponse({ url: publicMediaUrl(folderPath), fileName });
 }
 
+// ---------- Overwrite an existing Archive.org key ----------
+// Used by the watermark backfill to replace the original file in place.
+// The folder/key is known (decoded from the stored media token), so we skip
+// the chapter/subject/class lookup entirely and PUT directly to the bucket.
+async function handleOverwrite(req: Request): Promise<Response> {
+  const formData = await req.formData();
+  const key = formData.get('key') as string;
+  const file = formData.get('file') as File;
+  const mediatype = (formData.get('mediatype') as string | null) || 'texts';
+
+  if (!key || !file) throw new Error('key and file are required');
+
+  // Defensive guard: archive paths must stay inside our bucket folder root.
+  if (key.startsWith('/') || key.includes('..')) {
+    return jsonResponse({ error: 'invalid key' }, 400);
+  }
+
+  const buffer = await file.arrayBuffer();
+  const res = await fetchWithRetry(archiveS3Url(key), {
+    method: 'PUT',
+    headers: {
+      Authorization: authHeader(),
+      'x-amz-auto-make-bucket': '1',
+      'x-archive-meta-mediatype': mediatype,
+      'x-archive-meta-collection': 'opensource',
+      'x-archive-keep-old-version': '0',
+      'Content-Type': file.type || 'application/octet-stream',
+    },
+    body: new Blob([buffer]),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('Overwrite failed:', errorText);
+    const status = res.status === 503 ? 429 : 500;
+    return jsonResponse(
+      { error: `Overwrite failed: ${res.status} - ${errorText}`, retryable: res.status >= 500 },
+      status,
+    );
+  }
+
+  return jsonResponse({ url: publicMediaUrl(key), key });
+}
+
 // ---------- Multipart: initiate ----------
 async function handleInitiate(req: Request): Promise<Response> {
   const body = await req.json();
@@ -493,6 +537,8 @@ serve(async (req) => {
     switch (action) {
       case 'single':
         return await handleSingle(req);
+      case 'overwrite':
+        return await handleOverwrite(req);
       case 'initiate':
         return await handleInitiate(req);
       case 'upload-part':
