@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { fetchPdfViaProxy, triggerBlobDownload } from '@/utils/pdfMediaFetch';
 import { watermarkPdfBlob, triggerWatermarkedDownload } from '@/utils/watermark';
+import { mediaSrc } from '@/utils/mediaToken';
 import {
   isSplitPdfManifestUrl,
   fetchSplitPdfManifest,
@@ -259,25 +260,17 @@ function SinglePdfView({
           {!hideOpenOriginal && (
             <Button variant="ghost" size="sm" asChild className="gap-1">
               <a
-                href={url.replace(/ /g, '%20')}
+                href={mediaSrc(url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 referrerPolicy="no-referrer"
               >
                 <ExternalLink className="h-4 w-4" />
-                <span className="hidden sm:inline">Open original</span>
+                <span className="hidden sm:inline">Open in tab</span>
               </a>
             </Button>
           )}
         </div>
-      </div>
-
-      <div className="flex items-start gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-        <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-        <p className="leading-snug">
-          The "Open original" link goes directly to Archive.org and may be blocked by Chrome or an ad blocker.
-          If preview or Open fails, use the <strong>Download</strong> button — it always works through our server.
-        </p>
       </div>
 
       <div className="bg-muted/30 p-3 max-h-[80vh] overflow-auto">

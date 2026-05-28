@@ -13,6 +13,7 @@ import { TutorialDialog } from '@/components/TutorialDialog';
 import { Card } from '@/components/ui/card';
 import { useUserRole } from '@/hooks/useUserRole';
 import { SEO, createWebPageSchema } from '@/components/SEO';
+import { mediaSrc } from '@/utils/mediaToken';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -466,7 +467,7 @@ export default function Profile() {
                   {userProfile.teacher_documents.map((doc, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                       <a 
-                        href={doc} 
+                        href={mediaSrc(doc)} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="text-sm text-primary hover:underline flex-1 truncate"
