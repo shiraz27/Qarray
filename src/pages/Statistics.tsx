@@ -144,6 +144,7 @@ export default function Statistics() {
   const [questionOcrFilter, setQuestionOcrFilter] = useState<string>('all');
   const [watermarkFilter, setWatermarkFilter] = useState<string>('all');
   const [questionWatermarkFilter, setQuestionWatermarkFilter] = useState<string>('all');
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [isProcessingWatermarkBatch, setIsProcessingWatermarkBatch] = useState(false);
   const [isProcessingWatermarkQuestionBatch, setIsProcessingWatermarkQuestionBatch] = useState(false);
   const [processingWatermarkId, setProcessingWatermarkId] = useState<number | null>(null);
@@ -355,7 +356,7 @@ export default function Statistics() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [ocrFilter, watermarkFilter, searchQuery]);
+  }, [ocrFilter, watermarkFilter, sourceFilter, searchQuery]);
 
   useEffect(() => {
     setQuestionCurrentPage(1);
@@ -1274,8 +1275,28 @@ export default function Statistics() {
   const filteredResources = resources.filter(r => {
     const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
     const matchesWm = watermarkFilter === 'all' || (r.watermark_status ?? 'pending') === watermarkFilter;
-    const matchesSearch = normalizedIncludes(r.title, searchQuery);
-    return matchesFilter && matchesWm && matchesSearch;
+    const src = r.source_link ?? '';
+    const srcIsUrl = /^https?:\/\//i.test(src);
+    const matchesSource =
+      sourceFilter === 'all' ? true :
+      sourceFilter === 'missing' ? !src :
+      sourceFilter === 'has_link' ? srcIsUrl :
+      sourceFilter === 'has_book_name' ? (!!src && !srcIsUrl) :
+      true;
+    const q = (searchQuery ?? '').trim();
+    const matchesSearch = !q || [
+      r.title,
+      r.description,
+      r.chapters?.name,
+      r.school_name,
+      r.teacher_name,
+      r.source_link,
+      ...(r.teacher_names ?? []),
+      ...(r.school_names ?? []),
+      ...(r.books ?? []),
+      String(r.id),
+    ].some((f) => normalizedIncludes(f ?? '', q));
+    return matchesFilter && matchesWm && matchesSource && matchesSearch;
   });
 
   const totalPages = Math.ceil(filteredResources.length / itemsPerPage);
@@ -1287,7 +1308,15 @@ export default function Statistics() {
   const filteredQuestions = questions.filter(q => {
     const matchesFilter = questionOcrFilter === 'all' || q.ocr_status === questionOcrFilter;
     const matchesWm = questionWatermarkFilter === 'all' || (q.watermark_status ?? 'pending') === questionWatermarkFilter;
-    const matchesSearch = normalizedIncludes(q.data, questionSearchQuery);
+    const qs = (questionSearchQuery ?? '').trim();
+    const matchesSearch = !qs || [
+      q.data,
+      q.chapters?.name,
+      ...(q.teacher_names ?? []),
+      ...(q.school_names ?? []),
+      ...(q.books ?? []),
+      String(q.id),
+    ].some((f) => normalizedIncludes(f ?? '', qs));
     return matchesFilter && matchesWm && matchesSearch;
   });
 
