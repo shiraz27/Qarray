@@ -381,7 +381,8 @@ export function uploadFileToArchiveControlled(
   };
 
   const promise = (async () => {
-    if (file.size >= MULTIPART_THRESHOLD) {
+    const cfg = configFor(options.fileType);
+    if (file.size >= cfg.threshold) {
       return multipartUpload(file, options, onProgress, state);
     }
     // Small files: legacy single PUT (no real pause/resume)
