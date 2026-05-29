@@ -22,6 +22,13 @@ const BOTS: Record<string, { email: string; model: string; full_name: string }> 
   },
 }
 
+// Local Ollama mapping (per provider). Falls back to OpenRouter model above if Ollama is unreachable.
+const OLLAMA_MODELS: Record<string, string | undefined> = {
+  qwen: Deno.env.get('OLLAMA_MODEL_QWEN') || 'qwen2.5:7b',
+  deepseek: Deno.env.get('OLLAMA_MODEL_DEEPSEEK') || 'deepseek-r1:8b',
+  // vision: not assumed available locally — stays on OpenRouter
+}
+
 const KIND_TO_BOT: Record<Kind, keyof typeof BOTS> = {
   correction: 'deepseek',
   summary: 'qwen',
@@ -160,6 +167,65 @@ async function callOpenRouter(
   return content.trim()
 }
 
+async function callOllama(
+  baseUrl: string,
+  model: string,
+  system: string,
+  user: string,
+): Promise<string> {
+  const url = baseUrl.replace(/\/$/, '') + '/api/chat'
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 60_000)
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        options: { temperature: 0.4 },
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      }),
+      signal: ctrl.signal,
+    })
+    const text = await resp.text()
+    if (!resp.ok) throw new Error(`Ollama ${resp.status}: ${text.slice(0, 400)}`)
+    const json = JSON.parse(text)
+    const content = json?.message?.content
+    if (!content || typeof content !== 'string') {
+      throw new Error(`Ollama empty response: ${text.slice(0, 200)}`)
+    }
+    return content.trim()
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function callModel(
+  botKey: keyof typeof BOTS,
+  openrouterKey: string,
+  system: string,
+  user: string,
+): Promise<{ content: string; servedBy: 'ollama' | 'openrouter' }> {
+  const ollamaUrl = Deno.env.get('OLLAMA_BASE_URL')
+  const ollamaModel = OLLAMA_MODELS[botKey as string]
+  if (ollamaUrl && ollamaModel) {
+    try {
+      const content = await callOllama(ollamaUrl, ollamaModel, system, user)
+      console.log(`[ai-generate] served_by=ollama bot=${botKey} model=${ollamaModel}`)
+      return { content, servedBy: 'ollama' }
+    } catch (e: any) {
+      console.warn(`[ai-generate] Ollama failed (${e?.message || e}); falling back to OpenRouter`)
+    }
+  }
+  const content = await callOpenRouter(openrouterKey, BOTS[botKey].model, system, user)
+  console.log(`[ai-generate] served_by=openrouter bot=${botKey} model=${BOTS[botKey].model}`)
+  return { content, servedBy: 'openrouter' }
+}
+
 async function loadTarget(
   admin: ReturnType<typeof createClient>,
   targetType: 'resource' | 'question',
@@ -233,7 +299,7 @@ async function runGeneration(
     const system = systemPromptFor(kind, language)
     const userPrompt = `TITRE: ${title}\n\n---\n\n${text.slice(0, 12000)}`
 
-    const content = await callOpenRouter(openrouterKey, BOTS[botKey].model, system, userPrompt)
+    const { content } = await callModel(botKey, openrouterKey, system, userPrompt)
 
     let payload: any
     if (kind === 'infographic') {
