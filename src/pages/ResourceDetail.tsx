@@ -17,6 +17,7 @@ import { MediaPreview } from '@/components/MediaPreview';
 import { PdfInlinePreview } from '@/components/PdfInlinePreview';
 import { isPdfUrl } from '@/utils/mediaTypeUtils';
 import { UserAvatar } from '@/components/UserAvatar';
+import { parseAiAnswer, AiAnswerRenderer } from '@/components/AiAnswerRenderer';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
 import { BookBadge } from '@/components/BookBadge';
