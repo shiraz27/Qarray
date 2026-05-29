@@ -56,7 +56,7 @@ const AppContent = () => {
 
 const App = () => (
   <HelmetProvider>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <I18nextProvider i18n={i18n}>
         <QueryClientProvider client={queryClient}>
           <LibraryDataProvider>
