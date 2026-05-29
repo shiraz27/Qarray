@@ -33,10 +33,29 @@ export interface ArchiveUploadHandle {
   controller: ArchiveUploadController;
 }
 
-const MULTIPART_THRESHOLD = 16 * 1024 * 1024; // 16 MB
-const PART_SIZE = 8 * 1024 * 1024; // 8 MB
-const CONCURRENCY = 2;
+const MULTIPART_THRESHOLD = 16 * 1024 * 1024; // default 16 MB
+const PART_SIZE = 8 * 1024 * 1024; // default 8 MB
+const CONCURRENCY = 2; // default
 const MAX_PART_RETRIES = 3;
+
+interface MultipartConfig {
+  threshold: number;
+  partSize: number;
+  concurrency: number;
+}
+
+function configFor(fileType: string | undefined): MultipartConfig {
+  // Audio: lower threshold + smaller parts + higher concurrency so multi-minute
+  // recordings finish noticeably faster than the default PDF/image profile.
+  if (fileType === 'audio') {
+    return {
+      threshold: 6 * 1024 * 1024,
+      partSize: 3 * 1024 * 1024,
+      concurrency: 3,
+    };
+  }
+  return { threshold: MULTIPART_THRESHOLD, partSize: PART_SIZE, concurrency: CONCURRENCY };
+}
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
