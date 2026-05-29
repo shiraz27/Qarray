@@ -89,6 +89,7 @@ export default function ResourceDetail() {
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
   const [devoirTypes, setDevoirTypes] = useState<Array<{ id: number; devoir_type: string }>>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [aiAnswers, setAiAnswers] = useState<any[]>([]);
   const [contextData, setContextData] = useState<ContextData | null>(null);
   const { isModerator } = useUserRole();
 
