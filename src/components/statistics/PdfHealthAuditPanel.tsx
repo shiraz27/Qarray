@@ -11,6 +11,8 @@ import {
   type AuditProgress,
   type AuditResult,
 } from '@/utils/pdfHealthAudit';
+import { PdfHealthScheduledReport } from './PdfHealthScheduledReport';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function PdfHealthAuditPanel() {
   const [running, setRunning] = useState(false);
@@ -65,6 +67,15 @@ export function PdfHealthAuditPanel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <Tabs defaultValue="scheduled">
+          <TabsList>
+            <TabsTrigger value="scheduled">Latest scheduled report</TabsTrigger>
+            <TabsTrigger value="manual">Run scan now</TabsTrigger>
+          </TabsList>
+          <TabsContent value="scheduled" className="pt-4">
+            <PdfHealthScheduledReport />
+          </TabsContent>
+          <TabsContent value="manual" className="pt-4 space-y-4">
         <div className="flex items-center gap-2 flex-wrap">
           <Button onClick={handleRun} disabled={running} className="gap-2">
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
@@ -183,6 +194,8 @@ export function PdfHealthAuditPanel() {
             )}
           </div>
         )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
