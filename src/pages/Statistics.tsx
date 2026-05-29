@@ -50,6 +50,7 @@ import { WatermarkStatusEditor, type WatermarkStatus } from '@/components/statis
 import { processResourceWatermark, processQuestionWatermark } from '@/utils/clientWatermarkProcessor';
 import { Stamp } from 'lucide-react';
 import { PdfSplitCell } from '@/components/statistics/PdfSplitCell';
+import { PdfHealthAuditPanel } from '@/components/statistics/PdfHealthAuditPanel';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
 interface Stats {
