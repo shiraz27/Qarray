@@ -961,6 +961,20 @@ export default function ResourceDetail() {
         )}
       </div>
 
+      {aiAnswers.length > 0 && (
+        <div className="px-4 my-4 space-y-3">
+          <h2 className="text-lg font-semibold">AI Insights</h2>
+          {aiAnswers.map((a) => {
+            const ai = parseAiAnswer(a.data);
+            if (!ai) return null;
+            return (
+              <Card key={a.id} className="p-4">
+                <AiAnswerRenderer payload={ai} />
+              </Card>
+            );
+          })}
+        </div>
+      )}
       <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
     </div>
   );
