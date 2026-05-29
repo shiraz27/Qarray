@@ -331,19 +331,45 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
 
   if (isAudio) {
     const recordingNumber = extractRecordingNumber(url);
+    // Surface the in-flight upload (if any) directly on the card so users
+    // aren't left wondering why playback "doesn't work".
+    const decoded = isMediaToken(url) ? tokenInnerPath(url) : url;
+    const tail = decoded.split('/').filter(Boolean).pop() || '';
+    const activeUpload = uploadItems.find(
+      (u) =>
+        u.fileType === 'audio' &&
+        (u.status === 'queued' || u.status === 'uploading' || u.status === 'paused') &&
+        (u.url === url || (tail && (u.fileName === tail || decoded.includes(u.fileName)))),
+    );
+    const uploadPct = activeUpload ? Math.round((activeUpload.progress || 0) * 100) : 0;
     return (
       <>
         <Card 
-          className={`overflow-hidden ${className} p-3 hover:shadow-md transition-all cursor-pointer`}
-          onClick={() => setAudioModalOpen(true)}
+          className={`overflow-hidden ${className} p-3 transition-all ${
+            activeUpload ? 'opacity-90' : 'hover:shadow-md cursor-pointer'
+          }`}
+          onClick={() => { if (!activeUpload) setAudioModalOpen(true); }}
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <Volume2 className="w-5 h-5 text-primary" />
+              {activeUpload ? (
+                <Loader2 className="w-5 h-5 text-primary animate-spin" />
+              ) : (
+                <Volume2 className="w-5 h-5 text-primary" />
+              )}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 space-y-1">
               <p className="font-medium text-sm">Audio Recording</p>
-              <p className="text-xs text-muted-foreground">Click to play</p>
+              {activeUpload ? (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    Uploading… {uploadPct}%
+                  </p>
+                  <Progress value={uploadPct} className="h-1" />
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">Click to play</p>
+              )}
             </div>
           </div>
         </Card>
