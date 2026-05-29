@@ -8,14 +8,18 @@ import { useSharedWithSummary } from '@/hooks/useSharedWithSummary';
 interface Props {
   sharedWith: number[] | null | undefined;
   size?: 'xs' | 'sm';
+  sourceChapterId?: number | null;
 }
 
 /**
  * Tiny read-only badge shown on resources that are also shared into other
  * chapters. Counts distinct destination classes/subjects (not chapter names).
  */
-export const SharedWithBadge: React.FC<Props> = ({ sharedWith, size = 'xs' }) => {
-  const { classes, subjects, chapters, destinations, loading } = useSharedWithSummary(sharedWith);
+export const SharedWithBadge: React.FC<Props> = ({ sharedWith, size = 'xs', sourceChapterId }) => {
+  const { classes, subjects, chapters, destinations, loading } = useSharedWithSummary(
+    sharedWith,
+    sourceChapterId,
+  );
   if (!sharedWith || sharedWith.length === 0) return null;
 
   const textSize = size === 'xs' ? 'text-[10px]' : 'text-xs';
@@ -51,12 +55,20 @@ export const SharedWithBadge: React.FC<Props> = ({ sharedWith, size = 'xs' }) =>
                   <Tooltip key={destination.chapterId}>
                     <TooltipTrigger asChild>
                       <div className="rounded-md border border-border bg-background/60 px-2 py-1.5 leading-relaxed">
-                        <div className="font-medium break-words">Class: {destination.className}</div>
+                        <div className="font-medium break-words flex items-center gap-1.5 flex-wrap">
+                          <span>Class: {destination.className}</span>
+                          {destination.isSource && (
+                            <Badge variant="outline" className="text-[9px] font-normal px-1 py-0 h-4">
+                              source
+                            </Badge>
+                          )}
+                        </div>
                         <div className="text-muted-foreground break-words">Subject: {destination.subjectName}</div>
                         <div className="text-muted-foreground break-words">Chapter: {destination.chapterName}</div>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs text-xs space-y-1">
+                      {destination.isSource && <div className="font-semibold">Source chapter</div>}
                       <div>Class: {destination.className}</div>
                       <div>Subject: {destination.subjectName}</div>
                       <div>Chapter: {destination.chapterName}</div>
