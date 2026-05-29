@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
-import { computePageCountFromUrls } from '@/utils/pageCountHelpers';
+import { computePageCountFromUrls, mediaUrlsEqual } from '@/utils/pageCountHelpers';
 import { MediaUploader } from './MediaUploader';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -113,8 +113,9 @@ export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
         type_id: typeId,
         book: data.book || null,
         books: data.book ? [data.book] : [],
-        page_count: await computePageCountFromUrls(mediaUrls).then(r => r.complete ? r.count : null).catch(() => null),
       };
+
+      const mediaChanged = !mediaUrlsEqual(mediaUrls, initialUrls);
       if (isModerator && targetChapterId && targetChapterId !== chapterId) {
         updatePayload.chapter_id = targetChapterId;
       }
@@ -126,6 +127,23 @@ export const EditQuestionForm: React.FC<EditQuestionFormProps> = ({
       if (error) throw error;
 
       toast.success('Question updated successfully');
+
+      if (mediaChanged) {
+        void (async () => {
+          try {
+            const r = await computePageCountFromUrls(mediaUrls);
+            if (r.complete) {
+              await supabase
+                .from('questions')
+                .update({ page_count: r.count })
+                .eq('id', questionId);
+            }
+          } catch {
+            // ignore – existing page_count remains
+          }
+        })();
+      }
+
       onSuccess();
     } catch (error) {
       console.error('Error updating question:', error);
