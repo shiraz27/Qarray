@@ -582,21 +582,34 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
                 )}
                 {audioBlob && !isRecording && (
                   <>
-                    <Button 
-                      type="button" 
-                      onClick={handlePreviewRecording} 
-                      className="flex-1"
-                    >
-                      <Upload className="mr-2 h-4 w-4" />
-                      Preview Recording
-                    </Button>
-                    <Button 
-                      type="button" 
-                      onClick={() => setAudioBlob(null)} 
-                      variant="outline"
-                    >
-                      Cancel
-                    </Button>
+                    <div className="flex-1 space-y-2">
+                      {audioPreviewUrl && (
+                        <audio
+                          controls
+                          src={audioPreviewUrl}
+                          className="w-full"
+                          preload="metadata"
+                        />
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          onClick={handleUseRecording}
+                          className="flex-1"
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Use Recording
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => setAudioBlob(null)}
+                          variant="outline"
+                        >
+                          <RotateCw className="mr-2 h-4 w-4" />
+                          Re-record
+                        </Button>
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
