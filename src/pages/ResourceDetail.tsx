@@ -268,6 +268,15 @@ export default function ResourceDetail() {
       );
 
       setQuestions(questionsWithDetails);
+
+      // Fetch AI-generated answers attached to this resource
+      const { data: aiData } = await supabase
+        .from('answers')
+        .select('id, data, created_at, contributors')
+        .eq('resource_id', resourceId)
+        .eq('deleted', false)
+        .order('created_at', { ascending: false });
+      setAiAnswers(aiData || []);
       setLoading(false);
     };
 
