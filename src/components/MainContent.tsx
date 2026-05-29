@@ -55,17 +55,18 @@ interface MainContentProps {
 export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClassId = null }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { ensureChapters, invalidateChapters } = useLibraryData();
+  const { ensureChapters, invalidateChapters, getChaptersFromCache } = useLibraryData();
    
   const _unusedBAC = BAC_CLASS_IDS;
-  const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [commonChapters, setCommonChapters] = useState<CommonChapter[]>([]);
+  const initialCache = subjectId ? getChaptersFromCache(subjectId, viewingClassId) : null;
+  const [chapters, setChapters] = useState<Chapter[]>(initialCache?.chapters ?? []);
+  const [commonChapters, setCommonChapters] = useState<CommonChapter[]>(initialCache?.commonChapters ?? []);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<null | { id: string }>(null);
 
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
   const [editingChapterId, setEditingChapterId] = useState<number | null>(null);
-  const [classId, setClassId] = useState<number | null>(null);
+  const [classId, setClassId] = useState<number | null>(initialCache?.classId ?? null);
   const { isModerator, isAdmin } = useUserRole();
   const [filterResources, setFilterResources] = useState(false);
   const [filterQuestions, setFilterQuestions] = useState(false);
@@ -84,6 +85,16 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
   useEffect(() => {
     const load = async () => {
       if (!subjectId) return;
+
+      // If the chapters are already warm in cache, render synchronously with no skeleton.
+      const cached = getChaptersFromCache(subjectId, viewingClassId);
+      if (cached) {
+        setChapters(cached.chapters);
+        setCommonChapters(cached.commonChapters);
+        setClassId(cached.classId);
+        setLoading(false);
+        return;
+      }
 
       setLoading(true);
       try {
