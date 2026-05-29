@@ -1,26 +1,37 @@
 ## Goal
 
-When a multi-page (split) PDF fails to load its manifest, the current UI replaces the entire preview card with a full-bleed error ("Couldn't load multi-page PDF"). The user wants the surrounding actions to stay available so the failure doesn't "cloud" the rest of the media UI.
+Identify all resources/questions whose split-PDF per-page files fail to parse (the "Invalid PDF structure" case affecting IDs 163, 164) so you know the full scope. Read-only — no DB writes, no re-uploads.
 
 ## Scope
 
-Only `src/components/PdfInlinePreview.tsx` — purely presentational. No changes to manifest fetching, proxy, upload pipeline, DB, or any other media types.
+Frontend only. New audit tool added to the existing admin Statistics page. No backend, no migrations, no changes to upload/split logic. The current inline error + Download/Open fallback stays as-is.
 
-## Changes
+## What it does
 
-In `SplitPdfPreview`:
+1. New button **"Validate split PDFs"** in `src/pages/Statistics.tsx` (admin-gated, like other admin tools there).
+2. On click:
+   - Fetch all resources and questions whose `data` references a `…/pages/manifest.json` URL.
+   - For each row, fetch the manifest through `fetch-media` proxy (reuses `fetchSplitPdfManifest`).
+   - For each page URL in the manifest, fetch via `fetchPdfViaProxy` and try `pdfjsLib.getDocument(...).promise`. Mark page as `ok`, `unavailable` (proxy soft-miss), or `broken` (pdfjs throw — this is the "Invalid PDF structure" class).
+   - Run with a small concurrency limit (e.g. 4) and a visible progress counter `{processed}/{total} rows · {brokenPages} broken pages found`.
+3. Results panel inline:
+   - Summary: total manifests scanned, total pages checked, broken-page count, unavailable-page count.
+   - Table of rows with at least one broken page: kind (resource/question), id, title (resource) / chapter (question), manifest URL, list of broken page numbers, links to `/resource/:id` or `/question/:id`.
+4. **Export CSV** button writes `pdf-health-report.csv` to the browser download (columns: kind, id, title, manifest_url, total_pages, broken_pages, unavailable_pages).
+5. Re-running clears previous results.
 
-1. Always render the standard `SinglePdfView` shell (toolbar with Download / Open in tab / Zoom, etc.) so those controls remain visible even on manifest failure.
-2. When `error || !manifest`:
-   - Mount `SinglePdfView` with `url={url}` (the manifest URL). The inner preview will naturally show its own "Couldn't load preview" inline message in the body area (which already includes a Retry button) instead of replacing the whole card.
-   - Override `filenameOverride` with a best-effort name derived from the manifest URL path so the toolbar shows something meaningful.
-   - Pass a small `rightSlot` chip "Multi-page index unavailable" and a Retry button that re-runs `load()` to re-attempt manifest fetch.
-   - Hide page-dropdown and "Full PDF (Np)" merge button (they require the manifest).
-3. Keep the existing success path unchanged (dropdown + per-page view + "Full PDF" merge).
-4. Loading state stays the same compact spinner.
+## Files
+
+- `src/utils/pdfHealthAudit.ts` (new) — orchestration: enumerate rows, fetch manifests, per-page parse check, concurrency limit, returns structured report.
+- `src/components/statistics/PdfHealthAuditPanel.tsx` (new) — button, progress, results table, CSV export.
+- `src/pages/Statistics.tsx` — mount `<PdfHealthAuditPanel />` in the admin tools area (same gating as existing admin-only sections).
+
+## Non-goals
+
+- No automatic re-upload, re-split, or rasterization.
+- No DB column for `pdf_health` — results are session-only.
+- No change to `PdfInlinePreview` behavior (current degraded toolbar already covers user-facing UX).
 
 ## Result
 
-- The page never loses its top toolbar — Download (per current page when available), Open in tab, Zoom, and any external actions on `ResourceDetail` / `MediaList` remain visible and clickable.
-- Manifest failure shows as a small inline notice + Retry inside the preview body, not a full-card replacement.
-- No behavior change to single-PDF previews, images, audio, or to the actual fetch/proxy logic.
+You get a definitive list of every resource/question with corrupt split pages so you can decide case-by-case whether to ask for re-upload or hard-delete.
