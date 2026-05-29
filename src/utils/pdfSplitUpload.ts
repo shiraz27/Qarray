@@ -4,7 +4,6 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import {
   uploadFileToArchiveControlled,
   type ArchiveUploadController,
-  type ArchiveUploadHandle,
   type ArchiveUploadOptions,
   type ArchiveUploadProgress,
 } from '@/utils/archiveMultipartUpload';
@@ -454,6 +453,9 @@ export function uploadPdfMaybeSplit(
     const pageFiles = await splitPdfToPages(file);
     if (cancelled) throw new DOMException('Upload cancelled', 'AbortError');
 
+    // Hoist the source bytes once for any rasterize-on-retry fallback.
+    const srcBytes = new Uint8Array(await file.arrayBuffer());
+
     // 3. Upload each page sequentially. Aggregate progress across pages
     // (each page contributes 1/N of the total ratio).
     const base = `${sanitizeBase(file.name)}-${shortHash()}`;
@@ -472,7 +474,7 @@ export function uploadPdfMaybeSplit(
       };
       const url = await uploadAndVerifyPage({
         pageFile,
-        srcBytes: new Uint8Array(await file.arrayBuffer()),
+        srcBytes,
         pageIndex: i,
         options,
         pageOptionsBase,
