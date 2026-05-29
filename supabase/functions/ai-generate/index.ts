@@ -7,12 +7,12 @@ type Kind = 'correction' | 'summary' | 'step_by_step' | 'infographic'
 const BOTS: Record<string, { email: string; model: string; full_name: string }> = {
   qwen: {
     email: 'qwen-bot@ai.local',
-    model: 'qwen/qwen-2.5-72b-instruct:free',
+    model: 'qwen/qwen-2.5-7b-instruct:free',
     full_name: 'Qwen Tutor',
   },
   deepseek: {
     email: 'deepseek-bot@ai.local',
-    model: 'deepseek/deepseek-chat-v3.1:free',
+    model: 'deepseek/deepseek-r1:free',
     full_name: 'DeepSeek Tutor',
   },
   vision: {
@@ -179,7 +179,11 @@ async function callOllama(
   try {
     const resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+        'User-Agent': 'lovable-edge',
+      },
       body: JSON.stringify({
         model,
         stream: false,
