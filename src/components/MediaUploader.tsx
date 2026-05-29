@@ -37,6 +37,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string>('');
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [previewType, setPreviewType] = useState<'image' | 'audio' | 'pdf' | null>(null);
@@ -49,6 +50,20 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  // Build a playable object URL whenever a fresh recording arrives, and
+  // revoke it when the blob is cleared or the component unmounts.
+  useEffect(() => {
+    if (!audioBlob) {
+      if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
+      setAudioPreviewUrl('');
+      return;
+    }
+    const u = URL.createObjectURL(audioBlob);
+    setAudioPreviewUrl(u);
+    return () => URL.revokeObjectURL(u);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioBlob]);
 
   // Use global upload manager
   const {
