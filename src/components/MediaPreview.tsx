@@ -14,6 +14,8 @@ import {
   watermarkPdfBlob,
 } from '@/utils/watermark';
 import { mediaSrc, isMediaToken, tokenInnerPath } from '@/utils/mediaToken';
+import { useUploadManager } from '@/contexts/UploadManagerContext';
+import { Progress } from '@/components/ui/progress';
 
 
 interface MediaPreviewProps {
