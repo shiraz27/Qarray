@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Play, Pause, Volume2, VolumeX, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Card } from '@/components/ui/card';
@@ -18,7 +18,63 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [status, setStatus] = useState<'probing' | 'ready' | 'processing' | 'error'>('probing');
+  const [buffering, setBuffering] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const retryTimerRef = useRef<number | null>(null);
+  const attemptRef = useRef(0);
+
+  const src = mediaSrc(url);
+
+  // Lightweight readiness probe. The fetch-media proxy returns JSON
+  // `{ unavailable: true }` while Archive.org is still ingesting the file.
+  const probe = useCallback(async () => {
+    if (!src) return;
+    setStatus('probing');
+    try {
+      const res = await fetch(src, { method: 'GET', headers: { Range: 'bytes=0-0' } });
+      const ct = res.headers.get('Content-Type') || '';
+      if (ct.includes('application/json')) {
+        const body = await res.json().catch(() => null) as { unavailable?: boolean } | null;
+        if (body?.unavailable) {
+          setStatus('processing');
+          scheduleRetry();
+          return;
+        }
+      }
+      if (!res.ok && res.status !== 206) {
+        setStatus('processing');
+        scheduleRetry();
+        return;
+      }
+      setStatus('ready');
+      attemptRef.current = 0;
+    } catch {
+      setStatus('processing');
+      scheduleRetry();
+    }
+  }, [src]);
+
+  const scheduleRetry = useCallback(() => {
+    if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+    const n = attemptRef.current++;
+    const delay = Math.min(30000, 3000 * Math.pow(2, n)); // 3s, 6s, 12s, 24s, cap 30s
+    retryTimerRef.current = window.setTimeout(() => { void probe(); }, delay);
+  }, [probe]);
+
+  const retryNow = useCallback(() => {
+    if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+    attemptRef.current = 0;
+    void probe();
+  }, [probe]);
+
+  useEffect(() => {
+    void probe();
+    return () => {
+      if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -27,17 +83,28 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
     const updateTime = () => setCurrentTime(audio.currentTime);
     const updateDuration = () => setDuration(audio.duration);
     const handleEnded = () => setIsPlaying(false);
+    const handleWaiting = () => setBuffering(true);
+    const handleCanPlay = () => setBuffering(false);
+    const handleError = () => { setBuffering(false); setStatus('error'); };
 
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('waiting', handleWaiting);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('playing', handleCanPlay);
+    audio.addEventListener('error', handleError);
 
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('waiting', handleWaiting);
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('playing', handleCanPlay);
+      audio.removeEventListener('error', handleError);
     };
-  }, []);
+  }, [status]);
 
   const togglePlay = () => {
     const audio = audioRef.current;
