@@ -1,36 +1,26 @@
-## Problem
+## Goal
 
-Multi-page PDFs (any PDF > 3 pages uploaded since the split-PDF feature shipped) cannot be previewed or stamped. The UI shows **"Couldn't load multi-page PDF"** and stamps fail with:
+When a multi-page (split) PDF fails to load its manifest, the current UI replaces the entire preview card with a full-bleed error ("Couldn't load multi-page PDF"). The user wants the surrounding actions to stay available so the failure doesn't "cloud" the rest of the media UI.
 
-```
-{ "unavailable": true, "upstreamStatus": 200,
-  "upstreamContentType": "application/json",
-  "error": "Source not ready yet — please retry shortly." }
-```
+## Scope
 
-## Root cause
+Only `src/components/PdfInlinePreview.tsx` — purely presentational. No changes to manifest fetching, proxy, upload pipeline, DB, or any other media types.
 
-In `supabase/functions/fetch-media/index.ts` (lines ~158–191), the proxy guards against Archive.org HTML/JSON/XML interstitials by treating any `application/json` upstream response as "not ready yet". That guard is too broad: split-PDF manifests are **legitimately** `manifest.json` files served as `application/json`. Every manifest fetch therefore returns `unavailable=true`, and `fetchSplitPdfManifest` (`src/utils/splitPdfManifest.ts`) throws → preview and stamp pipelines fail for every multi-page PDF.
+## Changes
 
-This matches the symptom timeline (started ~24h ago, oldest unaffected PDF is May 28) — it began when the manifest-aware proxy guard / split-PDF flow went live together.
+In `SplitPdfPreview`:
 
-## Fix
+1. Always render the standard `SinglePdfView` shell (toolbar with Download / Open in tab / Zoom, etc.) so those controls remain visible even on manifest failure.
+2. When `error || !manifest`:
+   - Mount `SinglePdfView` with `url={url}` (the manifest URL). The inner preview will naturally show its own "Couldn't load preview" inline message in the body area (which already includes a Retry button) instead of replacing the whole card.
+   - Override `filenameOverride` with a best-effort name derived from the manifest URL path so the toolbar shows something meaningful.
+   - Pass a small `rightSlot` chip "Multi-page index unavailable" and a Retry button that re-runs `load()` to re-attempt manifest fetch.
+   - Hide page-dropdown and "Full PDF (Np)" merge button (they require the manifest).
+3. Keep the existing success path unchanged (dropdown + per-page view + "Full PDF" merge).
+4. Loading state stays the same compact spinner.
 
-Allow the manifest through the proxy without weakening the interstitial protection for binary media:
+## Result
 
-1. In `supabase/functions/fetch-media/index.ts`, before the `looksTextual` branch, detect when the resolved upstream URL is a split-PDF manifest (path ends with `manifest.json` or the Archive.org dashified `manifest-json` variant, matching `isSplitPdfManifestUrl` rules already used on the client).
-2. If it is a manifest, **skip** the textual-interstitial rejection and stream the JSON body through with its real `application/json` Content-Type so `fetchSplitPdfManifest` can parse it.
-3. Leave all other behavior (binary passthrough, retry/backoff, real interstitial detection for non-manifest URLs, `unavailable` envelope for upstream non-OK) unchanged.
-
-## Out of scope
-
-- No changes to `splitPdfManifest.ts`, the upload pipeline, or the DB.
-- No change to how single-page PDFs / images / audio are proxied.
-- No retroactive re-upload — existing manifests will start working as soon as the proxy is fixed.
-
-## Verification
-
-- Open any PDF uploaded on/after May 28 with > 3 pages → preview renders, page navigation works.
-- Try to stamp the same PDF → no more "Source not ready yet" error.
-- Open a single-page PDF and an image → still load normally (regression check).
-- Network tab: manifest request returns `Content-Type: application/json` with the manifest body (not the `unavailable` envelope).
+- The page never loses its top toolbar — Download (per current page when available), Open in tab, Zoom, and any external actions on `ResourceDetail` / `MediaList` remain visible and clickable.
+- Manifest failure shows as a small inline notice + Retry inside the preview body, not a full-card replacement.
+- No behavior change to single-PDF previews, images, audio, or to the actual fetch/proxy logic.
