@@ -1241,7 +1241,7 @@ export default function Chapter() {
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-semibold text-foreground flex-1">{capitalizeEveryWord(resource.title)}</h3>
                     <div className="flex gap-1 ml-2 flex-shrink-0">
-                      <SharedWithBadge sharedWith={(resource as any).shared_with} />
+                      <SharedWithBadge sharedWith={(resource as any).shared_with} sourceChapterId={(resource as any).chapter_id} />
                       {!resource.verified && (
                         <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full whitespace-nowrap">
                           Unverified
