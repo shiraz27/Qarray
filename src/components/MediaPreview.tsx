@@ -36,6 +36,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   const [imageError, setImageError] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const { toast } = useToast();
+  const { items: uploadItems } = useUploadManager();
 
   // Internal "browser-loadable" src — always routed through our media proxy so
   // the storage origin never appears in the DOM or in network requests.
