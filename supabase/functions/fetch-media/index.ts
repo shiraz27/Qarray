@@ -155,6 +155,15 @@ Deno.serve(async (req) => {
     const upstream = result.response;
     const upstreamCT = (upstream.headers.get('Content-Type') || '').toLowerCase();
 
+    // Split-PDF manifests are legitimate JSON payloads (`/pages/manifest.json`
+    // or Archive.org's dashified `/pages/manifest-json`). Do NOT treat them as
+    // "not ready" interstitials — stream them through untouched.
+    const resolvedLower = resolved.toLowerCase();
+    const isManifestUrl =
+      resolvedLower.includes('/pages/manifest.json') ||
+      resolvedLower.includes('/pages/manifest-json') ||
+      /\/pages\/manifest($|[/?#])/.test(resolvedLower);
+
     // Archive.org occasionally answers 200 with an HTML/JSON/XML interstitial
     // (item still propagating, S3-style error, redirect page) instead of the
     // expected binary. Treat that as a soft-unavailable wrapped response so
@@ -165,7 +174,7 @@ Deno.serve(async (req) => {
       upstreamCT.startsWith('text/html') ||
       upstreamCT.startsWith('text/xml') ||
       upstreamCT.startsWith('application/xml');
-    if (looksTextual) {
+    if (looksTextual && !isManifestUrl) {
       try {
         await upstream.body?.cancel();
       } catch {
