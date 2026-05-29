@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Play, Pause, Volume2, VolumeX, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Card } from '@/components/ui/card';
@@ -18,7 +18,63 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [status, setStatus] = useState<'probing' | 'ready' | 'processing' | 'error'>('probing');
+  const [buffering, setBuffering] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const retryTimerRef = useRef<number | null>(null);
+  const attemptRef = useRef(0);
+
+  const src = mediaSrc(url);
+
+  // Lightweight readiness probe. The fetch-media proxy returns JSON
+  // `{ unavailable: true }` while Archive.org is still ingesting the file.
+  const probe = useCallback(async () => {
+    if (!src) return;
+    setStatus('probing');
+    try {
+      const res = await fetch(src, { method: 'GET', headers: { Range: 'bytes=0-0' } });
+      const ct = res.headers.get('Content-Type') || '';
+      if (ct.includes('application/json')) {
+        const body = await res.json().catch(() => null) as { unavailable?: boolean } | null;
+        if (body?.unavailable) {
+          setStatus('processing');
+          scheduleRetry();
+          return;
+        }
+      }
+      if (!res.ok && res.status !== 206) {
+        setStatus('processing');
+        scheduleRetry();
+        return;
+      }
+      setStatus('ready');
+      attemptRef.current = 0;
+    } catch {
+      setStatus('processing');
+      scheduleRetry();
+    }
+  }, [src]);
+
+  const scheduleRetry = useCallback(() => {
+    if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+    const n = attemptRef.current++;
+    const delay = Math.min(30000, 3000 * Math.pow(2, n)); // 3s, 6s, 12s, 24s, cap 30s
+    retryTimerRef.current = window.setTimeout(() => { void probe(); }, delay);
+  }, [probe]);
+
+  const retryNow = useCallback(() => {
+    if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+    attemptRef.current = 0;
+    void probe();
+  }, [probe]);
+
+  useEffect(() => {
+    void probe();
+    return () => {
+      if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -27,17 +83,28 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
     const updateTime = () => setCurrentTime(audio.currentTime);
     const updateDuration = () => setDuration(audio.duration);
     const handleEnded = () => setIsPlaying(false);
+    const handleWaiting = () => setBuffering(true);
+    const handleCanPlay = () => setBuffering(false);
+    const handleError = () => { setBuffering(false); setStatus('error'); };
 
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('waiting', handleWaiting);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('playing', handleCanPlay);
+    audio.addEventListener('error', handleError);
 
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('waiting', handleWaiting);
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('playing', handleCanPlay);
+      audio.removeEventListener('error', handleError);
     };
-  }, []);
+  }, [status]);
 
   const togglePlay = () => {
     const audio = audioRef.current;
@@ -96,8 +163,10 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
 
   return (
     <Card className={`gamified-card p-4 ${className}`}>
-      <audio ref={audioRef} src={mediaSrc(url)} preload="metadata" />
-      
+      {status === 'ready' && (
+        <audio ref={audioRef} src={src} preload="metadata" />
+      )}
+
       <div className="space-y-4">
         {/* Recording Info */}
         {recordingNumber && (
@@ -108,6 +177,43 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
           </div>
         )}
 
+        {(status === 'probing' || status === 'processing' || status === 'error') && (
+          <div className="rounded-lg border border-dashed p-4 text-center space-y-3">
+            {status === 'probing' && (
+              <>
+                <Loader2 className="w-6 h-6 mx-auto animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Loading audio…</p>
+              </>
+            )}
+            {status === 'processing' && (
+              <>
+                <Loader2 className="w-6 h-6 mx-auto animate-spin text-primary" />
+                <p className="text-sm font-medium">Audio is still being processed</p>
+                <p className="text-xs text-muted-foreground">
+                  Storage typically takes 10–60 seconds to make a freshly uploaded
+                  recording playable. We're retrying automatically.
+                </p>
+                <Button size="sm" variant="outline" onClick={retryNow} className="hover-scale">
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Retry now
+                </Button>
+              </>
+            )}
+            {status === 'error' && (
+              <>
+                <AlertCircle className="w-6 h-6 mx-auto text-destructive" />
+                <p className="text-sm font-medium">Couldn't load this recording</p>
+                <Button size="sm" variant="outline" onClick={retryNow} className="hover-scale">
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Try again
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
+        {status === 'ready' && (
+          <>
         {/* Progress Bar */}
         <div className="space-y-2">
           <Slider
@@ -131,7 +237,9 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
             size="lg"
             className="rounded-full w-12 h-12 p-0 hover-scale shadow-lg gradient-primary"
           >
-            {isPlaying ? (
+            {buffering ? (
+              <Loader2 className="w-5 h-5 text-white animate-spin" />
+            ) : isPlaying ? (
               <Pause className="w-5 h-5 text-white" fill="white" />
             ) : (
               <Play className="w-5 h-5 text-white ml-0.5" fill="white" />
@@ -178,6 +286,8 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
             />
           </div>
         </div>
+          </>
+        )}
       </div>
     </Card>
   );

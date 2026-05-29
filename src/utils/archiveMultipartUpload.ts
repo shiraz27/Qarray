@@ -33,10 +33,29 @@ export interface ArchiveUploadHandle {
   controller: ArchiveUploadController;
 }
 
-const MULTIPART_THRESHOLD = 16 * 1024 * 1024; // 16 MB
-const PART_SIZE = 8 * 1024 * 1024; // 8 MB
-const CONCURRENCY = 2;
+const MULTIPART_THRESHOLD = 16 * 1024 * 1024; // default 16 MB
+const PART_SIZE = 8 * 1024 * 1024; // default 8 MB
+const CONCURRENCY = 2; // default
 const MAX_PART_RETRIES = 3;
+
+interface MultipartConfig {
+  threshold: number;
+  partSize: number;
+  concurrency: number;
+}
+
+function configFor(fileType: string | undefined): MultipartConfig {
+  // Audio: lower threshold + smaller parts + higher concurrency so multi-minute
+  // recordings finish noticeably faster than the default PDF/image profile.
+  if (fileType === 'audio') {
+    return {
+      threshold: 6 * 1024 * 1024,
+      partSize: 3 * 1024 * 1024,
+      concurrency: 3,
+    };
+  }
+  return { threshold: MULTIPART_THRESHOLD, partSize: PART_SIZE, concurrency: CONCURRENCY };
+}
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -137,6 +156,9 @@ async function multipartUpload(
   onProgress: ((p: ArchiveUploadProgress) => void) | undefined,
   state: { paused: boolean; cancelled: boolean; resumeWaiters: Array<() => void>; currentSignal: AbortController },
 ): Promise<{ url: string }> {
+  const cfg = configFor(options.fileType);
+  const PART_SIZE_LOCAL = cfg.partSize;
+  const CONCURRENCY_LOCAL = cfg.concurrency;
   // 1. Initiate
   const init = await invokeFn<{ uploadId: string; key: string; finalUrl: string }>({
     action: 'initiate',
@@ -151,11 +173,11 @@ async function multipartUpload(
   const { uploadId, key } = init;
 
   // Build part plan
-  const totalParts = Math.ceil(file.size / PART_SIZE);
+  const totalParts = Math.ceil(file.size / PART_SIZE_LOCAL);
   const plan: PartPlan[] = [];
   for (let i = 0; i < totalParts; i++) {
-    const start = i * PART_SIZE;
-    const end = Math.min(start + PART_SIZE, file.size);
+    const start = i * PART_SIZE_LOCAL;
+    const end = Math.min(start + PART_SIZE_LOCAL, file.size);
     plan.push({ partNumber: i + 1, start, end });
   }
 
@@ -275,7 +297,7 @@ async function multipartUpload(
     }
   };
 
-  const workerCount = Math.min(CONCURRENCY, plan.length);
+  const workerCount = Math.min(CONCURRENCY_LOCAL, plan.length);
   const workers = Array.from({ length: workerCount }, () => worker());
   await Promise.all(workers);
 
@@ -359,7 +381,8 @@ export function uploadFileToArchiveControlled(
   };
 
   const promise = (async () => {
-    if (file.size >= MULTIPART_THRESHOLD) {
+    const cfg = configFor(options.fileType);
+    if (file.size >= cfg.threshold) {
       return multipartUpload(file, options, onProgress, state);
     }
     // Small files: legacy single PUT (no real pause/resume)

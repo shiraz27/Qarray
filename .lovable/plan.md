@@ -1,46 +1,48 @@
 ## Diagnosis
 
-Saving a resource/question edit is slow because `computePageCountFromUrls(mediaUrls)` runs **on every save, for every existing URL, even when nothing about the media changed**. For each PDF URL it:
+Three separate problems are stacking up to make audio feel broken:
 
-1. POSTs to the `fetch-media` edge function
-2. Downloads the **full PDF blob** through the proxy
-3. Parses it with pdfjs-dist to count pages
+1. **Recording approval flow is confusing.** After "Stop Recording", `MediaUploader` shows a `Preview Recording` button that doesn't actually play the recording — it opens another modal-style preview step where the user must then click `Keep`. There is no inline playback of the freshly recorded blob, and the button labels ("Preview", "Keep") don't match what they do (queue an upload).
+2. **Player gives no signal while the file is still propagating.** `AudioPlayer` just mounts `<audio src={mediaSrc(url)} preload="metadata" />`. While the upload is in progress, or while Archive.org is still ingesting (the `fetch-media` proxy returns `{ unavailable: true, error: "Source not ready yet…" }` for several seconds after a successful PUT), the `<audio>` element fails silently. There's no spinner, no "still processing" hint, no retry — the play button just appears broken.
+3. **No per-file upload visibility in the player slot.** When a resource/question has an audio entry, the only "this thing exists but isn't ready yet" signal lives in the global `UploadStatusIndicator`. The audio card itself looks fully ready.
 
-These run **sequentially** (`for…of` in `src/utils/pageCountHelpers.ts`). The recent network logs show the same proxy hammered with split-PDF `manifest.json` lookups that even return `unavailable` ("Source not ready yet"), triggering more internal retries. So a resource with 3–5 PDFs becomes a 10–60 s save where the wire suggests "files being re-uploaded" — it's the proxy re-downloading them to recount pages.
-
-The user's intuition is correct in spirit: we are reprocessing unchanged media. We are not literally re-uploading, but the proxy round-trip + PDF parse is dominating the save latency.
-
-Other concern from the user — "not adding only changes but including everything" — also lines up: the update payload sends every column even when fields weren't modified. That's not the perf killer (text columns are tiny), but it's worth tightening as a small bonus.
+The user's chunking hunch is partially solved already: `archiveMultipartUpload.ts` already does 8 MB parts with 2× concurrency for files ≥ 16 MB. Recorded webm clips are almost always under that threshold, so the real wins are around (a) communicating state and (b) lowering the multipart threshold for audio so longer recordings use parallel parts.
 
 ## Changes
 
-### 1. `src/utils/pageCountHelpers.ts` — parallelize + add diff helper
-- Replace the sequential `for…of` in `computePageCountFromUrls` with `Promise.all` so PDF fetches happen concurrently. Keeps the same `{ count, complete }` shape.
-- Add a tiny helper `mediaUrlsEqual(a: string[], b: string[]): boolean` that returns true when both arrays contain the same URLs (order-insensitive). Used by callers to skip recompute when nothing changed.
+### 1. Inline recording approval (`src/components/MediaUploader.tsx`)
+- After `mediaRecorder.onstop`, keep the existing `audioBlob` state, but render an inline preview block right where the buttons live:
+  - Native `<audio controls src={URL.createObjectURL(audioBlob)} />` so the user can listen immediately, no extra step.
+  - Two buttons: `Use Recording` (queues upload via existing `queueFileUpload(file, 'audio')`, then clears state) and `Re-record` (drops the blob and goes back to `Start Recording`).
+- Delete `handlePreviewRecording` and the audio branch of the generic preview/keep dialog. Camera image preview path stays unchanged.
+- Revoke the object URL on unmount/cleanup to prevent leaks.
 
-### 2. `src/components/EditResourceForm.tsx` — only recompute when media changed
-- Compute `mediaChanged = !mediaUrlsEqual(mediaUrls, initialData.data)`.
-- If `mediaChanged` is **false**: do **not** include `page_count` in the update payload at all (leaves DB value intact, zero proxy calls).
-- If `mediaChanged` is **true**: keep current behavior but `await` `computePageCountFromUrls(mediaUrls)` (now parallelized). To make saves feel instant even in this branch, fire the page-count recompute **after** the main update returns:
-  - Send the UPDATE without `page_count`.
-  - After success and `toast.success`, kick off `computePageCountFromUrls(mediaUrls)` in the background; once it resolves, do a second small UPDATE setting only `page_count`. Errors are swallowed (existing page_count stays).
-  - This unblocks the user immediately while still keeping page_count fresh.
+### 2. Show a "still processing" state in the player (`src/components/AudioPlayer.tsx`)
+- Add a `status` state: `'probing' | 'ready' | 'processing' | 'error'`.
+- On mount, do a lightweight readiness probe against `mediaSrc(url)` (GET with `Range: bytes=0-0`). If response is `application/json` with `{ unavailable: true }`, set status to `'processing'` and schedule a retry with exponential backoff (3s → 6s → 12s → cap 30s). On a real media content-type, set `'ready'` and mount `<audio>`.
+- While `'processing'`: render the existing card chrome with a `Loader2` spinner, a clear message ("Audio is still being processed by storage. This usually takes 10–60 seconds.") and a `Retry now` button.
+- On `<audio>`'s `error` event: flip to `'error'` with a retry button that re-runs the probe.
+- Also wire `onWaiting` / `onCanPlay` so the play button shows a spinner while the browser is buffering after a play click.
 
-### 3. `src/components/EditQuestionForm.tsx` — same treatment
-- Currently the question form doesn't have access to the previous media list. Parse it once from `initialData.data` text with the same regex used in `computePageCountFromText` (`/(https?:\/\/[^\s\n")]+)/g`) to derive `initialMediaUrls`.
-- Apply the same `mediaChanged` check, omit `page_count` when unchanged, and run the recompute in the background on change.
+### 3. Surface upload-in-progress directly on the audio card (`src/components/MediaPreview.tsx`)
+- Use `useUploadManager().uploads` to find any active upload whose resulting URL matches `url` (compare on the last path segment / file name — uploads are tracked by file, and the URL is the file's archive download URL once known). When matched and status is `queued` / `uploading`:
+  - Disable the "Click to play" tap target.
+  - Replace the subtitle text with `Uploading… {Math.round(progress*100)}%` and render a thin progress bar.
+- When the upload finishes, the entry simply transitions to the normal "Click to play" card — and the `AudioPlayer` probe in change 2 covers the post-upload propagation gap.
 
-### 4. Optional micro-cleanup (resources only)
-- Build the `updateData` object as a true diff: only include fields whose value differs from `initialData`. Skips no-op writes to `school_names`/`teacher_names`/`books`/`type_ids` arrays and prevents unnecessary `updated_at` churn. Low risk because the keys removed are simply not sent to PostgREST.
+### 4. Lower multipart threshold for audio (`src/utils/archiveMultipartUpload.ts`)
+- Make `MULTIPART_THRESHOLD` and `PART_SIZE` per-`fileType`: audio uses 6 MB threshold, 3 MB parts, concurrency 3. Image/PDF unchanged.
+- Strictly a speed-up for longer recordings; small clips still take the single PUT path.
 
 ## Verification
 
-- Open an existing resource with several PDFs, change just the title, save. Expectation: save returns in well under a second; no `fetch-media` requests for PDF blobs are issued.
-- Add a new PDF to the same resource and save. Expectation: save returns immediately; one background batch of `fetch-media` calls happens after the success toast, followed by a small `page_count`-only UPDATE.
-- Same two scenarios for a question edit.
+- Record a 5-second clip, hit `Use Recording`. Expectation: clip appears in the pending list immediately, no extra "Preview/Keep" step.
+- Open a resource that contains an audio URL right after uploading. Expectation: audio card briefly shows `Uploading… NN%`, then the player opens with a `Processing…` state that auto-resolves to playable within a minute, without the user needing to refresh.
+- Open an old, fully-propagated audio resource. Expectation: probe completes immediately and the player behaves exactly as today.
+- Record a long (>10 min) clip. Expectation: upload uses multipart with smaller parts and finishes noticeably faster.
 
 ## Out of scope
 
-- No DB schema or RLS changes.
-- No changes to upload code paths (already async via `UploadManager`).
-- No change to `fetch-media` retry policy; this plan removes the need to call it in the common case.
+- No DB or RLS changes — purely client + helper code.
+- No changes to `upload-to-archive` or `fetch-media` edge functions; they already support multipart and retries.
+- Not addressing Archive.org's own propagation delay — only communicating it to the user.
