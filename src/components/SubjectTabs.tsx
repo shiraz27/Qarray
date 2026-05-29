@@ -62,12 +62,22 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
     const load = async () => {
       if (!classId) return;
 
+      const pickPreferred = (list: Subject[]): number | null => {
+        if (list.length === 0) return null;
+        const stored = readLastSubject(classId);
+        if (stored && list.find((s) => s.id === stored)) return stored;
+        return list[0].id;
+      };
+
       const cached = getSubjectsFromCache(classId);
       if (cached) {
         setSubjects(cached);
-        if (cached.length > 0 && !cached.find(s => s.id === activeSubject)) {
-          setActiveSubject(cached[0].id);
-          onSubjectChange?.(cached[0].id);
+        if (cached.length > 0 && !cached.find((s) => s.id === activeSubject)) {
+          const preferred = pickPreferred(cached);
+          if (preferred != null) {
+            setActiveSubject(preferred);
+            onSubjectChange?.(preferred);
+          }
         }
         setLoading(false);
         return;
@@ -77,9 +87,10 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
       try {
         const data = await ensureSubjects(classId);
         setSubjects(data);
-        if (data.length > 0) {
-          setActiveSubject(data[0].id);
-          onSubjectChange?.(data[0].id);
+        const preferred = pickPreferred(data);
+        if (preferred != null) {
+          setActiveSubject(preferred);
+          onSubjectChange?.(preferred);
         }
       } catch (error) {
         console.error('Error fetching subjects:', error);
@@ -95,6 +106,7 @@ export const SubjectTabs: React.FC<SubjectTabsProps> = ({ classId, onSubjectChan
   const handleSubjectClick = (subjectId: number) => {
     setActiveSubject(subjectId);
     onSubjectChange?.(subjectId);
+    if (classId) writeLastSubject(classId, subjectId);
   };
 
   const handleAddSubject = () => {

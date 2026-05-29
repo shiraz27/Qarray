@@ -1,30 +1,31 @@
 ## Goal
 
-Make the "Shared with" badge on resources also account for the resource's own (source) chapter — so the class / subject / chapter counts and the destinations list reflect every place the resource lives, not only the explicitly shared chapters.
-
-Visibility rule stays the same: the badge only renders when `shared_with` is non-empty (resources that live in just their source chapter still show no badge).
+1. Remember the last subject the user selected per class and restore it when they come back to the dashboard (or any time `SubjectTabs` mounts).
+2. Warm chapter data for that subject as soon as the app loads so navigating into it feels instant.
 
 ## Changes
 
-### 1. `src/hooks/useSharedWithSummary.ts`
-- Accept an optional `sourceChapterId: number | null | undefined` argument.
-- Merge it into the `ids` set used for the `chapters` lookup (dedup, ignore null/NaN).
-- Include the cache key derivation so changes to `sourceChapterId` re-run the effect.
-- Returned `classes`, `subjects`, `chapters`, and `destinations` then naturally include the source chapter's class/subject/chapter entries.
-- Optionally mark the source entry in `destinations` with `isSource: true` so the popover can label it.
+### 1. Persist last selected subject — `src/components/SubjectTabs.tsx`
+- Add small helpers (top of file) that read/write `localStorage` under key `lastSubject:<classId>` with safe try/catch.
+- In `useEffect([classId])` initial load:
+  - After subjects load (cached or fresh), compute `preferredId = stored id if it exists in subjects, else first subject id`.
+  - Use `preferredId` for `setActiveSubject` and `onSubjectChange`.
+- In `handleSubjectClick`: persist the chosen id under the current class key.
+- Keep current behavior when the stored id is no longer valid (subject deleted / class changed) — fall back to first.
 
-### 2. `src/components/SharedWithBadge.tsx`
-- Add `sourceChapterId?: number | null` prop.
-- Pass it through to `useSharedWithSummary`.
-- In the destinations list inside the popover, render a small "source" tag next to the entry whose `chapterId === sourceChapterId` so users can tell which one is the original chapter vs. a share.
-- Keep the early-return when `sharedWith` is empty (unchanged behavior).
+### 2. Preload chapters of the persisted subject — `src/hooks/useDataPreload.ts` (or thin wrapper)
+- Convert `useDataPreload` to also call `useLibraryData()` so it can warm the chapter cache.
+- After resolving `profile.class_id`:
+  - `await ensureSubjects(classId)` (already happens in `LibraryDataProvider` cache).
+  - Read stored `lastSubject:<classId>` from localStorage; pick that subject if it's in the fetched list, otherwise the first subject.
+  - Fire `ensureChapters(subjectId, classId)` in the background (no `await` on UI) so the Index page renders instantly when the user lands on it.
+- Guard everything with try/catch (preload is best-effort).
+- Keep the existing global `cache` object behavior intact for backward compatibility.
 
-### 3. Call sites
-- `src/pages/Chapter.tsx` (line ~1244): pass `sourceChapterId={(resource as any).chapter_id}`.
-- `src/pages/ResourceDetail.tsx` (line ~621): pass `sourceChapterId={(resource as any).chapter_id}`.
+### 3. Minor cleanup
+- The current `useDataPreload` does its own `subjects` fetch with a different filter than `LibraryDataProvider`. Replace it with `ensureSubjects(classId)` so both paths share one cache entry (avoids duplicate network calls).
 
 ## Out of scope
-
 - No DB / RLS changes.
-- No change to the badge visibility threshold.
-- No change to `resourceChapterFilter` or query logic — this is display-only aggregation.
+- No new global state library; just `localStorage` + existing `LibraryDataContext` caches.
+- Don't touch other consumers of subject selection (forms, Move dialogs, etc.).
