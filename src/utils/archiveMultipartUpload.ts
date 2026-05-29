@@ -156,6 +156,9 @@ async function multipartUpload(
   onProgress: ((p: ArchiveUploadProgress) => void) | undefined,
   state: { paused: boolean; cancelled: boolean; resumeWaiters: Array<() => void>; currentSignal: AbortController },
 ): Promise<{ url: string }> {
+  const cfg = configFor(options.fileType);
+  const PART_SIZE_LOCAL = cfg.partSize;
+  const CONCURRENCY_LOCAL = cfg.concurrency;
   // 1. Initiate
   const init = await invokeFn<{ uploadId: string; key: string; finalUrl: string }>({
     action: 'initiate',
@@ -170,11 +173,11 @@ async function multipartUpload(
   const { uploadId, key } = init;
 
   // Build part plan
-  const totalParts = Math.ceil(file.size / PART_SIZE);
+  const totalParts = Math.ceil(file.size / PART_SIZE_LOCAL);
   const plan: PartPlan[] = [];
   for (let i = 0; i < totalParts; i++) {
-    const start = i * PART_SIZE;
-    const end = Math.min(start + PART_SIZE, file.size);
+    const start = i * PART_SIZE_LOCAL;
+    const end = Math.min(start + PART_SIZE_LOCAL, file.size);
     plan.push({ partNumber: i + 1, start, end });
   }
 
@@ -294,7 +297,7 @@ async function multipartUpload(
     }
   };
 
-  const workerCount = Math.min(CONCURRENCY, plan.length);
+  const workerCount = Math.min(CONCURRENCY_LOCAL, plan.length);
   const workers = Array.from({ length: workerCount }, () => worker());
   await Promise.all(workers);
 
