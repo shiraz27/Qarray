@@ -9,6 +9,7 @@ import {
   type ArchiveUploadProgress,
 } from '@/utils/archiveMultipartUpload';
 import type { SplitPdfManifest } from '@/utils/splitPdfManifest';
+import { fetchPdfViaProxy } from '@/utils/pdfMediaFetch';
 
 // Idempotent worker config (matches pdfOcrHelpers.ts).
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
@@ -286,6 +287,117 @@ export interface PdfSplitUploadHandle {
 }
 
 /**
+ * Verify that a freshly uploaded per-page PDF parses cleanly when fetched
+ * back through the media proxy. Catches the truncated/partial-upload class
+ * of corruption that later surfaces in PdfInlinePreview as "Invalid PDF
+ * structure". Returns true when pdfjs can parse the file.
+ */
+async function verifyUploadedPagePdf(url: string): Promise<boolean> {
+  const fetched = await fetchPdfViaProxy(url);
+  if (fetched.kind !== 'ok') return false;
+  try {
+    const ab = await fetched.blob.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(ab) }).promise;
+    const ok = pdf.numPages >= 1;
+    try { await pdf.destroy(); } catch { /* ignore */ }
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Upload a single page file to Archive.org, then verify it parses. On
+ * verification failure, retry the upload up to `maxRetries` times with
+ * exponential backoff. As a final attempt the page is rasterized (lossy
+ * but always parseable) and re-uploaded.
+ */
+async function uploadAndVerifyPage(params: {
+  pageFile: File;
+  srcBytes: Uint8Array;
+  pageIndex: number; // 0-based
+  options: ArchiveUploadOptions;
+  pageOptionsBase: ArchiveUploadOptions;
+  onProgress?: (p: ArchiveUploadProgress) => void;
+  bindController: (c: ArchiveUploadController) => void;
+  isCancelled: () => boolean;
+  alreadyRasterized: boolean;
+}): Promise<string> {
+  const {
+    pageFile,
+    srcBytes,
+    pageIndex,
+    pageOptionsBase,
+    onProgress,
+    bindController,
+    isCancelled,
+    alreadyRasterized,
+  } = params;
+
+  const maxAttempts = 3;
+  let currentFile = pageFile;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (isCancelled()) throw new DOMException('Upload cancelled', 'AbortError');
+    try {
+      const handle = uploadFileToArchiveControlled(
+        currentFile,
+        pageOptionsBase,
+        onProgress,
+      );
+      bindController(handle.controller);
+      const { url } = await handle.promise;
+
+      // Give Archive.org a moment to make the file readable before we verify.
+      // The fetch-media proxy already retries 404s with backoff.
+      const ok = await verifyUploadedPagePdf(url);
+      if (ok) return url;
+
+      console.warn(
+        `[split-pdf] page ${pageIndex + 1} failed verification (attempt ${
+          attempt + 1
+        }/${maxAttempts})`,
+      );
+    } catch (e) {
+      lastError = e;
+      console.warn(
+        `[split-pdf] page ${pageIndex + 1} upload error (attempt ${
+          attempt + 1
+        }/${maxAttempts})`,
+        e,
+      );
+    }
+
+    // Back off before retrying.
+    const backoffMs = 2000 * Math.pow(2, attempt); // 2s, 4s, 8s
+    await new Promise((r) => setTimeout(r, backoffMs));
+
+    // Final attempt: if we weren't already rasterizing, fall back to a
+    // rasterized page which is guaranteed to parse.
+    if (attempt === maxAttempts - 2 && !alreadyRasterized) {
+      try {
+        currentFile = await rasterizePageToPdf(srcBytes, pageIndex);
+        console.warn(
+          `[split-pdf] page ${pageIndex + 1} switching to rasterized fallback`,
+        );
+      } catch (e) {
+        console.error(
+          `[split-pdf] page ${pageIndex + 1} rasterize fallback failed`,
+          e,
+        );
+      }
+    }
+  }
+
+  throw new Error(
+    `Page ${pageIndex + 1} failed verification after ${maxAttempts} attempts${
+      lastError instanceof Error ? `: ${lastError.message}` : ''
+    }`,
+  );
+}
+
+/**
  * Upload a PDF, splitting into one-file-per-page when it has more than
  * SPLIT_PAGE_THRESHOLD pages. Always returns a single URL — either the direct
  * PDF URL (small files) or the manifest URL (split files). Backwards
@@ -353,27 +465,32 @@ export function uploadPdfMaybeSplit(
       if (cancelled) throw new DOMException('Upload cancelled', 'AbortError');
       const pageFile = pageFiles[i];
       const pageNumber = i + 1;
-      const handle: ArchiveUploadHandle = uploadFileToArchiveControlled(
+      const pageOptionsBase: ArchiveUploadOptions = {
+        ...options,
+        fileName: `${pageNumber}.pdf`,
+        subPath: `${base}/pages/${pageNumber}.pdf`,
+      };
+      const url = await uploadAndVerifyPage({
         pageFile,
-        {
-          ...options,
-          fileName: `${pageNumber}.pdf`,
-          subPath: `${base}/pages/${pageNumber}.pdf`,
-        },
-        (p) => {
-          // Per-page progress folded into a 0..1 overall ratio that excludes
-          // the manifest write (we add a final tick at the end).
-          const overall =
-            (pagesDone + p.ratio) / (N + 1); // +1 for manifest step
+        srcBytes: new Uint8Array(await file.arrayBuffer()),
+        pageIndex: i,
+        options,
+        pageOptionsBase,
+        onProgress: (p) => {
+          const overall = (pagesDone + p.ratio) / (N + 1); // +1 for manifest
           onProgress?.({
             loaded: Math.round(overall * file.size),
             total: file.size,
             ratio: overall,
           });
         },
-      );
-      activeController = handle.controller;
-      const { url } = await handle.promise;
+        bindController: (c) => { activeController = c; },
+        isCancelled: () => cancelled,
+        // We don't know if pdf-lib or raster produced this page; assume
+        // pdf-lib (the common case). On verification failure we'll switch
+        // to raster on the penultimate retry.
+        alreadyRasterized: false,
+      });
       pageUrls.push(url);
       pagesDone++;
     }
