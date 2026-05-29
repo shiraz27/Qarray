@@ -12,6 +12,7 @@ export interface SharedWithSummary {
     className: string;
     subjectId: number | null;
     subjectName: string;
+    isSource?: boolean;
   }[];
   loading: boolean;
 }
@@ -27,16 +28,27 @@ const isChapterRow = (value: ChapterRow | undefined): value is ChapterRow => Boo
  * Given a list of chapter ids (resource.shared_with), resolve the distinct
  * destination classes and subjects for the small "Shared with" badge.
  */
-export function useSharedWithSummary(sharedWithIds: number[] | null | undefined): SharedWithSummary {
+export function useSharedWithSummary(
+  sharedWithIds: number[] | null | undefined,
+  sourceChapterId?: number | null,
+): SharedWithSummary {
   const [state, setState] = useState<SharedWithSummary>(EMPTY);
-  const key = (sharedWithIds || []).slice().sort((a, b) => a - b).join(',');
+  const key =
+    (sharedWithIds || []).slice().sort((a, b) => a - b).join(',') +
+    `|src:${sourceChapterId ?? ''}`;
 
   useEffect(() => {
-    if (!sharedWithIds || sharedWithIds.length === 0) {
+    const hasShared = !!(sharedWithIds && sharedWithIds.length > 0);
+    const hasSource = typeof sourceChapterId === 'number' && Number.isFinite(sourceChapterId);
+    if (!hasShared && !hasSource) {
       setState(EMPTY);
       return;
     }
-    const ids = Array.from(new Set(sharedWithIds.filter((id) => Number.isFinite(id))));
+    const combined = [
+      ...(sharedWithIds || []),
+      ...(hasSource ? [sourceChapterId as number] : []),
+    ];
+    const ids = Array.from(new Set(combined.filter((id) => Number.isFinite(id))));
     let cancelled = false;
     setState((s) => ({ ...s, loading: true }));
     (async () => {
@@ -85,6 +97,7 @@ export function useSharedWithSummary(sharedWithIds: number[] | null | undefined)
             className: c.class_id ? classNames.get(c.class_id) ?? `Class #${c.class_id}` : 'Unknown class',
             subjectId: c.subject_id ?? null,
             subjectName: c.subject_id ? subjectNames.get(c.subject_id) ?? `Subject #${c.subject_id}` : 'Unknown subject',
+            isSource: hasSource && c.id === sourceChapterId,
           })),
         loading: false,
       });
