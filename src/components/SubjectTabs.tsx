@@ -7,6 +7,7 @@ import { ManageSubjectDialog } from '@/components/ManageSubjectDialog';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
 import { normalizeText } from '@/utils/textHelpers';
+import { readLastSubject, writeLastSubject } from '@/utils/lastSubjectStorage';
 
 interface Subject {
   id: number;
