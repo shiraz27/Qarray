@@ -1717,6 +1717,9 @@ export default function Statistics() {
               </CardContent>
             </Card>
 
+            {/* Split PDF Health Audit (admin diagnostic) */}
+            <PdfHealthAuditPanel />
+
             {/* OCR Processing Stats - Tabbed View */}
             <Card>
               <CardHeader>
