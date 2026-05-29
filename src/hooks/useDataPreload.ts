@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useLibraryData } from '@/contexts/LibraryDataContext';
+import { readLastSubject } from '@/utils/lastSubjectStorage';
 
 // Cache for preloaded data
 const cache = {
@@ -9,6 +11,8 @@ const cache = {
 };
 
 export const useDataPreload = () => {
+  const { ensureSubjects, ensureChapters } = useLibraryData();
+
   useEffect(() => {
     const preloadData = async () => {
       try {
@@ -39,14 +43,21 @@ export const useDataPreload = () => {
             .eq('user_id', user.id)
             .single();
 
-          if (profile?.class_id && !cache.subjects) {
-            const { data: subjects } = await supabase
-              .from('subjects')
-              .select('*')
-              .or(`class_id.eq.${profile.class_id},common.cs.{${profile.class_id}}`)
-              .eq('deleted', false)
-              .order('name');
-            cache.subjects = subjects || [];
+          if (profile?.class_id) {
+            // Use shared LibraryData cache so SubjectTabs hits the same entry.
+            const subjects = await ensureSubjects(profile.class_id);
+            cache.subjects = subjects;
+
+            // Warm chapters for the user's last-selected subject (or first).
+            if (subjects.length > 0) {
+              const stored = readLastSubject(profile.class_id);
+              const preferred =
+                stored && subjects.find((s) => s.id === stored)
+                  ? stored
+                  : subjects[0].id;
+              // Fire-and-forget; result is cached for instant render.
+              void ensureChapters(preferred, profile.class_id).catch(() => {});
+            }
           }
         }
       } catch (error) {
@@ -55,6 +66,7 @@ export const useDataPreload = () => {
     };
 
     preloadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return cache;
