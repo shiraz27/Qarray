@@ -36,6 +36,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AiGenerationsCard } from '@/components/statistics/AiGenerationsCard';
 import { processResourceOCR } from '@/utils/clientOcrProcessor';
 import type { OcrMode } from '@/utils/pdfOcrHelpers';
 import { isPdfUrl, isImageUrl, urlsHaveOcrable, textHasOcrableUrl } from '@/utils/mediaTypeUtils';
@@ -2886,6 +2887,7 @@ export default function Statistics() {
             </Card>
 
             <CommonChaptersMatchCard />
+            <AiGenerationsCard />
           </div>
         )}
       </main>

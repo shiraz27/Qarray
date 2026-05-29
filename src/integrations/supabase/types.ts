@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_generations: {
+        Row: {
+          bot_user_id: string | null
+          created_at: string
+          error: string | null
+          id: string
+          kind: string
+          output_answer_id: number | null
+          status: string
+          target_id: number
+          target_type: string
+          updated_at: string
+        }
+        Insert: {
+          bot_user_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          kind: string
+          output_answer_id?: number | null
+          status?: string
+          target_id: number
+          target_type: string
+          updated_at?: string
+        }
+        Update: {
+          bot_user_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          kind?: string
+          output_answer_id?: number | null
+          status?: string
+          target_id?: number
+          target_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       answers: {
         Row: {
           contributors: string[] | null
@@ -22,6 +61,7 @@ export type Database = {
           deleted: boolean
           id: number
           question_id: number | null
+          resource_id: number | null
           updated_at: string | null
           verified: boolean
         }
@@ -32,6 +72,7 @@ export type Database = {
           deleted?: boolean
           id?: number
           question_id?: number | null
+          resource_id?: number | null
           updated_at?: string | null
           verified?: boolean
         }
@@ -42,6 +83,7 @@ export type Database = {
           deleted?: boolean
           id?: number
           question_id?: number | null
+          resource_id?: number | null
           updated_at?: string | null
           verified?: boolean
         }
@@ -483,6 +525,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ai_model: string | null
           avatar_color: string | null
           class_id: number | null
           created_at: string | null
@@ -491,6 +534,7 @@ export type Database = {
           full_name: string
           id: string
           institute_id: string | null
+          is_bot: boolean
           is_moderator: boolean
           phone_number: string | null
           state_id: number | null
@@ -506,6 +550,7 @@ export type Database = {
           verified: boolean
         }
         Insert: {
+          ai_model?: string | null
           avatar_color?: string | null
           class_id?: number | null
           created_at?: string | null
@@ -514,6 +559,7 @@ export type Database = {
           full_name: string
           id?: string
           institute_id?: string | null
+          is_bot?: boolean
           is_moderator?: boolean
           phone_number?: string | null
           state_id?: number | null
@@ -529,6 +575,7 @@ export type Database = {
           verified?: boolean
         }
         Update: {
+          ai_model?: string | null
           avatar_color?: string | null
           class_id?: number | null
           created_at?: string | null
@@ -537,6 +584,7 @@ export type Database = {
           full_name?: string
           id?: string
           institute_id?: string | null
+          is_bot?: boolean
           is_moderator?: boolean
           phone_number?: string | null
           state_id?: number | null
@@ -1145,7 +1193,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
-      user_type: "student" | "teacher"
+      user_type: "student" | "teacher" | "ai_bot"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1274,7 +1322,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
-      user_type: ["student", "teacher"],
+      user_type: ["student", "teacher", "ai_bot"],
     },
   },
 } as const

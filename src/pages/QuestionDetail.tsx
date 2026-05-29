@@ -13,6 +13,7 @@ import qarayLogo from '@/assets/qarray-logo-new.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MediaList } from '@/components/MediaList';
+import { parseAiAnswer, AiAnswerRenderer } from '@/components/AiAnswerRenderer';
 import { UserAvatar } from '@/components/UserAvatar';
 import { AnswerQuestionForm } from '@/components/AnswerQuestionForm';
 import { EditQuestionForm } from '@/components/EditQuestionForm';
@@ -898,7 +899,10 @@ export default function QuestionDetail() {
               )}
               
               <div className="flex-1 space-y-2">
-                <MediaList data={answer.data} showText={true} />
+                {(() => {
+                  const ai = parseAiAnswer(answer.data);
+                  return ai ? <AiAnswerRenderer payload={ai} /> : <MediaList data={answer.data} showText={true} />;
+                })()}
               </div>
               
               <div className="flex items-center justify-between pt-2 border-t">

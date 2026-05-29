@@ -17,6 +17,7 @@ import { MediaPreview } from '@/components/MediaPreview';
 import { PdfInlinePreview } from '@/components/PdfInlinePreview';
 import { isPdfUrl } from '@/utils/mediaTypeUtils';
 import { UserAvatar } from '@/components/UserAvatar';
+import { parseAiAnswer, AiAnswerRenderer } from '@/components/AiAnswerRenderer';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
 import { BookBadge } from '@/components/BookBadge';
@@ -88,6 +89,7 @@ export default function ResourceDetail() {
   const [resourceTypes, setResourceTypes] = useState<Array<{ id: number; type: string }>>([]);
   const [devoirTypes, setDevoirTypes] = useState<Array<{ id: number; devoir_type: string }>>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [aiAnswers, setAiAnswers] = useState<any[]>([]);
   const [contextData, setContextData] = useState<ContextData | null>(null);
   const { isModerator } = useUserRole();
 
@@ -266,6 +268,15 @@ export default function ResourceDetail() {
       );
 
       setQuestions(questionsWithDetails);
+
+      // Fetch AI-generated answers attached to this resource
+      const { data: aiData } = await supabase
+        .from('answers')
+        .select('id, data, created_at, contributors')
+        .eq('resource_id', resourceId)
+        .eq('deleted', false)
+        .order('created_at', { ascending: false });
+      setAiAnswers(aiData || []);
       setLoading(false);
     };
 
@@ -950,6 +961,20 @@ export default function ResourceDetail() {
         )}
       </div>
 
+      {aiAnswers.length > 0 && (
+        <div className="px-4 my-4 space-y-3">
+          <h2 className="text-lg font-semibold">AI Insights</h2>
+          {aiAnswers.map((a) => {
+            const ai = parseAiAnswer(a.data);
+            if (!ai) return null;
+            return (
+              <Card key={a.id} className="p-4">
+                <AiAnswerRenderer payload={ai} />
+              </Card>
+            );
+          })}
+        </div>
+      )}
       <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
     </div>
   );
