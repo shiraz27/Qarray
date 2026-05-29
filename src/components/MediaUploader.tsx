@@ -272,16 +272,12 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     }
   };
 
-  const handlePreviewRecording = () => {
+  const handleUseRecording = () => {
     if (!audioBlob) return;
-    
-    // Create preview URL for audio
-    const audioUrl = URL.createObjectURL(audioBlob);
     const file = new File([audioBlob], `recording-${Date.now()}.webm`, { type: 'audio/webm' });
-    
-    setPreviewUrl(audioUrl);
-    setPreviewFile(file);
-    setPreviewType('audio');
+    queueFileUpload(file, 'audio');
+    toast.success('Recording added to upload queue');
+    setAudioBlob(null);
   };
 
   const getMediaIcon = (url: string) => {
