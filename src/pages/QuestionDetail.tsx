@@ -898,7 +898,12 @@ export default function QuestionDetail() {
               )}
               
               <div className="flex-1 space-y-2">
-                <MediaList data={answer.data} showText={true} />
+                {(() => {
+                  // eslint-disable-next-line @typescript-eslint/no-var-requires
+                  const { parseAiAnswer, AiAnswerRenderer } = require('@/components/AiAnswerRenderer');
+                  const ai = parseAiAnswer(answer.data);
+                  return ai ? <AiAnswerRenderer payload={ai} /> : <MediaList data={answer.data} showText={true} />;
+                })()}
               </div>
               
               <div className="flex items-center justify-between pt-2 border-t">
