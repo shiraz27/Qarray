@@ -523,6 +523,45 @@ export type Database = {
         }
         Relationships: []
       }
+      pdf_health_reports: {
+        Row: {
+          broken_pages: number[]
+          checked_at: string
+          content_id: number
+          id: string
+          kind: string
+          manifest_error: string | null
+          manifest_url: string
+          title: string | null
+          total_pages: number
+          unavailable_pages: number[]
+        }
+        Insert: {
+          broken_pages?: number[]
+          checked_at?: string
+          content_id: number
+          id?: string
+          kind: string
+          manifest_error?: string | null
+          manifest_url: string
+          title?: string | null
+          total_pages?: number
+          unavailable_pages?: number[]
+        }
+        Update: {
+          broken_pages?: number[]
+          checked_at?: string
+          content_id?: number
+          id?: string
+          kind?: string
+          manifest_error?: string | null
+          manifest_url?: string
+          title?: string | null
+          total_pages?: number
+          unavailable_pages?: number[]
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           ai_model: string | null
