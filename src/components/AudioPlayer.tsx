@@ -163,8 +163,10 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
 
   return (
     <Card className={`gamified-card p-4 ${className}`}>
-      <audio ref={audioRef} src={mediaSrc(url)} preload="metadata" />
-      
+      {status === 'ready' && (
+        <audio ref={audioRef} src={src} preload="metadata" />
+      )}
+
       <div className="space-y-4">
         {/* Recording Info */}
         {recordingNumber && (
@@ -175,6 +177,43 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
           </div>
         )}
 
+        {(status === 'probing' || status === 'processing' || status === 'error') && (
+          <div className="rounded-lg border border-dashed p-4 text-center space-y-3">
+            {status === 'probing' && (
+              <>
+                <Loader2 className="w-6 h-6 mx-auto animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Loading audio…</p>
+              </>
+            )}
+            {status === 'processing' && (
+              <>
+                <Loader2 className="w-6 h-6 mx-auto animate-spin text-primary" />
+                <p className="text-sm font-medium">Audio is still being processed</p>
+                <p className="text-xs text-muted-foreground">
+                  Storage typically takes 10–60 seconds to make a freshly uploaded
+                  recording playable. We're retrying automatically.
+                </p>
+                <Button size="sm" variant="outline" onClick={retryNow} className="hover-scale">
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Retry now
+                </Button>
+              </>
+            )}
+            {status === 'error' && (
+              <>
+                <AlertCircle className="w-6 h-6 mx-auto text-destructive" />
+                <p className="text-sm font-medium">Couldn't load this recording</p>
+                <Button size="sm" variant="outline" onClick={retryNow} className="hover-scale">
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Try again
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
+        {status === 'ready' && (
+          <>
         {/* Progress Bar */}
         <div className="space-y-2">
           <Slider
@@ -198,7 +237,9 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
             size="lg"
             className="rounded-full w-12 h-12 p-0 hover-scale shadow-lg gradient-primary"
           >
-            {isPlaying ? (
+            {buffering ? (
+              <Loader2 className="w-5 h-5 text-white animate-spin" />
+            ) : isPlaying ? (
               <Pause className="w-5 h-5 text-white" fill="white" />
             ) : (
               <Play className="w-5 h-5 text-white ml-0.5" fill="white" />
@@ -245,6 +286,8 @@ export function AudioPlayer({ url, recordingNumber, className = '' }: AudioPlaye
             />
           </div>
         </div>
+          </>
+        )}
       </div>
     </Card>
   );
