@@ -441,16 +441,48 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
   }
 
   if (error || !manifest) {
+    // Degraded state: manifest failed to load. Keep the toolbar (filename,
+    // Retry, Open in tab) visible so surrounding actions on the page don't
+    // feel "broken" — show the error inline in the body only.
+    const fallbackName = getFilenameFromUrl(url).replace(/manifest\.?json?/i, 'document.pdf');
     return (
       <Card className={`overflow-hidden ${className}`}>
-        <div className="flex flex-col items-center gap-3 py-8 text-center">
-          <AlertCircle className="h-6 w-6 text-destructive" />
-          <p className="text-sm font-medium">Couldn't load multi-page PDF</p>
-          {error && <p className="text-xs text-muted-foreground">{error}</p>}
-          <Button variant="outline" size="sm" onClick={load} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Retry
-          </Button>
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 bg-card/95 backdrop-blur border-b border-border px-3 py-2">
+          <span className="text-sm font-medium truncate flex-1 min-w-0">{fallbackName}</span>
+          <span className="text-xs text-muted-foreground">Multi-page</span>
+          <div className="flex items-center gap-1 ml-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={load}
+              className="gap-1"
+              title="Retry loading multi-page index"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span className="hidden sm:inline">Retry</span>
+            </Button>
+            <Button variant="ghost" size="sm" asChild className="gap-1">
+              <a
+                href={mediaSrc(url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                referrerPolicy="no-referrer"
+              >
+                <ExternalLink className="h-4 w-4" />
+                <span className="hidden sm:inline">Open in tab</span>
+              </a>
+            </Button>
+          </div>
+        </div>
+        <div className="bg-muted/30 p-3">
+          <div className="flex items-start gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+            <AlertCircle className="h-4 w-4 mt-0.5 text-destructive flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="font-medium text-foreground">Couldn't load multi-page preview</p>
+              {error && <p className="mt-0.5 break-words">{error}</p>}
+              <p className="mt-1">Other actions on this page remain available.</p>
+            </div>
+          </div>
         </div>
       </Card>
     );
