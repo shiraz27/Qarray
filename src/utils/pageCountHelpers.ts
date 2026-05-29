@@ -64,31 +64,48 @@ export async function computePageCountFromUrls(urls: string[]): Promise<PageCoun
   let total = 0;
   let complete = true;
 
-  for (const url of urls) {
-    if (!url) continue;
-    if (isSplitPdfManifestUrl(url)) {
-      try {
-        const manifest = await fetchSplitPdfManifest(url);
-        if (manifest.totalPages > 0) total += manifest.totalPages;
-        else complete = false;
-      } catch {
-        complete = false;
+  const results = await Promise.all(
+    urls.map(async (url): Promise<number | null> => {
+      if (!url) return 0;
+      if (isSplitPdfManifestUrl(url)) {
+        try {
+          const manifest = await fetchSplitPdfManifest(url);
+          return manifest.totalPages > 0 ? manifest.totalPages : null;
+        } catch {
+          return null;
+        }
       }
-    } else if (isPdfUrl(url)) {
-      try {
-        const blob = await fetchViaProxy(url);
-        const n = await countPdfPages(blob);
-        if (n > 0) total += n;
-        else complete = false;
-      } catch {
-        complete = false;
+      if (isPdfUrl(url)) {
+        try {
+          const blob = await fetchViaProxy(url);
+          const n = await countPdfPages(blob);
+          return n > 0 ? n : null;
+        } catch {
+          return null;
+        }
       }
-    } else if (isImageUrl(url)) {
-      total += 1;
-    }
+      if (isImageUrl(url)) return 1;
+      return 0;
+    }),
+  );
+
+  for (const r of results) {
+    if (r === null) complete = false;
+    else total += r;
   }
 
   return { count: total, complete };
+}
+
+/** Order-insensitive equality check for two media URL lists. */
+export function mediaUrlsEqual(a: string[] | null | undefined, b: string[] | null | undefined): boolean {
+  const aa = a ?? [];
+  const bb = b ?? [];
+  if (aa.length !== bb.length) return false;
+  const sa = [...aa].sort();
+  const sb = [...bb].sort();
+  for (let i = 0; i < sa.length; i++) if (sa[i] !== sb[i]) return false;
+  return true;
 }
 
 /**
