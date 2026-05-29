@@ -1,48 +1,127 @@
-## Diagnosis
+# AI Bot Generators (Qwen / DeepSeek via OpenRouter)
 
-Three separate problems are stacking up to make audio feel broken:
+Adds a fleet of "AI bot" users that produce structured answers/comments on questions and resources, triggered manually by admins from the Statistics page. Their output flows through the existing `answers` / comment systems so it can be bookmarked, upvoted, and downvoted like any user contribution.
 
-1. **Recording approval flow is confusing.** After "Stop Recording", `MediaUploader` shows a `Preview Recording` button that doesn't actually play the recording — it opens another modal-style preview step where the user must then click `Keep`. There is no inline playback of the freshly recorded blob, and the button labels ("Preview", "Keep") don't match what they do (queue an upload).
-2. **Player gives no signal while the file is still propagating.** `AudioPlayer` just mounts `<audio src={mediaSrc(url)} preload="metadata" />`. While the upload is in progress, or while Archive.org is still ingesting (the `fetch-media` proxy returns `{ unavailable: true, error: "Source not ready yet…" }` for several seconds after a successful PUT), the `<audio>` element fails silently. There's no spinner, no "still processing" hint, no retry — the play button just appears broken.
-3. **No per-file upload visibility in the player slot.** When a resource/question has an audio entry, the only "this thing exists but isn't ready yet" signal lives in the global `UploadStatusIndicator`. The audio card itself looks fully ready.
+## 1. Bot identities
 
-The user's chunking hunch is partially solved already: `archiveMultipartUpload.ts` already does 8 MB parts with 2× concurrency for files ≥ 16 MB. Recorded webm clips are almost always under that threshold, so the real wins are around (a) communicating state and (b) lowering the multipart threshold for audio so longer recordings use parallel parts.
+Create real auth users (one per model), each with a profile:
 
-## Changes
+| Email | Model | Display name |
+|---|---|---|
+| `qwen-bot@ai.local` | `qwen/qwen-2.5-72b-instruct:free` | Qwen Tutor |
+| `deepseek-bot@ai.local` | `deepseek/deepseek-chat-v3.1:free` | DeepSeek Tutor |
+| `vision-bot@ai.local` | `meta-llama/llama-3.2-11b-vision-instruct:free` | Vision Tutor |
 
-### 1. Inline recording approval (`src/components/MediaUploader.tsx`)
-- After `mediaRecorder.onstop`, keep the existing `audioBlob` state, but render an inline preview block right where the buttons live:
-  - Native `<audio controls src={URL.createObjectURL(audioBlob)} />` so the user can listen immediately, no extra step.
-  - Two buttons: `Use Recording` (queues upload via existing `queueFileUpload(file, 'audio')`, then clears state) and `Re-record` (drops the blob and goes back to `Start Recording`).
-- Delete `handlePreviewRecording` and the audio branch of the generic preview/keep dialog. Camera image preview path stays unchanged.
-- Revoke the object URL on unmount/cleanup to prevent leaks.
+Schema changes (migration):
+- Extend `user_type` enum with `'ai_bot'`.
+- Add `profiles.ai_model text` (OpenRouter model id) and `profiles.is_bot boolean default false`.
+- Seed three `auth.users` + `profiles` rows with `user_type='ai_bot'`, `verified=true`, `teacher_verified=false`.
 
-### 2. Show a "still processing" state in the player (`src/components/AudioPlayer.tsx`)
-- Add a `status` state: `'probing' | 'ready' | 'processing' | 'error'`.
-- On mount, do a lightweight readiness probe against `mediaSrc(url)` (GET with `Range: bytes=0-0`). If response is `application/json` with `{ unavailable: true }`, set status to `'processing'` and schedule a retry with exponential backoff (3s → 6s → 12s → cap 30s). On a real media content-type, set `'ready'` and mount `<audio>`.
-- While `'processing'`: render the existing card chrome with a `Loader2` spinner, a clear message ("Audio is still being processed by storage. This usually takes 10–60 seconds.") and a `Retry now` button.
-- On `<audio>`'s `error` event: flip to `'error'` with a retry button that re-runs the probe.
-- Also wire `onWaiting` / `onCanPlay` so the play button shows a spinner while the browser is buffering after a play click.
+UI surfaces the existing `VerifiedBadge` plus a small "AI" tag (reuse `AIBadge.tsx`) next to bot names on answers/comments.
 
-### 3. Surface upload-in-progress directly on the audio card (`src/components/MediaPreview.tsx`)
-- Use `useUploadManager().uploads` to find any active upload whose resulting URL matches `url` (compare on the last path segment / file name — uploads are tracked by file, and the URL is the file's archive download URL once known). When matched and status is `queued` / `uploading`:
-  - Disable the "Click to play" tap target.
-  - Replace the subtitle text with `Uploading… {Math.round(progress*100)}%` and render a thin progress bar.
-- When the upload finishes, the entry simply transitions to the normal "Click to play" card — and the `AudioPlayer` probe in change 2 covers the post-upload propagation gap.
+## 2. Generation types
 
-### 4. Lower multipart threshold for audio (`src/utils/archiveMultipartUpload.ts`)
-- Make `MULTIPART_THRESHOLD` and `PART_SIZE` per-`fileType`: audio uses 6 MB threshold, 3 MB parts, concurrency 3. Image/PDF unchanged.
-- Strictly a speed-up for longer recordings; small clips still take the single PUT path.
+A single new table `ai_generations` records each run so admins see status + can re-trigger:
 
-## Verification
+```text
+ai_generations
+  id uuid pk
+  target_type text   -- 'resource' | 'question'
+  target_id   int
+  kind        text   -- 'correction' | 'summary' | 'step_by_step' | 'infographic'
+  bot_user_id uuid   -- which bot ran it
+  status      text   -- 'queued' | 'running' | 'completed' | 'failed'
+  output_answer_id int -- fk into answers when applicable
+  error       text
+  created_at, updated_at
+```
 
-- Record a 5-second clip, hit `Use Recording`. Expectation: clip appears in the pending list immediately, no extra "Preview/Keep" step.
-- Open a resource that contains an audio URL right after uploading. Expectation: audio card briefly shows `Uploading… NN%`, then the player opens with a `Processing…` state that auto-resolves to playable within a minute, without the user needing to refresh.
-- Open an old, fully-propagated audio resource. Expectation: probe completes immediately and the player behaves exactly as today.
-- Record a long (>10 min) clip. Expectation: upload uses multipart with smaller parts and finishes noticeably faster.
+`kind → bot` routing (deterministic, configurable later):
+- `correction` → DeepSeek
+- `summary` → Qwen
+- `step_by_step` → Qwen
+- `infographic` → Vision bot (HTML/SVG output)
 
-## Out of scope
+## 3. Output storage
 
-- No DB or RLS changes — purely client + helper code.
-- No changes to `upload-to-archive` or `fetch-media` edge functions; they already support multipart and retries.
-- Not addressing Archive.org's own propagation delay — only communicating it to the user.
+All four kinds are stored as **rows in `answers`** (questions) or as new comments on resources. Resources don't currently have a comments table — to keep the existing data shape, we'll treat resource generations the same way: insert into `answers` linked via a new nullable `answers.resource_id int` column. The detail view (`ResourceDetail.tsx`) already renders answer-like content for the resource; we'll surface AI outputs there with section labels ("Correction", "Résumé", "Étape par étape", "Infographie").
+
+Each answer body uses a small JSON wrapper so the UI can pick a renderer:
+
+```json
+{ "ai_kind": "step_by_step", "language": "fr", "content": "...markdown..." }
+```
+
+Infographics store `{ "ai_kind": "infographic", "svg": "<svg>...</svg>" }`. Renderer sanitizes with DOMPurify before injecting.
+
+Generated answers are inserted with `contributors=[bot_user_id]` and `verified=false` so users can vote them up/down through the existing votes table; admins can flip `verified=true`.
+
+## 4. Trigger UI (Statistics)
+
+New tab in `Statistics.tsx`: **"AI Generations"**.
+
+- Per-row action menu on every resource and question row: `Generate correction / summary / step-by-step / infographic / Generate all`.
+- Bulk action: checkbox column + top-bar button "Generate selected → [kind | all]".
+- Each row shows the latest `ai_generations` status badges per kind (✓ done, ⏳ running, ✗ failed → retry).
+- "Re-run" overwrites the previous answer row for that (target, kind, bot).
+
+No automatic triggers — strictly admin-initiated, mirroring existing OCR pattern.
+
+## 5. Backend pipeline
+
+New edge function `ai-generate` (verify_jwt=false; validates admin role in code):
+
+Input: `{ target_type, target_id, kinds: ['correction','summary',...] }`
+
+Per kind:
+1. Insert `ai_generations` row, status `running`.
+2. Load target text:
+   - `questions.ocr_text` + `questions.data` for questions.
+   - `resources.ocr_text` + `resources.title` + `resources.description` for resources.
+   - Detect language from text (simple heuristic: French default, Arabic if Arabic-range chars dominate).
+3. Call OpenRouter chat completions with the matching free model + a kind-specific system prompt instructing it to reply in the source language.
+4. For `infographic`, system prompt requires "return a single self-contained `<svg>` 600x800 with inline styles, no external assets, no scripts".
+5. Insert/update an `answers` row authored by the bot user; set `ai_generations.output_answer_id` and `status='completed'`.
+6. On 429/credit errors, mark `failed` with the error message.
+
+Secrets: `OPENROUTER_API_KEY` (added via secrets tool).
+
+No streaming — synchronous response per kind; the UI shows a row-level spinner and polls `ai_generations` every 3s while any are `running`.
+
+## 6. Rendering
+
+- `AnswerCard` (existing component) gains an "AI kind" header chip when `ai_kind` is present.
+- Infographic answers render the sanitized SVG inside a bordered card with a "Download SVG" button.
+- Step-by-step / summary / correction use the existing markdown renderer.
+- Votes and bookmarks work without changes since they key off `content_type='answer'` + `content_id`.
+
+## 7. RLS
+
+- `ai_generations`: select for moderators/admins only; insert/update via service_role (edge function).
+- `answers`: existing RLS already allows everyone to read non-deleted; bot inserts go through service_role with `contributors=[bot_user_id]`. Users can upvote/downvote unchanged. Only the bot user or admins can edit/delete (existing policy already covers this since `auth.uid() = ANY(contributors)` would be the bot — admins covered by `is_moderator_or_admin`).
+- Add a new `answers.resource_id` nullable int + index; SELECT policy unchanged (still public if not deleted).
+
+## 8. Out of scope (v1)
+
+- No automatic background generation; admin-triggered only.
+- No edit-and-resubmit loop — admins can delete + re-run.
+- No streaming UI.
+- No per-prompt customization; prompts are hard-coded server-side per kind/language.
+- Tunisian curriculum nuance lives in the prompts, not in code.
+
+## Files touched
+
+New:
+- `supabase/functions/ai-generate/index.ts`
+- `src/components/statistics/AiGenerationsTab.tsx`
+- `src/components/answers/AiAnswerRenderer.tsx` (markdown + SVG sanitizer)
+- migration: `ai_generations` table, `answers.resource_id`, `profiles.ai_model/is_bot`, `user_type` enum value, seed bot users.
+
+Edited:
+- `src/pages/Statistics.tsx` (add tab + per-row actions)
+- `src/pages/ResourceDetail.tsx` (render AI answers section)
+- `src/pages/QuestionDetail.tsx` (label AI answers via `ai_kind` chip)
+- `src/components/AnswerCard.tsx` or equivalent (chip + renderer dispatch)
+- `supabase/config.toml` (add `[functions.ai-generate] verify_jwt = false`)
+
+Secrets to add: `OPENROUTER_API_KEY`.
