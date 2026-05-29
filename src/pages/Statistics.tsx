@@ -2887,6 +2887,7 @@ export default function Statistics() {
             </Card>
 
             <CommonChaptersMatchCard />
+            <AiGenerationsCard />
           </div>
         )}
       </main>
