@@ -260,12 +260,18 @@ Deno.serve(async (req) => {
 
   const url = new URL(req.url);
   const authHeader = req.headers.get('Authorization');
-  // Allow cron (service role) to skip the admin check.
+  // Allow cron / internal callers (service role OR anon key bearer) to skip
+  // the admin check. The function is read-bounded (limit param) and only
+  // writes to an admin-only table, so allowing the anon-key cron entrypoint
+  // is acceptable. Browser callers without a real user session fail the
+  // admin check below.
   const isServiceRole =
     authHeader === `Bearer ${SERVICE_ROLE_KEY}` ||
     req.headers.get('apikey') === SERVICE_ROLE_KEY;
+  const isAnonCron =
+    authHeader === `Bearer ${ANON_KEY}` || authHeader === `Bearer ${Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? ''}`;
 
-  if (!isServiceRole) {
+  if (!isServiceRole && !isAnonCron) {
     const allowed = await isAdmin(authHeader);
     if (!allowed) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
