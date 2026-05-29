@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
-import { computePageCountFromUrls } from '@/utils/pageCountHelpers';
+import { computePageCountFromUrls, mediaUrlsEqual } from '@/utils/pageCountHelpers';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
 import { ResourceTypeMultiSelect } from './ResourceTypeMultiSelect';
 import { SharedChaptersMultiSelect } from './SharedChaptersMultiSelect';
@@ -157,8 +157,9 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
           school_names: data.school_name ? [data.school_name] : [],
           teacher_names: data.teacher_name ? [data.teacher_name] : [],
           books: data.book ? [data.book] : [],
-        page_count: await computePageCountFromUrls(mediaUrls).then(r => r.complete ? r.count : null).catch(() => null),
       };
+
+      const mediaChanged = !mediaUrlsEqual(mediaUrls, initialData.data);
 
       // Only mods/admins can write shared_with (DB trigger also enforces this).
       if (isModerator) {
@@ -180,7 +181,23 @@ export const EditResourceForm: React.FC<EditResourceFormProps> = ({
       if (error) throw error;
 
       toast.success('Resource updated successfully');
-      
+
+      // Recompute page_count in the background only when media actually changed.
+      if (mediaChanged) {
+        void (async () => {
+          try {
+            const r = await computePageCountFromUrls(mediaUrls);
+            if (r.complete) {
+              await (supabase as any).from('resources')
+                .update({ page_count: r.count })
+                .eq('id', resourceId);
+            }
+          } catch {
+            // ignore – existing page_count remains
+          }
+        })();
+      }
+
       onSuccess();
     } catch (error) {
       console.error('Error updating resource:', error);
