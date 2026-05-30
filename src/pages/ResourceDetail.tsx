@@ -26,6 +26,7 @@ import { SharedWithBadge } from '@/components/SharedWithBadge';
 import { EmptyState } from '@/components/EmptyState';
 import { SEO, createLearningResourceSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
+import { Textarea } from '@/components/ui/textarea';
 
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -92,6 +93,52 @@ export default function ResourceDetail() {
   const [aiAnswers, setAiAnswers] = useState<any[]>([]);
   const [contextData, setContextData] = useState<ContextData | null>(null);
   const { isModerator } = useUserRole();
+  const [editingAiId, setEditingAiId] = useState<number | null>(null);
+  const [editingAiText, setEditingAiText] = useState('');
+  const [deletingAiId, setDeletingAiId] = useState<number | null>(null);
+
+  const handleDeleteAiAnswer = async (answerId: number) => {
+    const { error } = await supabase
+      .from('answers')
+      .update({ deleted: true })
+      .eq('id', answerId);
+    if (error) {
+      toast({ title: 'Error', description: `Failed to delete: ${error.message}`, variant: 'destructive' });
+      return;
+    }
+    await supabase
+      .from('ai_generations')
+      .update({ output_answer_id: null, status: 'failed', error: 'Deleted by moderator' })
+      .eq('output_answer_id', answerId);
+    setAiAnswers((prev) => prev.filter((a) => a.id !== answerId));
+    setDeletingAiId(null);
+    toast({ title: 'Deleted', description: 'AI answer removed' });
+  };
+
+  const handleSaveAiAnswer = async (answerId: number) => {
+    const current = aiAnswers.find((a) => a.id === answerId);
+    if (!current) return;
+    const parsed = parseAiAnswer(current.data);
+    if (!parsed) {
+      toast({ title: 'Error', description: 'Cannot edit: invalid AI payload', variant: 'destructive' });
+      return;
+    }
+    const next = parsed.ai_kind === 'infographic'
+      ? { ...parsed, svg: editingAiText }
+      : { ...parsed, content: editingAiText };
+    const newData = JSON.stringify(next);
+    const { error } = await supabase
+      .from('answers')
+      .update({ data: newData })
+      .eq('id', answerId);
+    if (error) {
+      toast({ title: 'Error', description: `Failed to save: ${error.message}`, variant: 'destructive' });
+      return;
+    }
+    setAiAnswers((prev) => prev.map((a) => (a.id === answerId ? { ...a, data: newData } : a)));
+    setEditingAiId(null);
+    toast({ title: 'Saved', description: 'AI answer updated' });
+  };
 
   useEffect(() => {
     const getUser = async () => {
@@ -970,9 +1017,63 @@ export default function ResourceDetail() {
             return (
               <Card key={a.id} className="p-4">
                 <AiAnswerRenderer payload={ai} />
+                {isModerator && (
+                  <div className="flex justify-end gap-2 pt-3 mt-3 border-t">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditingAiId(a.id);
+                        setEditingAiText(ai.ai_kind === 'infographic' ? (ai.svg || '') : (ai.content || ''));
+                      }}
+                    >
+                      <Edit size={14} className="mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDeletingAiId(a.id)}
+                    >
+                      <Trash2 size={14} className="mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                )}
               </Card>
             );
           })}
+          <Dialog open={editingAiId !== null} onOpenChange={(open) => !open && setEditingAiId(null)}>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Edit AI Answer</DialogTitle>
+              </DialogHeader>
+              <Textarea
+                value={editingAiText}
+                onChange={(e) => setEditingAiText(e.target.value)}
+                rows={14}
+                className="font-mono text-sm"
+              />
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setEditingAiId(null)}>Cancel</Button>
+                <Button onClick={() => editingAiId && handleSaveAiAnswer(editingAiId)}>Save</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <AlertDialog open={deletingAiId !== null} onOpenChange={(open) => !open && setDeletingAiId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete AI Answer?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove this AI insight from the resource.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => deletingAiId && handleDeleteAiAnswer(deletingAiId)}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       )}
       <BottomNavigation onTabChange={handleTabChange} activeTab={activeTab} />
