@@ -1,0 +1,162 @@
+# AI Model Health Checks (Ollama + ngrok + OpenRouter)
+
+Editable runbook. Update freely as the setup changes.
+
+Last verified: 2026-05-30
+
+---
+
+## TL;DR for the current error
+
+`ERR_NGROK_3200 — The endpoint <id>.ngrok-free.app is offline.`
+
+This is **not** an Ollama, model, or OpenRouter problem. The ngrok tunnel
+process is not running, OR the URL you are testing is an old URL from a
+previous ngrok session (free ngrok URLs change every restart unless you
+use a reserved domain).
+
+Fix order:
+1. Make sure `ollama serve` is running (see step 1 below).
+2. Start ngrok again and copy the **new** `https://...ngrok-free.app` URL.
+3. Re-run the public curl test with that new URL.
+4. Update the `OLLAMA_BASE_URL` secret in the backend to the new URL.
+
+---
+
+## Copy-paste rules
+
+- Do NOT paste lines that start with `#` into zsh — zsh tries to parse them
+  and you get errors like `zsh: unknown sort specifier`. Either strip the
+  comment lines, or run `setopt interactivecomments` once per shell.
+- Always use `127.0.0.1` for local tests (not `localhost`) to avoid IPv6
+  weirdness on macOS.
+
+---
+
+## Step 1 — Is Ollama running locally?
+
+Stop the Ollama menu-bar app first (it binds 127.0.0.1 only), then in a
+terminal:
+
+```bash
+OLLAMA_HOST=0.0.0.0:11434 ollama serve
+```
+
+Leave that terminal open. In a NEW terminal:
+
+```bash
+curl -s http://127.0.0.1:11434/api/tags | jq '.models[].name'
+```
+
+Expected: a list of model names. If empty → run `ollama pull qwen2.5:7b`
+and `ollama pull deepseek-r1:8b`.
+
+If `curl` hangs or refuses connection → Ollama is not serving on
+`0.0.0.0`. Kill the menu-bar app, re-run `OLLAMA_HOST=0.0.0.0:11434 ollama serve`.
+
+---
+
+## Step 2 — Does local generation actually work?
+
+```bash
+curl -s http://127.0.0.1:11434/api/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"qwen2.5:7b","stream":false,"messages":[{"role":"user","content":"Say hi in one word."}]}'
+```
+
+Expected: JSON with `message.content`. Time it; if it takes >60s, the
+edge function will time out — use a smaller model or raise
+`OLLAMA_TIMEOUT_MS`.
+
+---
+
+## Step 3 — Is the public tunnel up?
+
+In a NEW terminal:
+
+```bash
+ngrok http 11434
+```
+
+Copy the `https://...ngrok-free.app` URL shown. **This URL changes every
+restart** on the free plan.
+
+Set it once in your shell so you stop pasting the wrong one:
+
+```bash
+export NGROK_URL="https://YOUR-CURRENT-URL.ngrok-free.app"
+```
+
+Then test:
+
+```bash
+curl -i "$NGROK_URL/api/tags" \
+  -H 'ngrok-skip-browser-warning: true' \
+  -A 'curl'
+```
+
+Decision table:
+
+| Response | Meaning | Action |
+|---|---|---|
+| `HTTP 200` + JSON `{"models":[...]}` | Tunnel works end-to-end | Go to step 4 |
+| `HTTP 404` + `ERR_NGROK_3200` | Tunnel offline / wrong URL | Restart `ngrok http 11434`, copy NEW URL |
+| `HTTP 502` | Tunnel up but Ollama unreachable | Re-check step 1 |
+| HTML "You are about to visit..." | ngrok browser warning | Add `-A 'curl'` and `ngrok-skip-browser-warning: true` |
+| `HTTP 401` | Tunnel has basic auth | Restart ngrok without `--basic-auth` |
+| `HTTP 403` | Free-plan header missing | Confirm exact header `ngrok-skip-browser-warning: true` |
+
+---
+
+## Step 4 — Does the backend actually use Ollama?
+
+The `ai-generate` edge function only routes to Ollama if `OLLAMA_BASE_URL`
+is set. Update the secret to the URL from step 3 (no trailing slash):
+
+```
+OLLAMA_BASE_URL = https://YOUR-CURRENT-URL.ngrok-free.app
+```
+
+Optional secrets:
+- `OLLAMA_MODEL_QWEN` (default `qwen2.5:7b`)
+- `OLLAMA_MODEL_DEEPSEEK` (default `deepseek-r1:8b`)
+- `OLLAMA_TIMEOUT_MS` (planned — default 60000)
+
+Trigger one AI generation from the app, then check the edge function logs
+for one of:
+- `served_by=ollama` → working as intended
+- `Ollama failed (...); falling back to OpenRouter` → tunnel or model
+  problem; go back to step 3
+- `OpenRouter 404: No endpoints found for ...` → OpenRouter model slug is
+  retired; update it in `supabase/functions/ai-generate/index.ts`
+  (current free slugs as of 2026-05: `deepseek/deepseek-r1-0528:free`,
+  `qwen/qwen3-8b:free`)
+
+---
+
+## Common gotchas
+
+- **`zsh: unknown sort specifier`** — you pasted a `#` comment line. Strip
+  it or run `setopt interactivecomments`.
+- **`jq: parse error: Invalid numeric literal`** — the response was HTML,
+  not JSON. Re-run with `curl -i` (no jq) and read the real status code.
+- **Old ngrok URL still in the secret** — free ngrok URLs rotate. Either
+  update `OLLAMA_BASE_URL` after every restart, or pay for a reserved
+  domain, or switch to `cloudflared tunnel --url http://localhost:11434`
+  which gives a stable-ish URL per session too.
+- **Laptop sleeps** → tunnel dies → fallback to OpenRouter. Expected.
+- **OpenRouter 404 on `deepseek/deepseek-r1:free`** — model retired; use
+  `deepseek/deepseek-r1-0528:free`.
+
+---
+
+## Future checks to add here
+
+Add new sections as the stack evolves. Suggested slots:
+
+- [ ] Cloudflared tunnel variant of step 3
+- [ ] Health check edge function that pings `/api/tags` and writes to
+      `app_events` so the monitoring panel shows tunnel status
+- [ ] Per-model latency budget table
+- [ ] LM Studio alternative (port 1234, OpenAI-compatible API)
+- [ ] Lovable AI Gateway fallback wiring (no API key required)
