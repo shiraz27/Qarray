@@ -1,0 +1,48 @@
+# Minimal self-hosted Supabase stack. For production use, mirror the official
+# repo at https://github.com/supabase/supabase/tree/master/docker — this file
+# is intentionally trimmed for an eject smoke-test.
+services:
+  db:
+    image: supabase/postgres:15.6.1.139
+    restart: unless-stopped
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  auth:
+    image: supabase/gotrue:v2.158.1
+    depends_on: [db]
+    environment:
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: ${SITE_URL}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+
+  rest:
+    image: postgrest/postgrest:v12.2.0
+    depends_on: [db]
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+
+  kong:
+    image: kong:2.8
+    depends_on: [auth, rest]
+    ports: ["8000:8000"]
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+    volumes:
+      - ./kong.yml:/var/lib/kong/kong.yml:ro
+
+volumes:
+  db_data:
+*** End Patch
