@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useFeatureFlags } from '@/hooks/useFeatureFlag';
 import { Header } from '@/components/Header';
+import { MonitoringAlertsBanner } from '@/components/statistics/MonitoringAlertsBanner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -412,6 +413,9 @@ export default function Moderation() {
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-6">
+        <div className="mb-4">
+          <MonitoringAlertsBanner />
+        </div>
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>

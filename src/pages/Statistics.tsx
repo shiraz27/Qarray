@@ -51,6 +51,7 @@ import { processResourceWatermark, processQuestionWatermark } from '@/utils/clie
 import { Stamp } from 'lucide-react';
 import { PdfSplitCell } from '@/components/statistics/PdfSplitCell';
 import { PdfHealthAuditPanel } from '@/components/statistics/PdfHealthAuditPanel';
+import { MonitoringPanel } from '@/components/statistics/MonitoringPanel';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
 interface Stats {
@@ -1797,6 +1798,11 @@ export default function Statistics() {
 
             {/* Split PDF Health Audit (admin diagnostic) */}
             <PdfHealthAuditPanel />
+
+            {/* Admin health monitoring (anchor target for #monitoring) */}
+            <div id="monitoring">
+              <MonitoringPanel />
+            </div>
 
             {/* OCR Processing Stats - Tabbed View */}
             <Card>
