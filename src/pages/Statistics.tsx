@@ -1438,6 +1438,17 @@ export default function Statistics() {
     } else if (field === 'pages') {
       updates.page_count = next == null ? null : (next as number);
     }
+    // Always refresh readability so the badge stops being "missing".
+    // Prefer OCR text; fall back to title + (new or existing) description.
+    const nextDescription =
+      field === 'description'
+        ? ((next as string | null) ?? '').toString()
+        : (row.description ?? '');
+    const readabilitySource =
+      (row.ocr_text && row.ocr_text.trim())
+        ? row.ocr_text
+        : [row.title ?? '', nextDescription].filter(Boolean).join('\n');
+    updates.ocr_readability = computeReadability(readabilitySource);
     const { error } = await supabase.from('resources').update(updates).eq('id', row.id);
     if (error) throw error;
     setResources((prev) => prev.map((r) => (r.id === row.id ? { ...r, ...updates } : r)));
@@ -1460,6 +1471,13 @@ export default function Statistics() {
     } else if (field === 'pages') {
       updates.page_count = next == null ? null : (next as number);
     }
+    const nextData =
+      field === 'title' || field === 'description'
+        ? ((next as string | null) ?? '').toString()
+        : (row.data ?? '');
+    const readabilitySource =
+      (row.ocr_text && row.ocr_text.trim()) ? row.ocr_text : nextData;
+    updates.ocr_readability = computeReadability(readabilitySource);
     const { error } = await supabase.from('questions').update(updates).eq('id', row.id);
     if (error) throw error;
     setQuestions((prev) => prev.map((q) => (q.id === row.id ? { ...q, ...updates } : q)));
