@@ -7,18 +7,18 @@ type Kind = 'correction' | 'summary' | 'step_by_step' | 'infographic'
 const BOTS: Record<string, { email: string; model: string; full_name: string }> = {
   qwen: {
     email: 'qwen-bot@ai.local',
-    model: 'qwen/qwen3-8b:free',
-    full_name: 'Qwen Tutor',
+    model: 'google/gemini-2.5-flash',
+    full_name: 'Gemini Tutor',
   },
   deepseek: {
     email: 'deepseek-bot@ai.local',
-    model: 'deepseek/deepseek-r1-0528:free',
-    full_name: 'DeepSeek Tutor',
+    model: 'google/gemini-2.5-flash',
+    full_name: 'Gemini Tutor',
   },
   vision: {
     email: 'vision-bot@ai.local',
-    model: 'meta-llama/llama-3.2-11b-vision-instruct:free',
-    full_name: 'Vision Tutor',
+    model: 'google/gemini-2.5-flash-image',
+    full_name: 'Gemini Vision',
   },
 }
 
@@ -67,12 +67,21 @@ const REFUSAL_PATTERNS: RegExp[] = [
   /limite\s+(de|des)\s+tokens?/i,
   /maximum\s+(de|des)\s+tokens?/i,
   /capacit[ée]\s+maximale/i,
+  // French — self-introduction / non-substantive
+  /je\s+suis\s+un?\s+(expert|assistant|tuteur|professeur)/i,
+  /mon\s+(r[ôo]le|objectif)\s+est/i,
+  /n['’]?h[ée]sitez\s+pas\s+(à|a)\s+(me\s+)?(poser|partager|demander|le\s+partager)/i,
+  /posez\s+(votre|une)\s+question/i,
+  /n['’]?attendez\s+pas,?\s+posez/i,
   // English
   /i['’]?m\s+sorry/i,
   /i\s+can(?:not|['’]t)\b/i,
   /exceeds?\s+the\s+(maximum|token)/i,
   /token\s+limit/i,
   /maximum\s+(context|token)/i,
+  /i\s+am\s+an?\s+(expert|assistant|tutor|teacher)/i,
+  /feel\s+free\s+to\s+ask/i,
+  /how\s+can\s+i\s+help/i,
   // Arabic
   /أعتذر/,
   /لا\s*أستطيع/,
@@ -85,29 +94,54 @@ function looksLikeRefusal(content: string): boolean {
   return REFUSAL_PATTERNS.some((re) => re.test(trimmed))
 }
 
+// For corrections, if the source contains multiple "Exercice N" headers but
+// the response references none of them, the model went off-task.
+function correctionMissesExercises(source: string, content: string): boolean {
+  const headers = Array.from(source.matchAll(/\bExercice\s+(\d+)/gi)).map((m) => m[1])
+  const unique = Array.from(new Set(headers))
+  if (unique.length < 2) return false
+  const mentioned = unique.filter((n) =>
+    new RegExp(`\\bExercice\\s+${n}\\b`, 'i').test(content),
+  )
+  return mentioned.length === 0
+}
+
 function systemPromptFor(kind: Kind, language: 'fr' | 'ar'): string {
   const langName = language === 'ar' ? 'Arabic' : 'French'
   const base = `You are an expert Tunisian high-school tutor. Respond ENTIRELY in ${langName}. Use clear, student-friendly language. Use Markdown for formatting (headings, lists, **bold**, math with $...$ when relevant).`
   switch (kind) {
     case 'correction':
       return `${base}
-The student gave you an exercise (possibly with their attempt). Produce a FULL, rigorous correction:
-- State what is asked
-- Solve step by step with justifications
-- Give the final answer clearly
-- Point out common mistakes`
+You will receive one or more numbered exercises (typically "Exercice 1", "Exercice 2", ... often with sub-questions a/b/c/d). You MUST:
+- Process EVERY exercise in the order it appears. Never skip one.
+- Keep the original numbering as Markdown headings (## Exercice 1, ## Exercice 2, ...). For each sub-question, write its label (a), b), ...) then the work.
+- Briefly restate what is asked, then give the full reasoning with justifications, and the final answer in **bold**.
+- Use rigorous math notation ($...$).
+Hard rules — violating any of these is a failure:
+- Do NOT introduce yourself, do NOT describe your role, do NOT invite further questions, do NOT add closing pleasantries or emojis.
+- Do NOT skip exercises. Do NOT answer only the first one.
+- Start your reply directly with "## Exercice 1" (or the first numbered header present).`
     case 'summary':
       return `${base}
-Produce a concise, well-structured RESUME of the material:
-- Key concepts and definitions
-- Main formulas / rules
-- A short bullet recap at the end`
+The material may include worksheets, exercises, or exam questions. DO NOT solve the exercises. Produce a structured study résumé of the **concepts, definitions, theorems, formulas, and methods** that the material covers or requires.
+Structure:
+- ## Concepts clés — short definitions
+- ## Formules / règles — bullet list, each formula in $...$
+- ## Méthodes — when/how to apply each
+- ## À retenir — 3 to 5 bullets
+Hard rules:
+- Do NOT solve any exercise, even partially. If an exercise is present, only extract the underlying concept it tests.
+- Do NOT introduce yourself, do NOT invite further questions, no emojis.
+- Start directly with "## Concepts clés".`
     case 'step_by_step':
       return `${base}
-Produce a STEP-BY-STEP explanation of the material, as if teaching from zero:
-- Numbered steps, one idea per step
-- Include small worked examples
-- Finish with a 3-bullet "what to remember"`
+Produce a STEP-BY-STEP explanation of the underlying topic, as if teaching from zero:
+- Numbered steps (## Étape 1, ## Étape 2, ...), one idea per step
+- Include small worked examples inside the steps
+- Finish with "## À retenir" as a 3-bullet recap
+Hard rules:
+- Do NOT introduce yourself, do NOT invite further questions, no emojis.
+- Start directly with "## Étape 1".`
     case 'infographic':
       return `You are an expert designer. Reply with a SINGLE self-contained <svg> tag, viewBox="0 0 600 800", no <script>, no external assets, only inline styles, fonts limited to system-ui/sans-serif. Visualize the material as an INFOGRAPHIC in ${langName}: title, 3-5 key blocks with icons (simple shapes), short labels. Use a clean color palette. Return ONLY the <svg>...</svg> markup, nothing else.`
   }
@@ -196,6 +230,45 @@ async function callOpenRouter(
   return content.trim()
 }
 
+async function callLovableAI(
+  apiKey: string,
+  model: string,
+  system: string,
+  user: string,
+): Promise<string> {
+  const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Lovable-API-Key': apiKey,
+      'X-Lovable-AIG-SDK': 'edge-function',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      temperature: 0.4,
+    }),
+  })
+  const text = await resp.text()
+  if (!resp.ok) {
+    throw new Error(`LovableAI ${resp.status}: ${text.slice(0, 400)}`)
+  }
+  let json: any
+  try {
+    json = JSON.parse(text)
+  } catch {
+    throw new Error(`LovableAI non-JSON: ${text.slice(0, 200)}`)
+  }
+  const content = json?.choices?.[0]?.message?.content
+  if (!content || typeof content !== 'string') {
+    throw new Error(`LovableAI empty response: ${text.slice(0, 200)}`)
+  }
+  return content.trim()
+}
+
 async function callOllama(
   baseUrl: string,
   model: string,
@@ -246,7 +319,7 @@ async function callModel(
   openrouterKey: string,
   system: string,
   user: string,
-): Promise<{ content: string; servedBy: 'ollama' | 'openrouter' }> {
+): Promise<{ content: string; servedBy: 'ollama' | 'openrouter' | 'lovable' }> {
   const ollamaUrl = Deno.env.get('OLLAMA_BASE_URL')
   const ollamaModel = OLLAMA_MODELS[botKey as string]
   if (ollamaUrl && ollamaModel) {
@@ -258,8 +331,16 @@ async function callModel(
       console.warn(`[ai-generate] Ollama failed (${e?.message || e}); falling back to OpenRouter`)
     }
   }
-  const content = await callOpenRouter(openrouterKey, BOTS[botKey].model, system, user)
-  console.log(`[ai-generate] served_by=openrouter bot=${botKey} model=${BOTS[botKey].model}`)
+  const model = BOTS[botKey].model
+  const lovableKey = Deno.env.get('LOVABLE_API_KEY')
+  // Prefer Lovable AI Gateway for google/* and openai/* models when the key is present.
+  if (lovableKey && /^(google|openai)\//.test(model)) {
+    const content = await callLovableAI(lovableKey, model, system, user)
+    console.log(`[ai-generate] served_by=lovable bot=${botKey} model=${model}`)
+    return { content, servedBy: 'lovable' }
+  }
+  const content = await callOpenRouter(openrouterKey, model, system, user)
+  console.log(`[ai-generate] served_by=openrouter bot=${botKey} model=${model}`)
   return { content, servedBy: 'openrouter' }
 }
 
@@ -348,6 +429,9 @@ async function runGeneration(
     } else {
       if (looksLikeRefusal(content)) {
         throw new Error('Model refused or returned non-answer (likely token/context limit)')
+      }
+      if (kind === 'correction' && correctionMissesExercises(text, content)) {
+        throw new Error('Correction response did not cover the numbered exercises in the source')
       }
       payload = { ai_kind: kind, language, content, model: BOTS[botKey].model }
     }
