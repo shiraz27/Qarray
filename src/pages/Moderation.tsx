@@ -412,6 +412,9 @@ export default function Moderation() {
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-6">
+        <div className="mb-4">
+          <MonitoringAlertsBanner />
+        </div>
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
