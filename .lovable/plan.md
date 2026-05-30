@@ -1,24 +1,40 @@
 ## Problem
 
-`useDataPreload` only warms chapters for the user's last-selected subject (or the first one). When you click any other subject, `MainContent` finds no cache entry, sets `loading=true`, and runs `ensureChapters` — which does N+1 count queries per chapter and is slow. That's the loading state you see.
+`ocr_readability` is only written by the OCR pipelines (`clientOcrProcessor.ts`, `clientQuestionOcrProcessor.ts`). Saving a description (manual edit or "AI suggest"), or any other cell, never recomputes it. Rows that have `ocr_text` but `null` readability (legacy or non-OCR'd) stay stuck on the "missing" badge forever.
 
 ## Fix
 
-Extend the preloader so that, after the initial subject is warmed, it sequentially warms the remaining subjects in the background. By the time you click another tab, its chapters are already in the `LibraryDataContext` cache and `MainContent` renders synchronously (it already checks `getChaptersFromCache` before showing the skeleton).
+### 1. Recompute on every save in Statistics
 
-## Changes
+In `src/pages/Statistics.tsx`, extend `saveResourceCell` and `saveQuestionCell` so the `updates` payload always includes a fresh `ocr_readability` computed from `row.ocr_text` (using existing `computeReadability` from `@/utils/ocrReadability`). When `ocr_text` is empty/null, fall back to whatever long-form text the row has just been given (description for resources, data for questions) so a saved AI description still produces a meaningful score instead of "unreadable".
 
-**`src/hooks/useDataPreload.ts`**
-- After the existing `ensureChapters(preferred, classId)` call, kick off a background loop:
-  - For each remaining subject (skip `preferred`), `await ensureChapters(subject.id, classId)` one-by-one.
-  - Run inside an `IIFE`/`void` so it doesn't block the hook's main path.
-  - Wrap each call in try/catch so one failure doesn't stop the rest.
-  - Sequential (not `Promise.all`) to avoid hammering the DB given the existing N+1 query pattern.
+Then merge `ocr_readability` into the local `setResources` / `setQuestions` state so the badge updates immediately without a refetch.
 
-**No other files change.** `LibraryDataContext.ensureChapters` already dedupes concurrent calls and `MainContent` already short-circuits on cache hits.
+This covers both:
+- Manual cell saves (typing a description).
+- "AI suggest" → "Save" flow (already routes through `saveResourceCell`/`saveQuestionCell`).
 
-## Out of scope
+### 2. Lazy backfill on view
 
-- Refactoring the N+1 counts in `ensureChapters` (separate perf task).
-- Invalidating preloaded chapters on mutation — existing `invalidateChapters` already handles that.
-- Preloading across class changes (only the user's own `class_id` is warmed, same as today).
+After `fetchResources` / `fetchQuestions` populate state, kick off a background pass:
+- Filter rows where `ocr_readability` is null but either `ocr_text` or (description/data) is non-empty.
+- For each, compute readability locally and `UPDATE` in a single `.in('id', ids)` batch per readability bucket (4 small updates max per fetch page).
+- Patch local state.
+
+No edge function needed — all computation is client-side and cheap.
+
+### 3. Out of scope
+
+- Changing how OCR pipelines compute readability.
+- Schema changes (`ocr_readability` already exists on both tables).
+- Backfilling rows that aren't currently loaded in the Statistics view (the lazy pass naturally covers everything as the admin pages through filters).
+
+## Files
+
+- `src/pages/Statistics.tsx` — extend `saveResourceCell`, `saveQuestionCell`, and add a `useEffect` that runs the lazy backfill after `resources` / `questions` change.
+
+## Validation
+
+- Edit a description on a row with "missing" readability → badge flips to a real tier on save.
+- Click "AI suggest" on description, then save → badge updates.
+- Load Statistics → existing rows with `ocr_text` but null readability get backfilled within a couple seconds.

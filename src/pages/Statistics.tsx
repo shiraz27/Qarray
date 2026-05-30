@@ -366,6 +366,66 @@ export default function Statistics() {
     setCurrentPage(1);
   }, [ocrFilter, watermarkFilter, sourceFilter, readabilityFilter, searchQuery]);
 
+  // Lazy backfill: compute & persist ocr_readability for rows that are missing it.
+  useEffect(() => {
+    const missing = resources.filter((r) => !r.ocr_readability);
+    if (missing.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      // Group by computed readability so we can do one UPDATE per bucket.
+      const buckets: Record<string, number[]> = {};
+      const computed = new Map<number, string>();
+      for (const r of missing) {
+        const src = (r.ocr_text && r.ocr_text.trim())
+          ? r.ocr_text
+          : [r.title ?? '', r.description ?? ''].filter(Boolean).join('\n');
+        if (!src.trim()) continue;
+        const tier = computeReadability(src);
+        computed.set(r.id, tier);
+        (buckets[tier] ||= []).push(r.id);
+      }
+      if (computed.size === 0 || cancelled) return;
+      for (const [tier, ids] of Object.entries(buckets)) {
+        if (cancelled) return;
+        await supabase.from('resources').update({ ocr_readability: tier }).in('id', ids);
+      }
+      if (cancelled) return;
+      setResources((prev) =>
+        prev.map((r) => (computed.has(r.id) ? { ...r, ocr_readability: computed.get(r.id)! } : r)),
+      );
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resources]);
+
+  useEffect(() => {
+    const missing = questions.filter((q) => !q.ocr_readability);
+    if (missing.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const buckets: Record<string, number[]> = {};
+      const computed = new Map<number, string>();
+      for (const q of missing) {
+        const src = (q.ocr_text && q.ocr_text.trim()) ? q.ocr_text : (q.data ?? '');
+        if (!src.trim()) continue;
+        const tier = computeReadability(src);
+        computed.set(q.id, tier);
+        (buckets[tier] ||= []).push(q.id);
+      }
+      if (computed.size === 0 || cancelled) return;
+      for (const [tier, ids] of Object.entries(buckets)) {
+        if (cancelled) return;
+        await supabase.from('questions').update({ ocr_readability: tier }).in('id', ids);
+      }
+      if (cancelled) return;
+      setQuestions((prev) =>
+        prev.map((q) => (computed.has(q.id) ? { ...q, ocr_readability: computed.get(q.id)! } : q)),
+      );
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questions]);
+
   useEffect(() => {
     setQuestionCurrentPage(1);
   }, [questionOcrFilter, questionWatermarkFilter, questionSearchQuery]);
@@ -1438,6 +1498,17 @@ export default function Statistics() {
     } else if (field === 'pages') {
       updates.page_count = next == null ? null : (next as number);
     }
+    // Always refresh readability so the badge stops being "missing".
+    // Prefer OCR text; fall back to title + (new or existing) description.
+    const nextDescription =
+      field === 'description'
+        ? ((next as string | null) ?? '').toString()
+        : (row.description ?? '');
+    const readabilitySource =
+      (row.ocr_text && row.ocr_text.trim())
+        ? row.ocr_text
+        : [row.title ?? '', nextDescription].filter(Boolean).join('\n');
+    updates.ocr_readability = computeReadability(readabilitySource);
     const { error } = await supabase.from('resources').update(updates).eq('id', row.id);
     if (error) throw error;
     setResources((prev) => prev.map((r) => (r.id === row.id ? { ...r, ...updates } : r)));
@@ -1460,6 +1531,13 @@ export default function Statistics() {
     } else if (field === 'pages') {
       updates.page_count = next == null ? null : (next as number);
     }
+    const nextData =
+      field === 'title' || field === 'description'
+        ? ((next as string | null) ?? '').toString()
+        : (row.data ?? '');
+    const readabilitySource =
+      (row.ocr_text && row.ocr_text.trim()) ? row.ocr_text : nextData;
+    updates.ocr_readability = computeReadability(readabilitySource);
     const { error } = await supabase.from('questions').update(updates).eq('id', row.id);
     if (error) throw error;
     setQuestions((prev) => prev.map((q) => (q.id === row.id ? { ...q, ...updates } : q)));
