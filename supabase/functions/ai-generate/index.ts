@@ -7,12 +7,12 @@ type Kind = 'correction' | 'summary' | 'step_by_step' | 'infographic'
 const BOTS: Record<string, { email: string; model: string; full_name: string }> = {
   qwen: {
     email: 'qwen-bot@ai.local',
-    model: 'qwen/qwen-2.5-7b-instruct:free',
+    model: 'qwen/qwen3-8b:free',
     full_name: 'Qwen Tutor',
   },
   deepseek: {
     email: 'deepseek-bot@ai.local',
-    model: 'deepseek/deepseek-r1:free',
+    model: 'deepseek/deepseek-r1-0528:free',
     full_name: 'DeepSeek Tutor',
   },
   vision: {
