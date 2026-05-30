@@ -8,7 +8,7 @@ Last verified: 2026-05-30
 
 ## TL;DR for the current error
 
-`ERR_NGROK_3200 — The endpoint <id>.ngrok-free.app is offline.`
+`ERR_NGROK_3200 — The endpoint <id>.ngrok-free.app/.dev is offline.`
 
 This is **not** an Ollama, model, or OpenRouter problem. The ngrok tunnel
 process is not running, OR the URL you are testing is an old URL from a
@@ -17,7 +17,7 @@ use a reserved domain).
 
 Fix order:
 1. Make sure `ollama serve` is running (see step 1 below).
-2. Start ngrok again and copy the **new** `https://...ngrok-free.app` URL.
+2. Start ngrok again and copy the **new** `https://...ngrok-free.app` or `https://...ngrok-free.dev` URL.
 3. Re-run the public curl test with that new URL.
 4. Update the `OLLAMA_BASE_URL` secret in the backend to the new URL.
 
@@ -78,13 +78,15 @@ In a NEW terminal:
 ngrok http 11434
 ```
 
-Copy the `https://...ngrok-free.app` URL shown. **This URL changes every
+Copy the full `https://...ngrok-free.app` or `https://...ngrok-free.dev` URL shown. **This URL changes every
 restart** on the free plan.
+
+Important: copy the domain exactly. If ngrok shows `.ngrok-free.dev`, do **not** test the old `.ngrok-free.app` URL.
 
 Set it once in your shell so you stop pasting the wrong one:
 
 ```bash
-export NGROK_URL="https://YOUR-CURRENT-URL.ngrok-free.app"
+export NGROK_URL="https://YOUR-CURRENT-URL.ngrok-free.dev"
 ```
 
 Then test:
@@ -114,7 +116,7 @@ The `ai-generate` edge function only routes to Ollama if `OLLAMA_BASE_URL`
 is set. Update the secret to the URL from step 3 (no trailing slash):
 
 ```
-OLLAMA_BASE_URL = https://YOUR-CURRENT-URL.ngrok-free.app
+OLLAMA_BASE_URL = https://YOUR-CURRENT-URL.ngrok-free.dev
 ```
 
 Optional secrets:
@@ -144,6 +146,8 @@ for one of:
   update `OLLAMA_BASE_URL` after every restart, or pay for a reserved
   domain, or switch to `cloudflared tunnel --url http://localhost:11434`
   which gives a stable-ish URL per session too.
+- **`.app` vs `.dev` mismatch** — newer ngrok sessions may show
+  `.ngrok-free.dev`. Use the exact domain shown in the `Forwarding` line.
 - **Laptop sleeps** → tunnel dies → fallback to OpenRouter. Expected.
 - **OpenRouter 404 on `deepseek/deepseek-r1:free`** — model retired; use
   `deepseek/deepseek-r1-0528:free`.
