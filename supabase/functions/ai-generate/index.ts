@@ -501,9 +501,11 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
     const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const ANON = Deno.env.get('SUPABASE_ANON_KEY')!
-    const OPENROUTER = Deno.env.get('OPENROUTER_API_KEY')
-    if (!OPENROUTER) {
-      return new Response(JSON.stringify({ error: 'Missing OPENROUTER_API_KEY' }), {
+    // Either OPENROUTER_API_KEY or LOVABLE_API_KEY must be present; callModel
+    // routes per-model and will throw a clear error if the needed one is missing.
+    const OPENROUTER = Deno.env.get('OPENROUTER_API_KEY') || ''
+    if (!OPENROUTER && !Deno.env.get('LOVABLE_API_KEY')) {
+      return new Response(JSON.stringify({ error: 'Missing OPENROUTER_API_KEY or LOVABLE_API_KEY' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
