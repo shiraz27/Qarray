@@ -56,6 +56,35 @@ function detectLanguage(text: string): 'fr' | 'ar' {
   return arabic > latin ? 'ar' : 'fr'
 }
 
+// Patterns that indicate the model refused, errored, or hit a token/context
+// limit instead of actually producing an answer. Matched case-insensitively
+// against the trimmed content.
+const REFUSAL_PATTERNS: RegExp[] = [
+  // French
+  /je\s+suis\s+d[ée]sol[ée]/i,
+  /je\s+ne\s+peux\s+pas/i,
+  /d[ée]passe\s+la\s+capacit[ée]/i,
+  /limite\s+(de|des)\s+tokens?/i,
+  /maximum\s+(de|des)\s+tokens?/i,
+  /capacit[ée]\s+maximale/i,
+  // English
+  /i['’]?m\s+sorry/i,
+  /i\s+can(?:not|['’]t)\b/i,
+  /exceeds?\s+the\s+(maximum|token)/i,
+  /token\s+limit/i,
+  /maximum\s+(context|token)/i,
+  // Arabic
+  /أعتذر/,
+  /لا\s*أستطيع/,
+  /تجاوز\s+الحد/,
+]
+
+function looksLikeRefusal(content: string): boolean {
+  const trimmed = (content || '').trim()
+  if (trimmed.length < 80) return true
+  return REFUSAL_PATTERNS.some((re) => re.test(trimmed))
+}
+
 function systemPromptFor(kind: Kind, language: 'fr' | 'ar'): string {
   const langName = language === 'ar' ? 'Arabic' : 'French'
   const base = `You are an expert Tunisian high-school tutor. Respond ENTIRELY in ${langName}. Use clear, student-friendly language. Use Markdown for formatting (headings, lists, **bold**, math with $...$ when relevant).`
@@ -312,9 +341,14 @@ async function runGeneration(
     let payload: any
     if (kind === 'infographic') {
       const svgMatch = content.match(/<svg[\s\S]*<\/svg>/i)
-      const svg = svgMatch ? svgMatch[0] : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800"><text x="20" y="40" font-family="sans-serif">${content.slice(0, 200).replace(/</g, '&lt;')}</text></svg>`
-      payload = { ai_kind: kind, language, svg, model: BOTS[botKey].model }
+      if (!svgMatch) {
+        throw new Error('Model did not return an SVG (likely refusal or token limit)')
+      }
+      payload = { ai_kind: kind, language, svg: svgMatch[0], model: BOTS[botKey].model }
     } else {
+      if (looksLikeRefusal(content)) {
+        throw new Error('Model refused or returned non-answer (likely token/context limit)')
+      }
       payload = { ai_kind: kind, language, content, model: BOTS[botKey].model }
     }
 
