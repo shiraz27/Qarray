@@ -1799,6 +1799,11 @@ export default function Statistics() {
             {/* Split PDF Health Audit (admin diagnostic) */}
             <PdfHealthAuditPanel />
 
+            {/* Admin health monitoring (anchor target for #monitoring) */}
+            <div id="monitoring">
+              <MonitoringPanel />
+            </div>
+
             {/* OCR Processing Stats - Tabbed View */}
             <Card>
               <CardHeader>
