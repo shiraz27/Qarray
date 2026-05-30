@@ -6,6 +6,23 @@ Last verified: 2026-05-30
 
 ---
 
+## Timeouts & expected durations
+
+- The `ai-generate` edge function waits up to **10 minutes** for an Ollama
+  reply (`callOllama` AbortController). The Supabase platform may cap things
+  sooner (~150s for purely synchronous calls), so 10 min is the practical
+  ceiling — not a hard guarantee.
+- The Statistics → AI Generations table shows live `elapsed / ~ETA`
+  while a row is running. ETA = median of the last ~10 completed runs of
+  the same `kind` on the same target type (resource/question). The first
+  run of a kind has no ETA — only elapsed time is shown.
+- Typical observed durations (fill in once measured):
+  - correction (deepseek-r1:8b): _TBD_
+  - summary / step_by_step (qwen2.5:7b): _TBD_
+  - infographic (vision via OpenRouter): _TBD_
+
+---
+
 ## TL;DR for the current error
 
 `ERR_NGROK_3200 — The endpoint <id>.ngrok-free.app/.dev is offline.`
