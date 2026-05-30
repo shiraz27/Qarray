@@ -97,6 +97,51 @@ export type Database = {
           },
         ]
       }
+      app_events: {
+        Row: {
+          category: string
+          content_id: number | null
+          content_type: string | null
+          created_at: string
+          event_type: string
+          id: string
+          message: string | null
+          metadata: Json
+          severity: string
+          target_url: string | null
+          url: string | null
+          user_id: string | null
+        }
+        Insert: {
+          category: string
+          content_id?: number | null
+          content_type?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          message?: string | null
+          metadata?: Json
+          severity: string
+          target_url?: string | null
+          url?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          category?: string
+          content_id?: number | null
+          content_type?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          message?: string | null
+          metadata?: Json
+          severity?: string
+          target_url?: string | null
+          url?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       bookmarks: {
         Row: {
           chapter_id: number | null
@@ -353,6 +398,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      health_alert_sent: {
+        Row: {
+          alert_id: string
+          id: string
+          sent_at: string
+        }
+        Insert: {
+          alert_id: string
+          id?: string
+          sent_at?: string
+        }
+        Update: {
+          alert_id?: string
+          id?: string
+          sent_at?: string
+        }
+        Relationships: []
       }
       institutes: {
         Row: {
