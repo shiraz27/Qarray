@@ -168,6 +168,16 @@ function SinglePdfView({
     } catch (e) {
       console.error('PDF load error:', e);
       setError(e instanceof Error ? e.message : 'Failed to load PDF');
+      try {
+        const { logAppEvent } = await import('@/utils/appEvents');
+        logAppEvent({
+          severity: 'error',
+          category: 'preview',
+          event_type: 'pdf_load_failed',
+          message: e instanceof Error ? e.message : String(e),
+          target_url: url,
+        });
+      } catch { /* ignore */ }
     } finally {
       setLoading(false);
     }
