@@ -51,6 +51,7 @@ import { processResourceWatermark, processQuestionWatermark } from '@/utils/clie
 import { Stamp } from 'lucide-react';
 import { PdfSplitCell } from '@/components/statistics/PdfSplitCell';
 import { PdfHealthAuditPanel } from '@/components/statistics/PdfHealthAuditPanel';
+import { MonitoringPanel } from '@/components/statistics/MonitoringPanel';
 import { SEO, createWebPageSchema } from '@/components/SEO';
 
 interface Stats {
