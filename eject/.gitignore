@@ -1,0 +1,8 @@
+.env.eject
+out/
+*.log
+*.age
+passwords_*.json
+passwords_*.csv
+secrets.eject.env
+*** End Patch
