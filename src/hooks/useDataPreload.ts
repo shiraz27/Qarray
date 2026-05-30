@@ -55,8 +55,26 @@ export const useDataPreload = () => {
                 stored && subjects.find((s) => s.id === stored)
                   ? stored
                   : subjects[0].id;
-              // Fire-and-forget; result is cached for instant render.
-              void ensureChapters(preferred, profile.class_id).catch(() => {});
+            // Warm preferred subject first for instant render.
+            void ensureChapters(preferred, profile.class_id).catch(() => {});
+
+            // Then sequentially warm all remaining subjects in the background
+            // so switching tabs hits the cache and skips the loading skeleton.
+            void (async () => {
+              try {
+                await ensureChapters(preferred, profile.class_id);
+              } catch {
+                /* ignore */
+              }
+              for (const s of subjects) {
+                if (s.id === preferred) continue;
+                try {
+                  await ensureChapters(s.id, profile.class_id);
+                } catch {
+                  /* ignore single-subject failures */
+                }
+              }
+            })();
             }
           }
         }
