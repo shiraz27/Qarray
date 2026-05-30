@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useFeatureFlags } from '@/hooks/useFeatureFlag';
 import { Header } from '@/components/Header';
+import { MonitoringAlertsBanner } from '@/components/statistics/MonitoringAlertsBanner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
