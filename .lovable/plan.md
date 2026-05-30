@@ -1,51 +1,39 @@
-I’ll add a new editable markdown file, likely `docs/AI_MODEL_HEALTH_CHECKS.md`, that you can revisit and update later.
+## Goal
 
-Plan:
+Stop AI generations from failing at the current 60-second wall, and give the user feedback while they wait — a live elapsed counter plus an ETA based on past completions for the same kind, when we have data.
 
-1. Create a troubleshooting checklist file
-   - Add a step-by-step terminal checklist for:
-     - Ollama local status
-     - installed local models
-     - direct `/api/chat` generation test
-     - ngrok/cloudflared public tunnel test
-     - final external URL test
-     - app/edge-function secret checks
-   - Include expected outputs and what each error means.
+## Changes
 
-2. Document your current error clearly
-   - `ERR_NGROK_3200` means the ngrok endpoint is offline.
-   - This is not a model failure and not an OpenRouter failure.
-   - Most likely: the ngrok process stopped, the old random URL expired, or a new ngrok URL was created but the app is still using the old one.
+### 1. Edge function `supabase/functions/ai-generate/index.ts`
 
-3. Add copy-paste-safe commands
-   - Avoid leading `# comments` because zsh produced `unknown sort specifier` from the pasted comment line.
-   - Include clean commands like:
+- In `callOllama`, raise the `AbortController` timeout from `60_000` ms to `600_000` ms (10 minutes). Going truly "indefinite" is not possible — Supabase Edge Functions have a hard wall-clock limit (~150 s for synchronous responses, longer when a request stays in flight reading from upstream). 10 min is the practical ceiling and well above what local Ollama needs even for 20B models on long prompts.
+- Add a small comment noting the platform constraint so the limit isn't mistaken for the old 60 s bug.
 
-```bash
-OLLAMA_HOST=0.0.0.0:11434 ollama serve
-```
+### 2. UI `src/components/statistics/AiGenerationsCard.tsx`
 
-```bash
-curl -s http://127.0.0.1:11434/api/tags | jq '.models[].name'
-```
+- Track `started_at` per running cell using `ai_generations.updated_at` (already bumped to "now" when status flips to `running` by the existing trigger). No schema change needed.
+- For each kind, compute an **ETA** from the median duration of the most recent ~10 completed generations of that same `(target_type, kind)`. Query once on mount and after each completion:
+  ```ts
+  // returns rows: kind, duration_seconds
+  select kind, extract(epoch from (updated_at - created_at)) as dur
+    from ai_generations
+   where target_type = $1 and status = 'completed'
+   order by updated_at desc
+   limit 80;
+  ```
+  Group client-side, take median per kind.
+- Replace the current spinner in `StatusPill` (when `status === 'running'`) with:
+  - `Loader2` spinner +
+  - `{elapsed}s / ~{eta}s` when ETA exists, else `{elapsed}s`.
+  - Tooltip: "Estimated from N past runs" or "No estimate yet — first run".
+- A single `setInterval(..., 1000)` re-renders elapsed counters while anything is running (replaces the 3 s status poll's role for ticking; status polling stays at 3 s).
+- Footer note: update the "Rate limits may cause failures" line to mention generations can take several minutes for long documents.
 
-```bash
-ngrok http 11434
-```
+### 3. Docs `docs/AI_MODEL_HEALTH_CHECKS.md`
 
-```bash
-NGROK_URL="https://YOUR-CURRENT-NGROK-URL.ngrok-free.app"
-curl -i "$NGROK_URL/api/tags" \
-  -H 'ngrok-skip-browser-warning: true' \
-  -A 'curl'
-```
+- Add a short "Timeouts & expected durations" section: 10-minute upstream timeout, typical durations observed (filled in by user later), how the ETA in the UI is derived.
 
-4. Add a final decision table
-   - `HTTP 200 + JSON` → tunnel works; set/update `OLLAMA_BASE_URL` to that URL.
-   - `ERR_NGROK_3200` → tunnel is offline; restart ngrok and use the new URL.
-   - HTML instead of JSON → ngrok warning/auth page; add header/user-agent or remove auth.
-   - local curl works but public curl fails → tunnel issue.
-   - public curl works but app still uses OpenRouter → `OLLAMA_BASE_URL` secret is missing/wrong or function needs redeploy/retry.
+## Out of scope
 
-5. Optional after the file is added
-   - Patch `ai-generate` to update retired OpenRouter model slugs and add better Ollama logging/timeout handling, so generation still works when your laptop/ngrok is offline.
+- Background / async job queue (would be needed for truly unbounded runs and is a much bigger change — happy to plan separately if you want it).
+- Per-model ETA breakdown (we estimate by `kind`, which already maps 1:1 to a bot/model today).

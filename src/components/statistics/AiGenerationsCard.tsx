@@ -46,6 +46,7 @@ interface Row {
 interface GenStatus {
   status: 'queued' | 'running' | 'completed' | 'failed';
   error?: string | null;
+  startedAt?: number; // epoch ms (from updated_at when running)
 }
 
 export const AiGenerationsCard: React.FC = () => {
@@ -57,6 +58,10 @@ export const AiGenerationsCard: React.FC = () => {
   const [running, setRunning] = useState(false);
   // map key `${target_type}:${target_id}:${kind}` -> status
   const [statusMap, setStatusMap] = useState<Record<string, GenStatus>>({});
+  // median duration in seconds, per kind (from recent completed runs of current tab)
+  const [etaByKind, setEtaByKind] = useState<Partial<Record<Kind, { sec: number; n: number }>>>({});
+  // tick once a second to refresh elapsed counters
+  const [, setNowTick] = useState(0);
 
   const fetchRows = async () => {
     setLoading(true);
@@ -87,20 +92,49 @@ export const AiGenerationsCard: React.FC = () => {
   const fetchStatuses = async () => {
     const { data } = await supabase
       .from('ai_generations')
-      .select('target_type, target_id, kind, status, error')
+      .select('target_type, target_id, kind, status, error, updated_at')
       .eq('target_type', tab)
       .order('updated_at', { ascending: false })
       .limit(1000);
     const next: Record<string, GenStatus> = {};
     for (const r of (data || []) as any[]) {
-      next[`${r.target_type}:${r.target_id}:${r.kind}`] = { status: r.status, error: r.error };
+      next[`${r.target_type}:${r.target_id}:${r.kind}`] = {
+        status: r.status,
+        error: r.error,
+        startedAt: r.updated_at ? new Date(r.updated_at).getTime() : undefined,
+      };
     }
     setStatusMap(next);
+  };
+
+  const fetchEtas = async () => {
+    const { data } = await supabase
+      .from('ai_generations')
+      .select('kind, created_at, updated_at')
+      .eq('target_type', tab)
+      .eq('status', 'completed')
+      .order('updated_at', { ascending: false })
+      .limit(80);
+    const buckets: Record<string, number[]> = {};
+    for (const r of (data || []) as any[]) {
+      const dur = (new Date(r.updated_at).getTime() - new Date(r.created_at).getTime()) / 1000;
+      if (!Number.isFinite(dur) || dur <= 0) continue;
+      (buckets[r.kind] ||= []).push(dur);
+    }
+    const next: Partial<Record<Kind, { sec: number; n: number }>> = {};
+    for (const k of Object.keys(buckets)) {
+      const arr = buckets[k].slice(0, 10).sort((a, b) => a - b);
+      const mid = Math.floor(arr.length / 2);
+      const median = arr.length % 2 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
+      next[k as Kind] = { sec: Math.round(median), n: arr.length };
+    }
+    setEtaByKind(next);
   };
 
   useEffect(() => {
     fetchRows();
     fetchStatuses();
+    fetchEtas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -108,8 +142,9 @@ export const AiGenerationsCard: React.FC = () => {
   useEffect(() => {
     const anyRunning = Object.values(statusMap).some((s) => s.status === 'running' || s.status === 'queued');
     if (!anyRunning) return;
-    const t = setInterval(fetchStatuses, 3000);
-    return () => clearInterval(t);
+    const tStatus = setInterval(() => { fetchStatuses(); fetchEtas(); }, 3000);
+    const tTick = setInterval(() => setNowTick((n) => n + 1), 1000);
+    return () => { clearInterval(tStatus); clearInterval(tTick); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusMap, tab]);
 
@@ -136,10 +171,11 @@ export const AiGenerationsCard: React.FC = () => {
   const runFor = async (ids: number[], kinds: Kind[]) => {
     if (ids.length === 0 || kinds.length === 0) return;
     setRunning(true);
+    const now = Date.now();
     // optimistic mark as running
     setStatusMap((prev) => {
       const n = { ...prev };
-      for (const id of ids) for (const k of kinds) n[`${tab}:${id}:${k}`] = { status: 'running' };
+      for (const id of ids) for (const k of kinds) n[`${tab}:${id}:${k}`] = { status: 'running', startedAt: now };
       return n;
     });
     try {
@@ -152,6 +188,7 @@ export const AiGenerationsCard: React.FC = () => {
       if (error) throw error;
       toast.success(`Triggered ${kinds.length} generation(s) on ${ids.length} item(s)`);
       await fetchStatuses();
+      await fetchEtas();
     } catch (e: any) {
       toast.error(e?.message || 'AI generation failed');
       await fetchStatuses();
@@ -160,10 +197,24 @@ export const AiGenerationsCard: React.FC = () => {
     }
   };
 
-  const StatusPill: React.FC<{ s?: GenStatus }> = ({ s }) => {
+  const formatSecs = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s` : `${s}s`);
+
+  const StatusPill: React.FC<{ s?: GenStatus; kind: Kind }> = ({ s, kind }) => {
     if (!s) return <span className="text-xs text-muted-foreground">—</span>;
     if (s.status === 'completed') return <CheckCircle2 className="h-3.5 w-3.5 text-green-600 inline" />;
-    if (s.status === 'running' || s.status === 'queued') return <Loader2 className="h-3.5 w-3.5 animate-spin inline text-blue-600" />;
+    if (s.status === 'running' || s.status === 'queued') {
+      const elapsed = s.startedAt ? Math.max(0, Math.floor((Date.now() - s.startedAt) / 1000)) : 0;
+      const eta = etaByKind[kind];
+      const title = eta
+        ? `Estimated from ${eta.n} past run(s): ~${formatSecs(eta.sec)}`
+        : 'No estimate yet — first run';
+      return (
+        <span className="inline-flex items-center gap-1 text-blue-600 text-[11px] tabular-nums" title={title}>
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          {eta ? `${formatSecs(elapsed)} / ~${formatSecs(eta.sec)}` : formatSecs(elapsed)}
+        </span>
+      );
+    }
     return (
       <span className="inline-flex items-center gap-1 text-red-600" title={s.error || ''}>
         <AlertCircle className="h-3.5 w-3.5" />
@@ -275,7 +326,7 @@ export const AiGenerationsCard: React.FC = () => {
                         <TableCell className="max-w-md truncate" title={r.title}>{r.title}</TableCell>
                         {KINDS.map((k) => (
                           <TableCell key={k.key} className="text-center">
-                            <StatusPill s={statusMap[`${tab}:${r.id}:${k.key}`]} />
+                            <StatusPill s={statusMap[`${tab}:${r.id}:${k.key}`]} kind={k.key} />
                           </TableCell>
                         ))}
                         <TableCell className="text-right">
@@ -295,8 +346,9 @@ export const AiGenerationsCard: React.FC = () => {
               </Table>
             </div>
             <p className="text-xs text-muted-foreground">
-              <Clock className="h-3 w-3 inline mr-1" /> Generations run via OpenRouter free-tier
-              models. Rate limits may cause failures — hover the red icon for the error.
+              <Clock className="h-3 w-3 inline mr-1" /> Generations can take several minutes for
+              long documents (local Ollama or OpenRouter free-tier). Elapsed and estimated time
+              are shown while running; hover the red icon for errors.
             </p>
           </TabsContent>
         </Tabs>

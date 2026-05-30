@@ -175,7 +175,11 @@ async function callOllama(
 ): Promise<string> {
   const url = baseUrl.replace(/\/$/, '') + '/api/chat'
   const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 60_000)
+  // Upstream timeout: 10 minutes. Local Ollama on a laptop can be slow for
+  // long prompts / large models (e.g. gpt-oss:20b). The Supabase Edge Function
+  // platform itself also caps wall-clock time (~150s sync), so this is the
+  // practical ceiling — not the 60s of the old bug.
+  const timer = setTimeout(() => ctrl.abort(), 600_000)
   try {
     const resp = await fetch(url, {
       method: 'POST',
