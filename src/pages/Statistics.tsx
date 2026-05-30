@@ -2175,6 +2175,18 @@ export default function Statistics() {
                                               onSuggest={() => suggestCellValue('resource', resource, 'description')}
                                               onSave={(v) => saveResourceCell(resource, 'description', v)}
                                             />
+                                            {(() => {
+                                              const tier = computeReadability(resource.description ?? '');
+                                              return (
+                                                <Badge
+                                                  variant="outline"
+                                                  className={`mt-1 text-[10px] ${readabilityBadgeClass(tier)}`}
+                                                  title="Description readability"
+                                                >
+                                                  Desc: {READABILITY_LABEL[tier]}
+                                                </Badge>
+                                              );
+                                            })()}
                                           </TableCell>
                                           <TableCell>
                                             {resource.chapters?.name || 'N/A'}
@@ -2705,6 +2717,18 @@ export default function Statistics() {
                                           <TableCell className="font-medium">{question.id}</TableCell>
                                           <TableCell>
                                             <div className="max-w-[400px] truncate">{question.data.substring(0, 100)}</div>
+                                            {(() => {
+                                              const tier = computeReadability(question.data ?? '');
+                                              return (
+                                                <Badge
+                                                  variant="outline"
+                                                  className={`mt-1 text-[10px] ${readabilityBadgeClass(tier)}`}
+                                                  title="Description readability"
+                                                >
+                                                  Desc: {READABILITY_LABEL[tier]}
+                                                </Badge>
+                                              );
+                                            })()}
                                           </TableCell>
                                           <TableCell>
                                             {question.chapters?.name || 'N/A'}
