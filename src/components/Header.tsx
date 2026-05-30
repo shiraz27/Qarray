@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Bell, Shield, BarChart3 } from 'lucide-react';
 import { NotificationPanel } from './NotificationPanel';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 
@@ -14,9 +15,11 @@ export const Header: React.FC<HeaderProps> = ({ userName = "User" }) => {
   const [notificationCount, setNotificationCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const { isModerator, isAdmin } = useUserRole();
+  const { enabled: notificationsEnabled } = useFeatureFlag('notifications');
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (notificationsEnabled === false) return;
     fetchNotificationCount();
     
     const setupSubscription = async () => {
@@ -49,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({ userName = "User" }) => {
     };
 
     setupSubscription();
-  }, []);
+  }, [notificationsEnabled]);
 
   const fetchNotificationCount = async () => {
     try {
@@ -98,28 +101,32 @@ export const Header: React.FC<HeaderProps> = ({ userName = "User" }) => {
               </Button>
             </>
           )}
-          <button
-            aria-label="Notifications" 
-            className="relative hover-scale p-2"
-            onClick={() => setShowNotifications(true)}
-          >
-            <Bell size={24} className="text-foreground" />
-            {notificationCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center font-bold shadow-lg animate-pulse">
-                {notificationCount > 9 ? '9+' : notificationCount}
-              </span>
-            )}
-          </button>
+          {notificationsEnabled !== false && (
+            <button
+              aria-label="Notifications" 
+              className="relative hover-scale p-2"
+              onClick={() => setShowNotifications(true)}
+            >
+              <Bell size={24} className="text-foreground" />
+              {notificationCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center font-bold shadow-lg animate-pulse">
+                  {notificationCount > 9 ? '9+' : notificationCount}
+                </span>
+              )}
+            </button>
+          )}
         </nav>
       </header>
       
-      <NotificationPanel 
-        open={showNotifications} 
-        onClose={() => {
-          setShowNotifications(false);
-          fetchNotificationCount();
-        }} 
-      />
+      {notificationsEnabled !== false && (
+        <NotificationPanel 
+          open={showNotifications} 
+          onClose={() => {
+            setShowNotifications(false);
+            fetchNotificationCount();
+          }} 
+        />
+      )}
     </>
   );
 };
