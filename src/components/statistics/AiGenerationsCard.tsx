@@ -116,9 +116,15 @@ export const AiGenerationsCard: React.FC = () => {
       .order('updated_at', { ascending: false })
       .limit(80);
     const buckets: Record<string, number[]> = {};
+    // Edge function wall-clock is capped at 10 minutes; anything beyond
+    // ~15 min is almost certainly a row that sat queued before running
+    // (created_at is set at insert, updated_at when completed) and is not
+    // a real generation duration. Drop those outliers so the ETA stays sane.
+    const MAX_REAL_DURATION_SEC = 15 * 60;
     for (const r of (data || []) as any[]) {
       const dur = (new Date(r.updated_at).getTime() - new Date(r.created_at).getTime()) / 1000;
       if (!Number.isFinite(dur) || dur <= 0) continue;
+      if (dur > MAX_REAL_DURATION_SEC) continue;
       (buckets[r.kind] ||= []).push(dur);
     }
     const next: Partial<Record<Kind, { sec: number; n: number }>> = {};
@@ -197,7 +203,15 @@ export const AiGenerationsCard: React.FC = () => {
     }
   };
 
-  const formatSecs = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s` : `${s}s`);
+  const formatSecs = (s: number) => {
+    if (!Number.isFinite(s) || s < 0) return '—';
+    if (s < 60) return `${s}s`;
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) return `${h}h${String(m).padStart(2, '0')}m`;
+    return `${m}m${String(sec).padStart(2, '0')}s`;
+  };
 
   const StatusPill: React.FC<{ s?: GenStatus; kind: Kind }> = ({ s, kind }) => {
     if (!s) return <span className="text-xs text-muted-foreground">—</span>;
