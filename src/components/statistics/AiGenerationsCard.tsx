@@ -203,7 +203,15 @@ export const AiGenerationsCard: React.FC = () => {
     }
   };
 
-  const formatSecs = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s` : `${s}s`);
+  const formatSecs = (s: number) => {
+    if (!Number.isFinite(s) || s < 0) return '—';
+    if (s < 60) return `${s}s`;
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) return `${h}h${String(m).padStart(2, '0')}m`;
+    return `${m}m${String(sec).padStart(2, '0')}s`;
+  };
 
   const StatusPill: React.FC<{ s?: GenStatus; kind: Kind }> = ({ s, kind }) => {
     if (!s) return <span className="text-xs text-muted-foreground">—</span>;
