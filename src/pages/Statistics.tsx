@@ -2914,6 +2914,40 @@ export default function Statistics() {
                                                 )
                                               }
                                             />
+                                            {question.ocr_text_proposed && (
+                                              <div className="mt-1">
+                                                <OcrReviewButton
+                                                  table="questions"
+                                                  rowId={question.id}
+                                                  currentText={question.ocr_text ?? null}
+                                                  proposedText={question.ocr_text_proposed ?? null}
+                                                  proposedStatus={question.ocr_text_proposed_status ?? null}
+                                                  proposedReadability={question.ocr_text_proposed_readability ?? null}
+                                                  onResolved={(patch) =>
+                                                    setQuestions((prev) =>
+                                                      prev.map((q) =>
+                                                        q.id === question.id
+                                                          ? {
+                                                              ...q,
+                                                              ...(patch.ocr_text !== null && patch.ocr_status !== null
+                                                                ? {
+                                                                    ocr_text: patch.ocr_text,
+                                                                    ocr_status: patch.ocr_status,
+                                                                    ocr_readability: patch.ocr_readability,
+                                                                  }
+                                                                : {}),
+                                                              ocr_text_proposed: null,
+                                                              ocr_text_proposed_at: null,
+                                                              ocr_text_proposed_readability: null,
+                                                              ocr_text_proposed_status: null,
+                                                            }
+                                                          : q,
+                                                      ),
+                                                    )
+                                                  }
+                                                />
+                                              </div>
+                                            )}
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
