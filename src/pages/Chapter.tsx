@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MessageSquare, FileText, ArrowLeft, Bookmark, ThumbsUp, ThumbsDown, Plus, Image as ImageIcon, Video, FileAudio, Share2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -23,6 +24,44 @@ import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { SEO, createCourseSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
 import { resourceChapterFilter } from '@/utils/resourceChapterFilter';
+
+type SortKey = 'votes' | 'newest' | 'pages_asc' | 'pages_desc';
+
+function makeSortComparator(sortBy: SortKey) {
+  return (a: { upvotes: number; downvotes: number; created_at: string; page_count?: number | null }, b: typeof a) => {
+    if (sortBy === 'newest') {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+    if (sortBy === 'pages_asc' || sortBy === 'pages_desc') {
+      const av = a.page_count ?? null;
+      const bv = b.page_count ?? null;
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      return sortBy === 'pages_asc' ? av - bv : bv - av;
+    }
+    return (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes);
+  };
+}
+
+function SortSelector({ value, onChange }: { value: SortKey; onChange: (v: SortKey) => void }) {
+  return (
+    <div className="flex items-center gap-2 mb-2">
+      <span className="text-sm text-muted-foreground">Sort by:</span>
+      <Select value={value} onValueChange={(v) => onChange(v as SortKey)}>
+        <SelectTrigger className="w-[180px] h-8">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="votes">Top voted</SelectItem>
+          <SelectItem value="newest">Newest</SelectItem>
+          <SelectItem value="pages_asc">Pages (fewest first)</SelectItem>
+          <SelectItem value="pages_desc">Pages (most first)</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 interface ChapterData {
   id: number;
@@ -100,6 +139,7 @@ export default function Chapter() {
   const [selectedTypeFilters, setSelectedTypeFilters] = useState<number[]>([]);
   const [selectedDevoirFilters, setSelectedDevoirFilters] = useState<number[]>([]);
   const [showWithCorrectionOnly, setShowWithCorrectionOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<'votes' | 'newest' | 'pages_asc' | 'pages_desc'>('votes');
   const [activeTab, setActiveTab] = useState('subjects');
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
   const [isResourceDialogOpen, setIsResourceDialogOpen] = useState(false);
@@ -851,6 +891,7 @@ export default function Chapter() {
           </TabsList>
 
           <TabsContent value="questions" className="space-y-3">
+            <SortSelector value={sortBy} onChange={setSortBy} />
             <Dialog open={isQuestionDialogOpen} onOpenChange={setIsQuestionDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="w-full mb-4">
@@ -930,7 +971,8 @@ export default function Chapter() {
               />
             ) : (
               questions
-                .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
+                .slice()
+                .sort(makeSortComparator(sortBy))
                 .map((question) => {
                   const { text, media } = extractMediaFromText(question.data);
                   const hasAudio = media.some(m => m.type === 'audio');
@@ -1117,6 +1159,7 @@ export default function Chapter() {
                 </label>
               </div>
             </div>
+            <SortSelector value={sortBy} onChange={setSortBy} />
 
             <Dialog open={isResourceDialogOpen} onOpenChange={setIsResourceDialogOpen}>
               <DialogTrigger asChild>
@@ -1208,7 +1251,8 @@ export default function Chapter() {
                   (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
                   (!showWithCorrectionOnly || r.with_correction)
                 )
-                .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
+                .slice()
+                .sort(makeSortComparator(sortBy))
                 .map((resource) => {
                   const resourceTypeIds = resource.type_ids && resource.type_ids.length > 0 ? resource.type_ids : (resource.type_id ? [resource.type_id] : []);
                   const resolvedResourceTypes = resourceTypeIds
