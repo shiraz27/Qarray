@@ -33,6 +33,63 @@ export interface AuditResult {
   totalPagesChecked: number;
   totalBrokenPages: number;
   totalUnavailablePages: number;
+  skippedHealthy: number;
+  skippedOutOfScope: number;
+}
+
+export type AuditScope =
+  | 'all'
+  | 'skip-recent-healthy'
+  | 'only-previously-broken'
+  | 'only-unchecked';
+
+export type AuditKindFilter = 'all' | 'resource' | 'question';
+
+export interface AuditOptions {
+  scope: AuditScope;
+  /** Recency window in days for "skip-recent-healthy". Ignored otherwise. */
+  maxAgeDays: number;
+  kind: AuditKindFilter;
+  /** Optional cap on number of manifests to scan (after filtering). */
+  limit?: number;
+}
+
+interface LatestReport {
+  brokenPages: number[];
+  unavailablePages: number[];
+  manifestError: string | null;
+  checkedAt: string;
+}
+
+/** Latest scheduled report per (kind, content_id, manifest_url). */
+async function loadLatestReportsIndex(): Promise<Map<string, LatestReport>> {
+  const index = new Map<string, LatestReport>();
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('pdf_health_reports')
+      .select('kind, content_id, manifest_url, broken_pages, unavailable_pages, manifest_error, checked_at')
+      .order('checked_at', { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`Health reports fetch failed: ${error.message}`);
+    if (!data || data.length === 0) break;
+    for (const r of data as any[]) {
+      const key = `${r.kind}::${r.content_id}::${r.manifest_url}`;
+      // ordered desc, so first wins
+      if (!index.has(key)) {
+        index.set(key, {
+          brokenPages: r.broken_pages ?? [],
+          unavailablePages: r.unavailable_pages ?? [],
+          manifestError: r.manifest_error ?? null,
+          checkedAt: r.checked_at,
+        });
+      }
+    }
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return index;
 }
 
 /** Collect resources + questions whose payload includes a manifest URL. */
