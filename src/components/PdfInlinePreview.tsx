@@ -255,21 +255,23 @@ function SinglePdfView({
             <ZoomIn className="h-4 w-4" />
           </Button>
           <div className="inline-flex rounded-md shadow-sm overflow-hidden">
-            <Button
-              variant={extraDownloadActions ? 'outline' : 'default'}
-              size="sm"
-              onClick={handleDownload}
-              disabled={downloading}
-              title={downloadTitle ?? 'Download this file'}
-              className={`gap-1 ${extraDownloadActions ? 'rounded-r-none' : ''}`}
-            >
-              {downloading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                downloadIcon ?? <Download className="h-4 w-4" />
-              )}
-              <span className="hidden sm:inline">{downloadLabel ?? 'Download'}</span>
-            </Button>
+            {showDownload && (
+              <Button
+                variant={extraDownloadActions ? 'outline' : 'default'}
+                size="sm"
+                onClick={handleDownload}
+                disabled={downloading}
+                title={downloadTitle ?? 'Download this file'}
+                className={`gap-1 ${extraDownloadActions ? 'rounded-r-none' : ''}`}
+              >
+                {downloading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  downloadIcon ?? <Download className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">{downloadLabel ?? 'Download'}</span>
+              </Button>
+            )}
             {extraDownloadActions}
           </div>
           {!hideOpenOriginal && (
