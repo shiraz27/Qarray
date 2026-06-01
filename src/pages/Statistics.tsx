@@ -2346,6 +2346,40 @@ export default function Statistics() {
                                                 )
                                               }
                                             />
+                                            {resource.ocr_text_proposed && (
+                                              <div className="mt-1">
+                                                <OcrReviewButton
+                                                  table="resources"
+                                                  rowId={resource.id}
+                                                  currentText={resource.ocr_text ?? null}
+                                                  proposedText={resource.ocr_text_proposed ?? null}
+                                                  proposedStatus={resource.ocr_text_proposed_status ?? null}
+                                                  proposedReadability={resource.ocr_text_proposed_readability ?? null}
+                                                  onResolved={(patch) =>
+                                                    setResources((prev) =>
+                                                      prev.map((r) =>
+                                                        r.id === resource.id
+                                                          ? {
+                                                              ...r,
+                                                              ...(patch.ocr_text !== null && patch.ocr_status !== null
+                                                                ? {
+                                                                    ocr_text: patch.ocr_text,
+                                                                    ocr_status: patch.ocr_status,
+                                                                    ocr_readability: patch.ocr_readability,
+                                                                  }
+                                                                : {}),
+                                                              ocr_text_proposed: null,
+                                                              ocr_text_proposed_at: null,
+                                                              ocr_text_proposed_readability: null,
+                                                              ocr_text_proposed_status: null,
+                                                            }
+                                                          : r,
+                                                      ),
+                                                    )
+                                                  }
+                                                />
+                                              </div>
+                                            )}
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
