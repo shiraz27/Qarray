@@ -474,6 +474,7 @@ export const AiGenerationsCard: React.FC = () => {
                                       s={statusMap[`${tab}:${r.id}:${k.key}:${m.id}`]}
                                       kind={k.key}
                                       model={m.id}
+                                      rowKey={`${tab}:${r.id}:${k.key}:${m.id}`}
                                     />
                                     <span className="truncate max-w-[100px] text-muted-foreground">{m.label}</span>
                                   </div>
