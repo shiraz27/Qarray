@@ -1121,6 +1121,7 @@ export default function Chapter() {
                 </label>
               </div>
             </div>
+            <SortSelector value={sortBy} onChange={setSortBy} />
 
             <Dialog open={isResourceDialogOpen} onOpenChange={setIsResourceDialogOpen}>
               <DialogTrigger asChild>
@@ -1212,7 +1213,8 @@ export default function Chapter() {
                   (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
                   (!showWithCorrectionOnly || r.with_correction)
                 )
-                .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
+                .slice()
+                .sort(makeSortComparator(sortBy))
                 .map((resource) => {
                   const resourceTypeIds = resource.type_ids && resource.type_ids.length > 0 ? resource.type_ids : (resource.type_id ? [resource.type_id] : []);
                   const resolvedResourceTypes = resourceTypeIds
