@@ -1946,13 +1946,13 @@ export default function Statistics() {
                           </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="h-[250px]">
+                          <div className="h-[250px] w-full overflow-hidden relative">
                             <ChartContainer config={{
                               completed: { label: 'Completed', color: 'hsl(var(--chart-2))' },
                               pending: { label: 'Pending', color: 'hsl(var(--chart-3))' },
                               failed: { label: 'Failed', color: 'hsl(var(--chart-4))' },
                               not_applicable: { label: 'Not Applicable', color: 'hsl(var(--muted))' }
-                            }}>
+                            }} className="!aspect-auto h-full w-full">
                               <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                   <Pie
