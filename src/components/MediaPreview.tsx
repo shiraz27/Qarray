@@ -16,6 +16,7 @@ import {
 import { mediaSrc, isMediaToken, tokenInnerPath } from '@/utils/mediaToken';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
 import { Progress } from '@/components/ui/progress';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 
 
 interface MediaPreviewProps {
@@ -37,6 +38,9 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   const [downloading, setDownloading] = useState(false);
   const { toast } = useToast();
   const { items: uploadItems } = useUploadManager();
+  const { enabled: downloadFileEnabled, loading: downloadFileFlagLoading } =
+    useFeatureFlag('download_file');
+  const showFileDownload = downloadFileFlagLoading || downloadFileEnabled !== false;
 
   // Internal "browser-loadable" src — always routed through our media proxy so
   // the storage origin never appears in the DOM or in network requests.
