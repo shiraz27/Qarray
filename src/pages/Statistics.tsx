@@ -103,6 +103,10 @@ interface ResourceRow {
   watermark_status?: string | null;
   pages_watermarked?: number | null;
   source_link?: string | null;
+  description_proposed?: string | null;
+  description_proposed_at?: string | null;
+  description_proposed_status?: string | null;
+  description_proposed_model?: string | null;
 }
 
 // Track suggested titles from AI extraction
