@@ -1121,6 +1121,9 @@ export default function ResourceDetail() {
                     />
                     <span className="text-sm font-medium">{question.downvotes}</span>
                   </div>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ReportButton contentType="question" contentId={question.id} />
+                  </div>
                 </div>
               </div>
             </Card>
