@@ -65,6 +65,20 @@ function SortSelector({ value, onChange }: { value: SortKey; onChange: (v: SortK
   );
 }
 
+function matchPageFilter(count: number | null | undefined, mode: 'all' | 'single' | 'multi' | 'none') {
+  if (mode === 'all') return true;
+  if (mode === 'none') return count == null;
+  if (mode === 'single') return count === 1;
+  if (mode === 'multi') return typeof count === 'number' && count > 1;
+  return true;
+}
+
+function textMatchesAny(needle: string, fields: (string | null | undefined)[]) {
+  const n = needle.trim();
+  if (!n) return true;
+  return fields.some((f) => normalizedIncludes(f ?? '', n));
+}
+
 interface ChapterData {
   id: number;
   name: string;
