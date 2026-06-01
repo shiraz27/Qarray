@@ -2405,6 +2405,31 @@ export default function Statistics() {
                                                   )}
                                                 </Button>
                                               )}
+                                              <DescriptionAiButton
+                                                resourceId={resource.id}
+                                                hasOcrText={!!(resource.ocr_text && resource.ocr_text.trim().length > 0)}
+                                                currentDescription={resource.description ?? null}
+                                                proposedDescription={resource.description_proposed ?? null}
+                                                proposedModel={resource.description_proposed_model ?? null}
+                                                onUpdated={(patch) =>
+                                                  setResources((prev) =>
+                                                    prev.map((r) =>
+                                                      r.id === resource.id
+                                                        ? {
+                                                            ...r,
+                                                            ...(patch.description !== undefined
+                                                              ? { description: patch.description ?? '' }
+                                                              : {}),
+                                                            description_proposed: patch.description_proposed,
+                                                            description_proposed_at: patch.description_proposed_at,
+                                                            description_proposed_status: patch.description_proposed_status,
+                                                            description_proposed_model: patch.description_proposed_model,
+                                                          }
+                                                        : r,
+                                                    ),
+                                                  )
+                                                }
+                                              />
                                               {canProcess && (
                                                 <>
                                                   <Button
