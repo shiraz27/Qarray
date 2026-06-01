@@ -1,64 +1,64 @@
-## Diagnosis for resource 163
+## Feature: Content Reporting / Flagging
 
-Looked it up:
-- `resources.id=163` — title "Devoir de synthèse 3", 14 pages, OCR `completed`, readability `high`, OCR length **11,766 chars** (we currently truncate at 12,000, so the full text was sent to the models).
-- Two AI rows on this resource:
-  - `correction` (deepseek r1 free) → `completed` → the self-intro "Je suis un expert…" answer.
-  - `summary` (qwen3-8b free) → `completed` → an answer that *solves* exercises instead of summarizing.
-  - `infographic` (llama vision free) → `failed: 404 endpoints not found` (separate model availability bug).
+Add a report button on **resources**, **questions**, and **answers** (comments) that lets any authenticated user flag content. Admins review reports in Statistics.
 
-So the OCR/page coverage isn't the bottleneck — the models received the full text. Three real problems:
+### 1. Database — new `content_reports` table
 
-1. **Weak free models give garbage.** `qwen3-8b:free` and `deepseek-r1:free` are small/free tiers; they wander off-task on real worksheets and confuse "summarize" with "solve".
-2. **Refusal/self-intro detector misses these.** Current `looksLikeRefusal` only catches apology/token-limit phrasing. A self-promo answer ("Je suis un expert", "Mon rôle est", "N'hésitez pas à poser votre question", emoji-only sign-offs) sneaks through.
-3. **Prompts are too soft.** The `summary` system prompt says "produce a structured résumé of the material" — but if the material *is* a worksheet of exercises, the model interprets that as "do them". The `correction` prompt doesn't require iterating every numbered exercise.
+Columns:
+- `id` uuid PK
+- `content_type` text (`resource` | `question` | `answer`)
+- `content_id` integer
+- `reporter_id` uuid (auth.uid())
+- `reason` text — enum-like: `inappropriate`, `quality`, `missing`, `incorrect`, `spam`, `other`
+- `details` text (optional free-form, max 1000 chars)
+- `status` text — `open` | `reviewed` | `dismissed` (default `open`)
+- `reviewed_by` uuid, `reviewed_at` timestamptz, `admin_notes` text
+- `created_at`, `updated_at`
 
-## Fix
+RLS + GRANTs:
+- authenticated can INSERT their own reports (reporter_id = auth.uid())
+- reporter can SELECT their own reports
+- admins/moderators can SELECT/UPDATE/DELETE all (via `is_moderator_or_admin`)
+- unique partial index on `(content_type, content_id, reporter_id) WHERE status = 'open'` to prevent duplicate open reports from the same user
 
-### A. Stronger refusal/non-answer detection in `supabase/functions/ai-generate/index.ts`
+### 2. Reusable `ReportButton` component
 
-Extend `REFUSAL_PATTERNS` with self-introduction / non-substantive openings:
-- `je\s+suis\s+un?\s+(expert|assistant|tuteur|professeur)`
-- `mon\s+(r[ôo]le|objectif)\s+est`
-- `n['’]?h[ée]sitez\s+pas\s+(à|a)\s+(me\s+)?(poser|partager|demander)`
-- `posez\s+(votre|une)\s+question`
-- `i\s+am\s+an?\s+(expert|assistant|tutor|teacher)`
-- `feel\s+free\s+to\s+ask`
-- `how\s+can\s+i\s+help`
+`src/components/ReportButton.tsx`
+- Props: `contentType`, `contentId`, optional `variant`/`size`
+- Flag icon button (ghost, small) → opens AlertDialog confirmation: "Report something wrong to admins?"
+- On confirm → second Dialog with:
+  - RadioGroup of reasons (Inappropriate content, Low quality, Missing/broken, Incorrect info, Spam, Other)
+  - Textarea for details (optional, max 1000, zod-validated)
+  - Submit / Cancel
+- Inserts into `content_reports`; toast on success; toast "Already reported" if unique violation
 
-Add a second heuristic for the `correction` kind specifically:
-- If the source text contains `Exercice\s+\d+` (≥2 occurrences) but the response mentions zero of those exact `Exercice N` headers → treat as refusal/off-task.
+### 3. Integration points
 
-Both cases throw, which already routes through the existing `failed` path (no `answers` row inserted).
+- `ResourceDetail.tsx` — add button in the resource header actions
+- Question card render block in `ResourceDetail.tsx` (and `QuestionDetail.tsx`) — add small flag button next to existing question actions
+- Answer rendering — add flag button on each answer
 
-### B. Sharper system prompts (still in `ai-generate/index.ts`)
+Only show the button to authenticated users; hide for the content's own contributors (optional — can still report, but UX-wise hide self-report).
 
-Rewrite the three text prompts to be explicit and prescriptive:
+### 4. Admin UI — Statistics page new tab
 
-- **summary**: "You will receive teaching material that may include exercises. DO NOT solve the exercises. Produce a structured study summary of the *concepts, definitions, formulas, and methods* that appear in or are needed by the material. End with a 3–5 bullet 'à retenir'."
-- **correction**: "You will receive one or more numbered exercises (`Exercice N`, often with sub-questions a/b/c). You MUST process every exercise in order, keep the original numbering, restate each question briefly, then give the full solution with justifications and the final answer in bold. Do not introduce yourself, do not invite further questions, do not skip exercises."
-- **step_by_step**: Add "Do not introduce yourself. Start directly with Step 1."
+New component `src/components/statistics/ReportsCard.tsx` added as a tab/section in `Statistics.tsx` (admin/moderator-gated like other admin cards):
 
-### C. Default model upgrade (optional but recommended)
+- Filters: status (open/reviewed/dismissed/all), content_type, reason
+- Table columns: created_at, reporter (full_name), content_type + linked id (opens `/resource/:id` or `/question/:id`), reason badge, details snippet, status
+- Row expand → full details + admin notes textarea
+- Actions per row: **Mark reviewed**, **Dismiss**, **Open content** (link). Optional **Delete content** (links to existing admin-delete flow, not duplicated here)
+- Counts badge "X open reports" surfaced at top of Statistics for visibility
 
-Today `KIND_TO_BOT` points `correction → deepseek-r1:free` and `summary/step_by_step → qwen3-8b:free`. Both are the weakest free tier on OpenRouter and the root cause of "ridiculous" output.
+### Technical notes
 
-Recommended switch via Lovable AI Gateway (free during promo, much better quality):
-- `correction` → `google/gemini-2.5-flash` (strong reasoning, handles long French math text)
-- `summary` / `step_by_step` → `google/gemini-2.5-flash`
-- Keep `infographic` on a vision model but swap the dead `meta-llama/llama-3.2-11b-vision-instruct:free` (currently 404s) → `google/gemini-2.5-flash-image` (Nano Banana) which the gateway supports.
+- Use existing `is_moderator_or_admin(auth.uid())` helper for RLS
+- Use shadcn `AlertDialog` + `Dialog` + `RadioGroup` + `Textarea` already in the project
+- Validate input with zod (reason enum, details ≤ 1000 chars, trimmed)
+- Log via `logAppEvent` (category `other`, event_type `content_reported`) for audit trail
 
-To do this cleanly: add a small `callLovableAI(model, system, user)` path (POST to `https://ai.gateway.lovable.dev/v1/chat/completions` with the existing `LOVABLE_API_KEY`) and let `callModel` prefer Lovable AI Gateway when the bot's model id starts with `google/` or `openai/`, falling back to OpenRouter for `qwen/`, `deepseek/`, `meta-llama/`. Existing Ollama path stays as-is.
+### Out of scope (confirm if you want any of these)
 
-This needs the user's go-ahead because it changes the visible "bot" labels (the `BOTS` registry that controls the `model` field shown next to each AI answer).
-
-### D. No DB or UI changes
-
-Bad rows already in the DB (answer ids 27, 28) can be removed by the moderator using the Edit/Delete buttons added in the previous turn — no migration needed.
-
-## Decision needed from you
-
-1. **Switch default models to Lovable AI Gateway (Gemini 2.5 Flash) for correction/summary/step_by_step, and Nano Banana for infographic?** Strongly recommended — biggest quality jump. The visible bot name next to AI answers will change (e.g. `google/gemini-2.5-flash` instead of `qwen/qwen3-8b:free`).
-2. **Or keep the same free OpenRouter models and only ship A + B (stricter refusal patterns + sharper prompts)?** Cheaper, no behavior change for the bot identities, but quality stays bounded by the small free models.
-
-Tell me which (1 or 2 — or 1 only for certain kinds) and I'll implement.
+- Email/push notification to admins when a report is filed
+- Auto-hide content after N reports
+- Per-reason auto-routing (e.g., quality → contributors instead of admins)
