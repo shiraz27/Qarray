@@ -769,6 +769,10 @@ export default function ResourceDetail() {
             </div>
           </div>
 
+          <div className="flex justify-end">
+            <ReportButton contentType="resource" contentId={resource.id} variant="inline" />
+          </div>
+
           {canEdit && (
             <div className="flex gap-2 pt-2 border-t">
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
