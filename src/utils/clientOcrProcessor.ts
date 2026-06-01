@@ -11,6 +11,7 @@ import {
 import { expandManifestUrls } from '@/utils/splitPdfManifest';
 import { encodeMediaUrl } from '@/utils/mediaToken';
 import { computeReadability } from '@/utils/ocrReadability';
+import { writeOcrResult } from '@/utils/ocrProposalWrite';
 
 export type { OcrMode };
 
