@@ -26,6 +26,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Bot, ChevronDown, Loader2, RefreshCw, Sparkles, FileText, ListOrdered, Image as ImageIcon, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { AI_MODELS, DEFAULT_MODELS, PROVIDER_LABEL, modelsForKind as modelsForKindFn, type AiProvider, type Kind as ModelKind } from './aiModels';
+import { AiGenerationReviewDialog } from './AiGenerationReviewDialog';
 
 type Kind = 'correction' | 'summary' | 'step_by_step' | 'infographic';
 type TargetType = 'resource' | 'question';
@@ -48,6 +49,10 @@ interface GenStatus {
   status: 'queued' | 'running' | 'completed' | 'failed';
   error?: string | null;
   startedAt?: number; // epoch ms (from updated_at when running)
+  id?: string;
+  outputAnswerId?: number | null;
+  proposedData?: string | null;
+  reviewStatus?: 'pending' | 'approved' | 'discarded' | null;
 }
 
 const MODELS_STORAGE_KEY = 'ai-generations.selected-models';
@@ -74,6 +79,8 @@ export const AiGenerationsCard: React.FC = () => {
   const [running, setRunning] = useState(false);
   // map key `${target_type}:${target_id}:${kind}:${model}` -> status
   const [statusMap, setStatusMap] = useState<Record<string, GenStatus>>({});
+  // currently-open review dialog (keyed by statusMap key)
+  const [reviewKey, setReviewKey] = useState<string | null>(null);
   // median duration in seconds, per `${kind}:${model}` (from recent completed runs of current tab)
   const [etaByKindModel, setEtaByKindModel] = useState<Record<string, { sec: number; n: number }>>({});
   // selected models (multi-select)
@@ -115,7 +122,7 @@ export const AiGenerationsCard: React.FC = () => {
   const fetchStatuses = async () => {
     const { data } = await supabase
       .from('ai_generations')
-      .select('target_type, target_id, kind, model, status, error, updated_at')
+      .select('id, target_type, target_id, kind, model, status, error, updated_at, output_answer_id, proposed_data, review_status')
       .eq('target_type', tab)
       .order('updated_at', { ascending: false })
       .limit(1000);
@@ -126,6 +133,10 @@ export const AiGenerationsCard: React.FC = () => {
         status: r.status,
         error: r.error,
         startedAt: r.updated_at ? new Date(r.updated_at).getTime() : undefined,
+        id: r.id,
+        outputAnswerId: r.output_answer_id ?? null,
+        proposedData: r.proposed_data ?? null,
+        reviewStatus: r.review_status ?? null,
       };
     }
     setStatusMap(next);
@@ -252,9 +263,23 @@ export const AiGenerationsCard: React.FC = () => {
     return `${m}m${String(sec).padStart(2, '0')}s`;
   };
 
-  const StatusPill: React.FC<{ s?: GenStatus; kind: Kind; model: string }> = ({ s, kind, model }) => {
+  const StatusPill: React.FC<{ s?: GenStatus; kind: Kind; model: string; rowKey: string }> = ({ s, kind, model, rowKey }) => {
     if (!s) return <span className="text-xs text-muted-foreground">—</span>;
-    if (s.status === 'completed') return <CheckCircle2 className="h-3.5 w-3.5 text-green-600 inline" />;
+    if (s.status === 'completed') {
+      if (s.reviewStatus === 'pending' && s.proposedData && s.outputAnswerId) {
+        return (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setReviewKey(rowKey); }}
+            className="inline-flex items-center gap-1 rounded-full border border-amber-400 bg-amber-50 px-1.5 py-0 text-[10px] font-medium text-amber-800 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/60"
+            title="New AI output pending review"
+          >
+            <AlertCircle className="h-3 w-3" /> Review
+          </button>
+        );
+      }
+      return <CheckCircle2 className="h-3.5 w-3.5 text-green-600 inline" />;
+    }
     if (s.status === 'running' || s.status === 'queued') {
       const elapsed = s.startedAt ? Math.max(0, Math.floor((Date.now() - s.startedAt) / 1000)) : 0;
       const eta = etaByKindModel[`${kind}:${model}`];
@@ -294,17 +319,29 @@ export const AiGenerationsCard: React.FC = () => {
   );
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5" /> AI Generations
+              {(() => {
+                const n = Object.values(statusMap).filter(
+                  (s) => s.reviewStatus === 'pending' && s.proposedData && s.outputAnswerId,
+                ).length;
+                return n > 0 ? (
+                  <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300">
+                    <AlertCircle className="h-3 w-3 mr-1" /> {n} pending review
+                  </Badge>
+                ) : null;
+              })()}
             </CardTitle>
             <CardDescription>
               Trigger AI bots (Qwen, DeepSeek, Vision) to generate corrections, summaries,
-              step-by-step explanations, and infographics. Output appears as bot-authored
-              answers users can vote on.
+              step-by-step explanations, and infographics. The first run for an item is
+              published immediately; re-runs are held for admin review (Approve / Discard)
+              before they replace the live answer.
             </CardDescription>
           </div>
           <Button size="sm" variant="outline" onClick={() => { fetchRows(); fetchStatuses(); }}>
@@ -449,6 +486,7 @@ export const AiGenerationsCard: React.FC = () => {
                                       s={statusMap[`${tab}:${r.id}:${k.key}:${m.id}`]}
                                       kind={k.key}
                                       model={m.id}
+                                      rowKey={`${tab}:${r.id}:${k.key}:${m.id}`}
                                     />
                                     <span className="truncate max-w-[100px] text-muted-foreground">{m.label}</span>
                                   </div>
@@ -482,5 +520,27 @@ export const AiGenerationsCard: React.FC = () => {
         </Tabs>
       </CardContent>
     </Card>
+    {(() => {
+      if (!reviewKey) return null;
+      const s = statusMap[reviewKey];
+      if (!s || !s.id || !s.outputAnswerId || !s.proposedData) return null;
+      // rowKey = `${tab}:${id}:${kind}:${model}` — extract kind/model for header.
+      const parts = reviewKey.split(':');
+      const kind = parts[2] ?? '';
+      const model = parts.slice(3).join(':') ?? '';
+      return (
+        <AiGenerationReviewDialog
+          open={true}
+          onOpenChange={(o) => { if (!o) setReviewKey(null); }}
+          generationId={s.id}
+          answerId={s.outputAnswerId}
+          kind={kind}
+          model={model}
+          proposedDataString={s.proposedData}
+          onResolved={() => { setReviewKey(null); fetchStatuses(); }}
+        />
+      );
+    })()}
+  </>
   );
 };

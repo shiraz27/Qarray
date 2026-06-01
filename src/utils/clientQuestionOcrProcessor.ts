@@ -11,6 +11,7 @@ import {
 import { expandManifestUrls } from '@/utils/splitPdfManifest';
 import { encodeMediaUrl } from '@/utils/mediaToken';
 import { computeReadability } from '@/utils/ocrReadability';
+import { writeOcrResult } from '@/utils/ocrProposalWrite';
 
 type FileType = MediaType;
 
@@ -138,15 +139,10 @@ export async function processQuestionOCR(
 
     if (expandedFiles.length === 0) {
       // No media to process
-      await supabase
-        .from('questions')
-        .update({
-          ocr_status: 'not_applicable',
-          ocr_text: 'No media files found',
-          ocr_processed_at: new Date().toISOString(),
-        })
-        .eq('id', questionId);
-
+      await writeOcrResult('questions', questionId, {
+        status: 'not_applicable',
+        text: 'No media files found',
+      });
       return { success: true, message: 'No media to process' };
     }
 
@@ -259,32 +255,25 @@ export async function processQuestionOCR(
       ocrText = combinedText;
     }
 
-    // Update question in database
-    await supabase
-      .from('questions')
-      .update({
-        ocr_status: ocrStatus,
-        ocr_text: ocrText,
-        ocr_readability: computeReadability(ocrText),
-        ocr_processed_at: new Date().toISOString(),
-      })
-      .eq('id', questionId);
-
-    return { success: true, message: 'OCR completed successfully' };
+    // Update question in database (proposal flow when prior OCR exists)
+    const { proposed } = await writeOcrResult('questions', questionId, {
+      status: ocrStatus,
+      text: ocrText,
+    });
+    return {
+      success: true,
+      message: proposed
+        ? 'OCR completed — pending admin review'
+        : 'OCR completed successfully',
+    };
   } catch (error: any) {
     console.error('OCR processing error:', error);
 
-    // Mark as failed in database
-    await supabase
-      .from('questions')
-      .update({
-        ocr_status: 'failed',
-        ocr_text: `Error: ${error.message}`,
-        ocr_readability: 'unreadable',
-        ocr_processed_at: new Date().toISOString(),
-      })
-      .eq('id', questionId);
-
+    // Mark as failed in database (failures bypass proposal flow)
+    await writeOcrResult('questions', questionId, {
+      status: 'failed',
+      text: `Error: ${error.message}`,
+    });
     return { success: false, message: error.message };
   }
 }

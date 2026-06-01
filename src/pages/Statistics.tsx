@@ -47,6 +47,7 @@ import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, app
 import { MetaCell, type CellValue } from '@/components/statistics/MetaCell';
 import { OcrStatusEditor, type OcrStatus } from '@/components/statistics/OcrStatusEditor';
 import { OcrTextEditor } from '@/components/statistics/OcrTextEditor';
+import { OcrReviewButton } from '@/components/statistics/OcrReviewButton';
 import { WatermarkStatusEditor, type WatermarkStatus } from '@/components/statistics/WatermarkStatusEditor';
 import { processResourceWatermark, processQuestionWatermark } from '@/utils/clientWatermarkProcessor';
 import { Stamp } from 'lucide-react';
@@ -84,6 +85,10 @@ interface ResourceRow {
   ocr_status: string | null;
   ocr_text: string | null;
   ocr_readability?: string | null;
+  ocr_text_proposed?: string | null;
+  ocr_text_proposed_status?: string | null;
+  ocr_text_proposed_readability?: string | null;
+  ocr_text_proposed_at?: string | null;
   chapter_id: number | null;
   chapters?: { name: string };
   resource_types?: { type: string };
@@ -112,6 +117,10 @@ interface QuestionRow {
   ocr_status: string | null;
   ocr_text?: string | null;
   ocr_readability?: string | null;
+  ocr_text_proposed?: string | null;
+  ocr_text_proposed_status?: string | null;
+  ocr_text_proposed_readability?: string | null;
+  ocr_text_proposed_at?: string | null;
   chapter_id: number | null;
   chapters?: { name: string };
   teacher_names?: string[] | null;
@@ -709,7 +718,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('resources')
-        .select('id, title, description, data, ocr_status, ocr_text, ocr_readability, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked, source_link')
+        .select('id, title, description, data, ocr_status, ocr_text, ocr_readability, ocr_text_proposed, ocr_text_proposed_status, ocr_text_proposed_readability, ocr_text_proposed_at, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked, source_link')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -737,7 +746,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('questions')
-        .select('id, data, ocr_status, ocr_text, ocr_readability, chapter_id, chapters(name, subject_id), teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked')
+        .select('id, data, ocr_status, ocr_text, ocr_readability, ocr_text_proposed, ocr_text_proposed_status, ocr_text_proposed_readability, ocr_text_proposed_at, chapter_id, chapters(name, subject_id), teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -2337,6 +2346,40 @@ export default function Statistics() {
                                                 )
                                               }
                                             />
+                                            {resource.ocr_text_proposed && (
+                                              <div className="mt-1">
+                                                <OcrReviewButton
+                                                  table="resources"
+                                                  rowId={resource.id}
+                                                  currentText={resource.ocr_text ?? null}
+                                                  proposedText={resource.ocr_text_proposed ?? null}
+                                                  proposedStatus={resource.ocr_text_proposed_status ?? null}
+                                                  proposedReadability={resource.ocr_text_proposed_readability ?? null}
+                                                  onResolved={(patch) =>
+                                                    setResources((prev) =>
+                                                      prev.map((r) =>
+                                                        r.id === resource.id
+                                                          ? {
+                                                              ...r,
+                                                              ...(patch.ocr_text !== null && patch.ocr_status !== null
+                                                                ? {
+                                                                    ocr_text: patch.ocr_text,
+                                                                    ocr_status: patch.ocr_status,
+                                                                    ocr_readability: patch.ocr_readability,
+                                                                  }
+                                                                : {}),
+                                                              ocr_text_proposed: null,
+                                                              ocr_text_proposed_at: null,
+                                                              ocr_text_proposed_readability: null,
+                                                              ocr_text_proposed_status: null,
+                                                            }
+                                                          : r,
+                                                      ),
+                                                    )
+                                                  }
+                                                />
+                                              </div>
+                                            )}
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
@@ -2871,6 +2914,40 @@ export default function Statistics() {
                                                 )
                                               }
                                             />
+                                            {question.ocr_text_proposed && (
+                                              <div className="mt-1">
+                                                <OcrReviewButton
+                                                  table="questions"
+                                                  rowId={question.id}
+                                                  currentText={question.ocr_text ?? null}
+                                                  proposedText={question.ocr_text_proposed ?? null}
+                                                  proposedStatus={question.ocr_text_proposed_status ?? null}
+                                                  proposedReadability={question.ocr_text_proposed_readability ?? null}
+                                                  onResolved={(patch) =>
+                                                    setQuestions((prev) =>
+                                                      prev.map((q) =>
+                                                        q.id === question.id
+                                                          ? {
+                                                              ...q,
+                                                              ...(patch.ocr_text !== null && patch.ocr_status !== null
+                                                                ? {
+                                                                    ocr_text: patch.ocr_text,
+                                                                    ocr_status: patch.ocr_status,
+                                                                    ocr_readability: patch.ocr_readability,
+                                                                  }
+                                                                : {}),
+                                                              ocr_text_proposed: null,
+                                                              ocr_text_proposed_at: null,
+                                                              ocr_text_proposed_readability: null,
+                                                              ocr_text_proposed_status: null,
+                                                            }
+                                                          : q,
+                                                      ),
+                                                    )
+                                                  }
+                                                />
+                                              </div>
+                                            )}
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">

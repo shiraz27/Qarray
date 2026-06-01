@@ -473,22 +473,26 @@ async function runGeneration(
 
     const dataString = JSON.stringify(payload)
 
-    // Upsert answer row
-    let answerId: number
+    // When a previous bot answer already exists for this target/kind/model,
+    // do NOT overwrite it. Stash the new output as a proposal so an admin
+    // can compare before/after and approve or discard via the Statistics UI.
     if (existingGen?.output_answer_id) {
-      const { data: upd, error: updErr } = await admin
-        .from('answers')
+      await admin
+        .from('ai_generations')
         .update({
-          data: dataString,
-          contributors: [botUserId],
-          deleted: false,
+          status: 'completed',
+          error: null,
+          proposed_data: dataString,
+          proposed_at: new Date().toISOString(),
+          review_status: 'pending',
         })
-        .eq('id', existingGen.output_answer_id)
-        .select('id')
-        .single()
-      if (updErr) throw new Error(`Update answer: ${updErr.message}`)
-      answerId = (upd as any).id
-    } else {
+        .eq('id', genId)
+      return { status: 'completed', answerId: existingGen.output_answer_id }
+    }
+
+    // No prior answer — first-time generation: insert directly.
+    let answerId: number
+    {
       const insertRow: any = {
         data: dataString,
         contributors: [botUserId],
@@ -507,7 +511,14 @@ async function runGeneration(
 
     await admin
       .from('ai_generations')
-      .update({ status: 'completed', output_answer_id: answerId, error: null })
+      .update({
+        status: 'completed',
+        output_answer_id: answerId,
+        error: null,
+        proposed_data: null,
+        proposed_at: null,
+        review_status: null,
+      })
       .eq('id', genId)
 
     return { status: 'completed', answerId }
