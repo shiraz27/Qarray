@@ -320,16 +320,45 @@ function SinglePdfView({
             <div>
               <p className="text-sm font-medium">Couldn't load preview</p>
               <p className="text-xs text-muted-foreground">{error}</p>
-              {downloadReady && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  You can still download the file using the Download button above.
-                </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Downloads and direct preview remain available in the toolbar above.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button variant="outline" size="sm" onClick={load} className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Retry
+              </Button>
+              {showDownload && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownload}
+                  disabled={downloading}
+                  className="gap-2"
+                >
+                  {downloading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  {downloadLabel ?? 'Download'}
+                </Button>
+              )}
+              {!hideOpenOriginal && (
+                <Button variant="outline" size="sm" asChild className="gap-2">
+                  <a
+                    href={mediaSrc(url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    referrerPolicy="no-referrer"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Open in tab
+                  </a>
+                </Button>
               )}
             </div>
-            <Button variant="outline" size="sm" onClick={load} className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Retry
-            </Button>
           </div>
         )}
 
