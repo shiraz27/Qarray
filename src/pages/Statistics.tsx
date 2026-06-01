@@ -43,7 +43,8 @@ import type { OcrMode } from '@/utils/pdfOcrHelpers';
 import { isPdfUrl, isImageUrl, urlsHaveOcrable, textHasOcrableUrl } from '@/utils/mediaTypeUtils';
 import { processQuestionOCR } from '@/utils/clientQuestionOcrProcessor';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
-import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, applySuggestedTitle, extractMetadataFromOCR, type ExtractedMetadata, type MetadataField } from '@/utils/metadataExtractor';
+import { extractMetadataFromOCR, applyResourceMetadata, applyQuestionMetadata, type ExtractedMetadata, type MetadataField } from '@/utils/metadataExtractor';
+import { MetadataReviewDialog, type MetadataReviewTarget } from '@/components/statistics/MetadataReviewDialog';
 import { MetaCell, type CellValue } from '@/components/statistics/MetaCell';
 import { OcrStatusEditor, type OcrStatus } from '@/components/statistics/OcrStatusEditor';
 import { OcrTextEditor } from '@/components/statistics/OcrTextEditor';
@@ -111,12 +112,6 @@ interface ResourceRow {
   description_proposed_at?: string | null;
   description_proposed_status?: string | null;
   description_proposed_model?: string | null;
-}
-
-// Track suggested titles from AI extraction
-interface SuggestedTitleEntry {
-  resourceId: number;
-  suggestedTitle: string;
 }
 
 interface QuestionRow {
@@ -202,8 +197,8 @@ export default function Statistics() {
     partial: number;
     failed: number;
   } | null>(null);
-  const [suggestedTitles, setSuggestedTitles] = useState<SuggestedTitleEntry[]>([]);
-  const [applyingTitleId, setApplyingTitleId] = useState<number | null>(null);
+  const [metadataReview, setMetadataReview] = useState<MetadataReviewTarget | null>(null);
+  const [applyingReview, setApplyingReview] = useState(false);
   const itemsPerPage = 20;
 
   /**
@@ -1213,255 +1208,76 @@ export default function Statistics() {
   };
 
   // Metadata extraction handlers
-  const handleExtractMetadata = async (resourceId: number) => {
-    const resource = resources.find(r => r.id === resourceId);
-    if (!resource || !resource.ocr_text || resource.ocr_status !== 'completed') {
-      toast.error('Resource must have completed OCR first');
+  // Per-row AI metadata extraction: fetch proposal, then open review dialog.
+  // No automatic writes — user must approve via MetadataReviewDialog.
+  const openMetadataReview = async (kind: 'resource' | 'question', id: number) => {
+    const row: any = kind === 'resource'
+      ? resources.find((r) => r.id === id)
+      : questions.find((q) => q.id === id);
+    if (!row || !row.ocr_text || row.ocr_status !== 'completed') {
+      toast.error('Item must have completed OCR first');
       return;
     }
-
-    setExtractingMetadataId(resourceId);
+    setExtractingMetadataId(id);
     try {
-      const result = await extractAndUpdateResourceMetadata(
-        resourceId,
-        resource.ocr_text,
-        (message) => {
-          toast.loading(message, { id: `extracting-${resourceId}` });
-        }
-      );
-      
-      toast.dismiss(`extracting-${resourceId}`);
-      
-      if (result.success) {
-        toast.success(result.message);
-        
-        // Store suggested title if found
-        if (result.metadata.suggested_title) {
-          setSuggestedTitles(prev => {
-            const filtered = prev.filter(st => st.resourceId !== resourceId);
-            return [...filtered, { resourceId, suggestedTitle: result.metadata.suggested_title! }];
-          });
-        }
-        
-        // Refresh resources to show updated fields
-        fetchResources(selectedClass, selectedSubject, selectedChapter);
-      } else {
+      const result = await extractMetadataFromOCR(row.ocr_text, kind === 'resource' ? { resourceId: id } : { questionId: id });
+      if (!result.success) {
         toast.error(result.message);
+        return;
       }
-    } catch (error) {
-      console.error('Metadata extraction error:', error);
+      setMetadataReview({
+        kind,
+        id,
+        proposed: result.metadata,
+        current: kind === 'resource'
+          ? {
+              title: row.title ?? null,
+              description: row.description ?? null,
+              teacher_names: row.teacher_names ?? [],
+              school_names: row.school_names ?? [],
+              books: row.books ?? [],
+              type_id: row.type_id ?? null,
+              devoir_type_id: row.devoir_type_id ?? null,
+            }
+          : {
+              teacher_names: row.teacher_names ?? [],
+              school_names: row.school_names ?? [],
+              books: row.books ?? [],
+              type_id: row.type_id ?? null,
+            },
+      });
+    } catch (err) {
+      console.error('extract metadata error', err);
       toast.error('Failed to extract metadata');
     } finally {
       setExtractingMetadataId(null);
     }
   };
 
-  const handleApplySuggestedTitle = async (resourceId: number) => {
-    const suggestedEntry = suggestedTitles.find(st => st.resourceId === resourceId);
-    if (!suggestedEntry) {
-      toast.error('No suggested title found');
-      return;
-    }
-
-    setApplyingTitleId(resourceId);
+  const applyMetadataReview = async (fields: MetadataField[]) => {
+    if (!metadataReview) return;
+    setApplyingReview(true);
     try {
-      const result = await applySuggestedTitle(resourceId, suggestedEntry.suggestedTitle);
-      
-      if (result.success) {
-        toast.success('Title updated successfully');
-        // Remove from suggested titles
-        setSuggestedTitles(prev => prev.filter(st => st.resourceId !== resourceId));
-        // Refresh resources
-        fetchResources(selectedClass, selectedSubject, selectedChapter);
-      } else {
-        toast.error(result.message);
+      const res = metadataReview.kind === 'resource'
+        ? await applyResourceMetadata(metadataReview.id, metadataReview.proposed, fields)
+        : await applyQuestionMetadata(metadataReview.id, metadataReview.proposed, fields);
+      if (!res.success) {
+        toast.error(res.message);
+        return;
       }
-    } catch (error) {
-      console.error('Error applying title:', error);
-      toast.error('Failed to apply title');
-    } finally {
-      setApplyingTitleId(null);
-    }
-  };
-
-  const handleExtractAllMetadata = async () => {
-    const eligibleResources = resources.filter(
-      r => r.ocr_status === 'completed' && r.ocr_text
-    );
-    
-    if (eligibleResources.length === 0) {
-      toast.info('No resources with completed OCR to process');
-      return;
-    }
-
-    setIsExtractingBatch(true);
-    let successCount = 0;
-    let failCount = 0;
-    let skippedCount = 0;
-    const newSuggestedTitles: SuggestedTitleEntry[] = [];
-    
-    try {
-      for (let i = 0; i < eligibleResources.length; i++) {
-        const resource = eligibleResources[i];
-        
-        toast.loading(`[${i + 1}/${eligibleResources.length}] Extracting metadata...`, {
-          id: 'batch-metadata-progress',
-        });
-        
-        try {
-          const result = await extractAndUpdateResourceMetadata(
-            resource.id,
-            resource.ocr_text!
-          );
-          
-          if (result.success && (result.metadata.school_name || result.metadata.teacher_name || result.metadata.suggested_title)) {
-            successCount++;
-            
-            // Store suggested title
-            if (result.metadata.suggested_title) {
-              newSuggestedTitles.push({
-                resourceId: resource.id,
-                suggestedTitle: result.metadata.suggested_title
-              });
-            }
-          } else if (result.success) {
-            skippedCount++;
-          } else {
-            failCount++;
-          }
-        } catch (error) {
-          failCount++;
-        }
-        
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-      toast.dismiss('batch-metadata-progress');
-      toast.success(`Completed: ${successCount} extracted, ${skippedCount} no data found, ${failCount} failed`);
-      
-      // Update suggested titles
-      setSuggestedTitles(prev => {
-        const existingIds = new Set(newSuggestedTitles.map(st => st.resourceId));
-        const filtered = prev.filter(st => !existingIds.has(st.resourceId));
-        return [...filtered, ...newSuggestedTitles];
-      });
-      
-      // Refresh resources
-      fetchResources(selectedClass, selectedSubject, selectedChapter);
-    } catch (error) {
-      console.error('Batch metadata extraction error:', error);
-      toast.error('Failed to process resources');
-    } finally {
-      setIsExtractingBatch(false);
-    }
-  };
-
-  // Generic AI metadata batch runner for selected resources or questions.
-  // `fields` undefined = fill all fields.
-  const runAiMetadataBatch = async (
-    kind: 'resource' | 'question',
-    ids: number[],
-    fields?: MetadataField[]
-  ) => {
-    if (ids.length === 0) return;
-    const items = kind === 'resource'
-      ? resources.filter(r => ids.includes(r.id))
-      : questions.filter(q => ids.includes(q.id));
-    const eligible = items.filter((it: any) => it.ocr_status === 'completed' && it.ocr_text);
-    const skippedNoOcr = ids.length - eligible.length;
-    if (eligible.length === 0) {
-      toast.info('Selected items have no completed OCR yet — run OCR first');
-      return;
-    }
-    setIsExtractingBatch(true);
-    let success = 0, failed = 0;
-    const newSuggestedTitles: SuggestedTitleEntry[] = [];
-    const label = !fields ? 'all fields' : fields.join(', ');
-    try {
-      for (let i = 0; i < eligible.length; i++) {
-        const it: any = eligible[i];
-        toast.loading(`[${i + 1}/${eligible.length}] AI: ${label}…`, { id: 'ai-batch' });
-        try {
-          const result = kind === 'resource'
-            ? await extractAndUpdateResourceMetadata(it.id, it.ocr_text, undefined, fields)
-            : await extractAndUpdateQuestionMetadata(it.id, it.ocr_text, undefined, fields);
-          if (result.success) {
-            success++;
-            if (kind === 'resource' && result.metadata.suggested_title && (!fields || fields.includes('title'))) {
-              newSuggestedTitles.push({ resourceId: it.id, suggestedTitle: result.metadata.suggested_title });
-            }
-          } else {
-            failed++;
-          }
-        } catch {
-          failed++;
-        }
-        await new Promise(r => setTimeout(r, 400));
-      }
-      toast.dismiss('ai-batch');
-      toast.success(`AI done — ${success} ok, ${failed} failed${skippedNoOcr ? `, ${skippedNoOcr} skipped (no OCR)` : ''}`);
-      if (newSuggestedTitles.length) {
-        setSuggestedTitles(prev => {
-          const ids = new Set(newSuggestedTitles.map(s => s.resourceId));
-          return [...prev.filter(s => !ids.has(s.resourceId)), ...newSuggestedTitles];
-        });
-      }
-      if (kind === 'resource') {
+      toast.success(`Applied ${Object.keys(res.updates).length} field(s)`);
+      if (metadataReview.kind === 'resource') {
         fetchResources(selectedClass, selectedSubject, selectedChapter);
       } else {
         fetchQuestions(selectedClass, selectedSubject, selectedChapter);
       }
+      setMetadataReview(null);
+    } catch (err) {
+      console.error('apply metadata error', err);
+      toast.error('Failed to apply metadata');
     } finally {
-      setIsExtractingBatch(false);
+      setApplyingReview(false);
     }
-  };
-
-  const aiBatchChips = (kind: 'resource' | 'question', getIds: () => number[]) => {
-    const fieldsList: Array<{ key: MetadataField; label: string }> =
-      kind === 'resource'
-        ? [
-            { key: 'title', label: 'Title' },
-            { key: 'description', label: 'Description' },
-            { key: 'teachers', label: 'Teachers' },
-            { key: 'schools', label: 'Schools' },
-            { key: 'books', label: 'Books' },
-            { key: 'types', label: 'Types' },
-          ]
-        : [
-            { key: 'teachers', label: 'Teachers' },
-            { key: 'schools', label: 'Schools' },
-            { key: 'books', label: 'Books' },
-            { key: 'types', label: 'Types' },
-          ];
-    return (
-      <div className="flex flex-wrap items-center gap-1">
-        <Button
-          size="sm"
-          variant="default"
-          disabled={isExtractingBatch}
-          onClick={() => runAiMetadataBatch(kind, getIds())}
-        >
-          {isExtractingBatch ? (
-            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-          ) : (
-            <Sparkles className="mr-1 h-4 w-4" />
-          )}
-          AI: All
-        </Button>
-        {fieldsList.map(({ key, label }) => (
-          <Button
-            key={key}
-            size="sm"
-            variant="outline"
-            disabled={isExtractingBatch}
-            onClick={() => runAiMetadataBatch(kind, getIds(), [key])}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
-    );
   };
 
   const getOcrStatusBadge = (status: string | null) => {
@@ -1991,18 +1807,7 @@ export default function Statistics() {
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <h4 className="font-medium">Resources OCR Stats</h4>
                           <div className="flex gap-2">
-                            {ocrStats.completed > 0 && (
-                              <Button 
-                                onClick={handleExtractAllMetadata} 
-                                disabled={isExtractingBatch}
-                                size="sm"
-                                variant="outline"
-                              >
-                                {isExtractingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                <Sparkles className="mr-1 h-4 w-4" />
-                                Extract All Metadata ({ocrStats.completed})
-                              </Button>
-                            )}
+                            {/* Bulk "Extract All Metadata" removed — metadata extraction now requires per-row review. */}
                             {(ocrStats.pending > 0 || ocrStats.failed > 0) && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -2186,7 +1991,7 @@ export default function Statistics() {
                                 {selectedResourceIds.size} selected
                               </span>
                               <div className="flex flex-wrap items-center gap-2">
-                                {aiBatchChips('resource', () => Array.from(selectedResourceIds))}
+                                {/* Bulk AI metadata chips removed — use the per-row Sparkles button to review each item. */}
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button size="sm" disabled={isProcessingBatch}>
@@ -2274,8 +2079,6 @@ export default function Statistics() {
                                         resource.ocr_status === 'failed' ||
                                         resource.ocr_status === 'not_applicable'
                                       ) && isPdfOrImage;
-                                      const suggestedTitle = suggestedTitles.find(st => st.resourceId === resource.id);
-                                      
                                       return (
                                         <TableRow key={resource.id}>
                                           <TableCell>
@@ -2294,28 +2097,6 @@ export default function Statistics() {
                                                 onSuggest={() => suggestCellValue('resource', resource, 'title')}
                                                 onSave={(v) => saveResourceCell(resource, 'title', v)}
                                               />
-                                              {suggestedTitle && (
-                                                <div className="flex items-center gap-2">
-                                                  <Badge variant="outline" className="text-xs gap-1 text-primary border-primary/30">
-                                                    <FileEdit className="w-3 h-3" />
-                                                    AI: {suggestedTitle.suggestedTitle.substring(0, 40)}{suggestedTitle.suggestedTitle.length > 40 ? '...' : ''}
-                                                  </Badge>
-                                                  <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    className="h-6 px-2"
-                                                    onClick={() => handleApplySuggestedTitle(resource.id)}
-                                                    disabled={applyingTitleId === resource.id}
-                                                    title="Apply suggested title"
-                                                  >
-                                                    {applyingTitleId === resource.id ? (
-                                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                                    ) : (
-                                                      <Check className="h-3 w-3 text-green-600" />
-                                                    )}
-                                                  </Button>
-                                                </div>
-                                              )}
                                               {(resource.school_name || resource.teacher_name) && (
                                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                   {resource.school_name && (
@@ -2562,9 +2343,9 @@ export default function Statistics() {
                                                 <Button
                                                   size="sm"
                                                   variant="ghost"
-                                                  onClick={() => handleExtractMetadata(resource.id)}
+                                                  onClick={() => openMetadataReview('resource', resource.id)}
                                                   disabled={extractingMetadataId === resource.id}
-                                                  title="Extract metadata with AI"
+                                                  title="Extract metadata with AI (review before applying)"
                                                 >
                                                   {extractingMetadataId === resource.id ? (
                                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -2884,7 +2665,7 @@ export default function Statistics() {
                                 {selectedQuestionIds.size} selected
                               </span>
                               <div className="flex flex-wrap items-center gap-2">
-                                {aiBatchChips('question', () => Array.from(selectedQuestionIds))}
+                                {/* Bulk AI metadata chips removed — use the per-row Sparkles button to review each item. */}
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button size="sm" disabled={isProcessingQuestionBatch}>
@@ -3190,6 +2971,21 @@ export default function Statistics() {
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
+                                              {question.ocr_status === 'completed' && question.ocr_text && (
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={() => openMetadataReview('question', question.id)}
+                                                  disabled={extractingMetadataId === question.id}
+                                                  title="Extract metadata with AI (review before applying)"
+                                                >
+                                                  {extractingMetadataId === question.id ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                  ) : (
+                                                    <Sparkles className="h-4 w-4" />
+                                                  )}
+                                                </Button>
+                                              )}
                                               {canProcess && (
                                                 <>
                                                   <Button
@@ -3355,6 +3151,13 @@ export default function Statistics() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <MetadataReviewDialog
+        open={!!metadataReview}
+        target={metadataReview}
+        applying={applyingReview}
+        onDiscard={() => setMetadataReview(null)}
+        onApply={applyMetadataReview}
+      />
     </div>
   );
 }
