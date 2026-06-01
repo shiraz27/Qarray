@@ -21,6 +21,7 @@ import { parseAiAnswer, AiAnswerRenderer } from '@/components/AiAnswerRenderer';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
 import { BookBadge } from '@/components/BookBadge';
+import { ReportButton } from '@/components/ReportButton';
 import { PageCountBadge } from '@/components/PageCountBadge';
 import { SharedWithBadge } from '@/components/SharedWithBadge';
 import { EmptyState } from '@/components/EmptyState';
@@ -768,6 +769,10 @@ export default function ResourceDetail() {
             </div>
           </div>
 
+          <div className="flex justify-end">
+            <ReportButton contentType="resource" contentId={resource.id} variant="inline" />
+          </div>
+
           {canEdit && (
             <div className="flex gap-2 pt-2 border-t">
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -1115,6 +1120,9 @@ export default function ResourceDetail() {
                       className={question.userVote === 'downvote' ? 'fill-red-600 text-red-600' : 'text-muted-foreground'}
                     />
                     <span className="text-sm font-medium">{question.downvotes}</span>
+                  </div>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ReportButton contentType="question" contentId={question.id} />
                   </div>
                 </div>
               </div>

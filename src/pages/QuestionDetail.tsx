@@ -20,6 +20,7 @@ import { EditQuestionForm } from '@/components/EditQuestionForm';
 import { BookBadge } from '@/components/BookBadge';
 import { PageCountBadge } from '@/components/PageCountBadge';
 import { EditAnswerForm } from '@/components/EditAnswerForm';
+import { ReportButton } from '@/components/ReportButton';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { EmptyState } from '@/components/EmptyState';
 import { SEO, createQAPageSchema } from '@/components/SEO';
@@ -736,6 +737,10 @@ export default function QuestionDetail() {
             </div>
           </div>
 
+          <div className="flex justify-end">
+            <ReportButton contentType="question" contentId={question.id} variant="inline" />
+          </div>
+
           {canEdit && (
             <div className="flex gap-2 pt-2 border-t">
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -927,6 +932,7 @@ export default function QuestionDetail() {
                     />
                     <span className="text-sm font-medium">{answer.downvotes}</span>
                   </button>
+                  <ReportButton contentType="answer" contentId={answer.id} />
                 </div>
 
                 {canEditAnswer(answer) && (
