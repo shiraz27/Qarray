@@ -24,6 +24,9 @@ import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { SEO, createCourseSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
 import { resourceChapterFilter } from '@/utils/resourceChapterFilter';
+import { normalizedIncludes } from '@/utils/textHelpers';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 
 type SortKey = 'votes' | 'newest' | 'pages_asc' | 'pages_desc';
 
