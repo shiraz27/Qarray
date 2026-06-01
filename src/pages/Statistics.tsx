@@ -416,7 +416,8 @@ export default function Statistics() {
   useEffect(() => {
     setCurrentPage(1);
   }, [ocrFilter, watermarkFilter, sourceFilter, readabilityFilter, searchQuery,
-      pagesFilter, pagesSort, teacherFilter, schoolFilter, bookFilter, typeFilter, descriptionFilter]);
+      pagesFilter, pagesSort, teacherFilter, schoolFilter, bookFilter, typeFilter, descriptionFilter,
+      overstampFilter]);
 
   // Lazy backfill: compute & persist ocr_readability for rows that are missing it.
   useEffect(() => {
