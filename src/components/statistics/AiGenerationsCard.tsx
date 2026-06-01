@@ -25,6 +25,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Bot, ChevronDown, Loader2, RefreshCw, Sparkles, FileText, ListOrdered, Image as ImageIcon, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import { AI_MODELS, DEFAULT_MODELS, PROVIDER_LABEL, modelsForKind as modelsForKindFn, type AiProvider, type Kind as ModelKind } from './aiModels';
 
 type Kind = 'correction' | 'summary' | 'step_by_step' | 'infographic';
 type TargetType = 'resource' | 'question';
@@ -49,6 +50,21 @@ interface GenStatus {
   startedAt?: number; // epoch ms (from updated_at when running)
 }
 
+const MODELS_STORAGE_KEY = 'ai-generations.selected-models';
+
+function loadStoredModels(): string[] {
+  try {
+    const raw = localStorage.getItem(MODELS_STORAGE_KEY);
+    if (!raw) return DEFAULT_MODELS;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+      const valid = parsed.filter((id) => AI_MODELS.some((m) => m.id === id));
+      return valid.length > 0 ? valid : DEFAULT_MODELS;
+    }
+  } catch {}
+  return DEFAULT_MODELS;
+}
+
 export const AiGenerationsCard: React.FC = () => {
   const [tab, setTab] = useState<TargetType>('resource');
   const [rows, setRows] = useState<Row[]>([]);
@@ -56,12 +72,19 @@ export const AiGenerationsCard: React.FC = () => {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
-  // map key `${target_type}:${target_id}:${kind}` -> status
+  // map key `${target_type}:${target_id}:${kind}:${model}` -> status
   const [statusMap, setStatusMap] = useState<Record<string, GenStatus>>({});
-  // median duration in seconds, per kind (from recent completed runs of current tab)
-  const [etaByKind, setEtaByKind] = useState<Partial<Record<Kind, { sec: number; n: number }>>>({});
+  // median duration in seconds, per `${kind}:${model}` (from recent completed runs of current tab)
+  const [etaByKindModel, setEtaByKindModel] = useState<Record<string, { sec: number; n: number }>>({});
+  // selected models (multi-select)
+  const [selectedModels, setSelectedModels] = useState<string[]>(() => loadStoredModels());
+  const [providerFilter, setProviderFilter] = useState<'all' | AiProvider>('all');
   // tick once a second to refresh elapsed counters
   const [, setNowTick] = useState(0);
+
+  useEffect(() => {
+    try { localStorage.setItem(MODELS_STORAGE_KEY, JSON.stringify(selectedModels)); } catch {}
+  }, [selectedModels]);
 
   const fetchRows = async () => {
     setLoading(true);
@@ -92,13 +115,14 @@ export const AiGenerationsCard: React.FC = () => {
   const fetchStatuses = async () => {
     const { data } = await supabase
       .from('ai_generations')
-      .select('target_type, target_id, kind, status, error, updated_at')
+      .select('target_type, target_id, kind, model, status, error, updated_at')
       .eq('target_type', tab)
       .order('updated_at', { ascending: false })
       .limit(1000);
     const next: Record<string, GenStatus> = {};
     for (const r of (data || []) as any[]) {
-      next[`${r.target_type}:${r.target_id}:${r.kind}`] = {
+      const model = r.model || 'legacy';
+      next[`${r.target_type}:${r.target_id}:${r.kind}:${model}`] = {
         status: r.status,
         error: r.error,
         startedAt: r.updated_at ? new Date(r.updated_at).getTime() : undefined,
@@ -110,7 +134,7 @@ export const AiGenerationsCard: React.FC = () => {
   const fetchEtas = async () => {
     const { data } = await supabase
       .from('ai_generations')
-      .select('kind, created_at, updated_at')
+      .select('kind, model, created_at, updated_at')
       .eq('target_type', tab)
       .eq('status', 'completed')
       .order('updated_at', { ascending: false })
@@ -125,16 +149,17 @@ export const AiGenerationsCard: React.FC = () => {
       const dur = (new Date(r.updated_at).getTime() - new Date(r.created_at).getTime()) / 1000;
       if (!Number.isFinite(dur) || dur <= 0) continue;
       if (dur > MAX_REAL_DURATION_SEC) continue;
-      (buckets[r.kind] ||= []).push(dur);
+      const key = `${r.kind}:${r.model || 'legacy'}`;
+      (buckets[key] ||= []).push(dur);
     }
-    const next: Partial<Record<Kind, { sec: number; n: number }>> = {};
+    const next: Record<string, { sec: number; n: number }> = {};
     for (const k of Object.keys(buckets)) {
       const arr = buckets[k].slice(0, 10).sort((a, b) => a - b);
       const mid = Math.floor(arr.length / 2);
       const median = arr.length % 2 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
-      next[k as Kind] = { sec: Math.round(median), n: arr.length };
+      next[k] = { sec: Math.round(median), n: arr.length };
     }
-    setEtaByKind(next);
+    setEtaByKindModel(next);
   };
 
   useEffect(() => {
@@ -176,12 +201,25 @@ export const AiGenerationsCard: React.FC = () => {
 
   const runFor = async (ids: number[], kinds: Kind[]) => {
     if (ids.length === 0 || kinds.length === 0) return;
+    if (selectedModels.length === 0) {
+      toast.error('Pick at least one model first');
+      return;
+    }
     setRunning(true);
     const now = Date.now();
     // optimistic mark as running
     setStatusMap((prev) => {
       const n = { ...prev };
-      for (const id of ids) for (const k of kinds) n[`${tab}:${id}:${k}`] = { status: 'running', startedAt: now };
+      for (const id of ids) {
+        for (const k of kinds) {
+          for (const m of selectedModels) {
+            // Skip mismatched kind/model so we don't show false spinners (infographic only for image models).
+            const isImage = /image/i.test(m);
+            if (k === 'infographic' ? !isImage : isImage) continue;
+            n[`${tab}:${id}:${k}:${m}`] = { status: 'running', startedAt: now };
+          }
+        }
+      }
       return n;
     });
     try {
@@ -189,10 +227,11 @@ export const AiGenerationsCard: React.FC = () => {
         body: {
           targets: ids.map((id) => ({ target_type: tab, target_id: id })),
           kinds,
+          models: selectedModels,
         },
       });
       if (error) throw error;
-      toast.success(`Triggered ${kinds.length} generation(s) on ${ids.length} item(s)`);
+      toast.success(`Triggered ${kinds.length} action(s) × ${selectedModels.length} model(s) on ${ids.length} item(s)`);
       await fetchStatuses();
       await fetchEtas();
     } catch (e: any) {
@@ -213,12 +252,12 @@ export const AiGenerationsCard: React.FC = () => {
     return `${m}m${String(sec).padStart(2, '0')}s`;
   };
 
-  const StatusPill: React.FC<{ s?: GenStatus; kind: Kind }> = ({ s, kind }) => {
+  const StatusPill: React.FC<{ s?: GenStatus; kind: Kind; model: string }> = ({ s, kind, model }) => {
     if (!s) return <span className="text-xs text-muted-foreground">—</span>;
     if (s.status === 'completed') return <CheckCircle2 className="h-3.5 w-3.5 text-green-600 inline" />;
     if (s.status === 'running' || s.status === 'queued') {
       const elapsed = s.startedAt ? Math.max(0, Math.floor((Date.now() - s.startedAt) / 1000)) : 0;
-      const eta = etaByKind[kind];
+      const eta = etaByKindModel[`${kind}:${model}`];
       const title = eta
         ? `Estimated from ${eta.n} past run(s): ~${formatSecs(eta.sec)}`
         : 'No estimate yet — first run';
@@ -238,7 +277,9 @@ export const AiGenerationsCard: React.FC = () => {
 
   const kindMenu = (ids: number[]) => (
     <DropdownMenuContent align="end" className="w-56">
-      <DropdownMenuLabel>Generate for {ids.length} item(s)</DropdownMenuLabel>
+      <DropdownMenuLabel>
+        Generate for {ids.length} item(s) · {selectedModels.length} model(s)
+      </DropdownMenuLabel>
       <DropdownMenuSeparator />
       {KINDS.map((k) => (
         <DropdownMenuItem key={k.key} onClick={() => runFor(ids, [k.key])}>
@@ -272,6 +313,62 @@ export const AiGenerationsCard: React.FC = () => {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Model picker */}
+        <div className="rounded-md border p-3 space-y-2 bg-muted/30">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="text-sm font-medium">Models to run ({selectedModels.length} selected)</div>
+            <div className="flex items-center gap-1 flex-wrap">
+              {(['all', 'lovable', 'openrouter', 'ollama'] as const).map((p) => (
+                <Button
+                  key={p}
+                  size="sm"
+                  variant={providerFilter === p ? 'default' : 'outline'}
+                  className="h-6 px-2 text-[11px]"
+                  onClick={() => setProviderFilter(p)}
+                >
+                  {p === 'all' ? 'All' : PROVIDER_LABEL[p]}
+                </Button>
+              ))}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[11px]"
+                onClick={() => setSelectedModels(DEFAULT_MODELS)}
+              >
+                Reset
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {AI_MODELS.filter((m) => providerFilter === 'all' || m.provider === providerFilter).map((m) => {
+              const active = selectedModels.includes(m.id);
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() =>
+                    setSelectedModels((prev) =>
+                      prev.includes(m.id) ? prev.filter((x) => x !== m.id) : [...prev, m.id],
+                    )
+                  }
+                  className={`text-[11px] rounded-full border px-2 py-0.5 transition-colors ${
+                    active
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background hover:bg-accent'
+                  }`}
+                  title={`${PROVIDER_LABEL[m.provider]} — ${m.id}`}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Each selected model runs independently and produces its own bot answer.
+            Infographic only uses image-capable models.
+          </p>
+        </div>
+
         <Tabs value={tab} onValueChange={(v) => setTab(v as TargetType)}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="resource">Resources</TabsTrigger>
@@ -310,7 +407,7 @@ export const AiGenerationsCard: React.FC = () => {
                     <TableHead className="w-16">ID</TableHead>
                     <TableHead>Title</TableHead>
                     {KINDS.map((k) => (
-                      <TableHead key={k.key} className="text-center w-16">
+                      <TableHead key={k.key} className="text-center min-w-[120px]">
                         <k.icon className="h-3.5 w-3.5 inline" />
                       </TableHead>
                     ))}
@@ -339,8 +436,25 @@ export const AiGenerationsCard: React.FC = () => {
                         <TableCell className="text-xs text-muted-foreground">#{r.id}</TableCell>
                         <TableCell className="max-w-md truncate" title={r.title}>{r.title}</TableCell>
                         {KINDS.map((k) => (
-                          <TableCell key={k.key} className="text-center">
-                            <StatusPill s={statusMap[`${tab}:${r.id}:${k.key}`]} kind={k.key} />
+                          <TableCell key={k.key} className="align-top">
+                            <div className="flex flex-col gap-0.5">
+                              {(() => {
+                                const models = modelsForKindFn(k.key as ModelKind).filter((m) => selectedModels.includes(m.id));
+                                if (models.length === 0) {
+                                  return <span className="text-[10px] text-muted-foreground">—</span>;
+                                }
+                                return models.map((m) => (
+                                  <div key={m.id} className="flex items-center gap-1 text-[10px]" title={m.label}>
+                                    <StatusPill
+                                      s={statusMap[`${tab}:${r.id}:${k.key}:${m.id}`]}
+                                      kind={k.key}
+                                      model={m.id}
+                                    />
+                                    <span className="truncate max-w-[100px] text-muted-foreground">{m.label}</span>
+                                  </div>
+                                ));
+                              })()}
+                            </div>
                           </TableCell>
                         ))}
                         <TableCell className="text-right">
