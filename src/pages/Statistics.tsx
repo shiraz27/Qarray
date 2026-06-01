@@ -203,8 +203,8 @@ export default function Statistics() {
     partial: number;
     failed: number;
   } | null>(null);
-  const [suggestedTitles, setSuggestedTitles] = useState<SuggestedTitleEntry[]>([]);
-  const [applyingTitleId, setApplyingTitleId] = useState<number | null>(null);
+  const [metadataReview, setMetadataReview] = useState<MetadataReviewTarget | null>(null);
+  const [applyingReview, setApplyingReview] = useState(false);
   const itemsPerPage = 20;
 
   /**
