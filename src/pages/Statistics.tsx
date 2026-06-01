@@ -85,6 +85,10 @@ interface ResourceRow {
   ocr_status: string | null;
   ocr_text: string | null;
   ocr_readability?: string | null;
+  ocr_text_proposed?: string | null;
+  ocr_text_proposed_status?: string | null;
+  ocr_text_proposed_readability?: string | null;
+  ocr_text_proposed_at?: string | null;
   chapter_id: number | null;
   chapters?: { name: string };
   resource_types?: { type: string };
@@ -113,6 +117,10 @@ interface QuestionRow {
   ocr_status: string | null;
   ocr_text?: string | null;
   ocr_readability?: string | null;
+  ocr_text_proposed?: string | null;
+  ocr_text_proposed_status?: string | null;
+  ocr_text_proposed_readability?: string | null;
+  ocr_text_proposed_at?: string | null;
   chapter_id: number | null;
   chapters?: { name: string };
   teacher_names?: string[] | null;
