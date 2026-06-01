@@ -393,10 +393,13 @@ async function runGeneration(
   targetType: 'resource' | 'question',
   targetId: number,
   kind: Kind,
+  model: string,
 ): Promise<{ status: 'completed' | 'failed'; error?: string; answerId?: number }> {
+  if (!modelSupportsKind(model, kind)) {
+    return { status: 'failed', error: `Model "${model}" does not support kind "${kind}"` }
+  }
   // upsert generation row to running
-  const botKey = KIND_TO_BOT[kind]
-  const botUserId = await ensureBot(admin, botKey)
+  const botUserId = await ensureBot(admin, model)
 
   const { data: existingGen } = await admin
     .from('ai_generations')
@@ -404,6 +407,7 @@ async function runGeneration(
     .eq('target_type', targetType)
     .eq('target_id', targetId)
     .eq('kind', kind)
+    .eq('model', model)
     .maybeSingle()
 
   // Reset stale 'running' rows (older than 3 minutes) so they don't block reruns
@@ -414,7 +418,7 @@ async function runGeneration(
   ) {
     return {
       status: 'running',
-      error: 'Another generation for this target/kind is already in progress',
+      error: 'Another generation for this target/kind/model is already in progress',
     }
   }
 
@@ -426,11 +430,12 @@ async function runGeneration(
         target_type: targetType,
         target_id: targetId,
         kind,
+        model,
         bot_user_id: botUserId,
         status: 'running',
         error: null,
       },
-      { onConflict: 'target_type,target_id,kind' } as any,
+      { onConflict: 'target_type,target_id,kind,model' } as any,
     )
     .select('id')
     .single()
@@ -447,7 +452,7 @@ async function runGeneration(
     const system = systemPromptFor(kind, language)
     const userPrompt = `TITRE: ${title}\n\n---\n\n${text.slice(0, 12000)}`
 
-    const { content } = await callModel(botKey, openrouterKey, system, userPrompt)
+    const { content } = await callModel(model, openrouterKey, system, userPrompt)
 
     let payload: any
     if (kind === 'infographic') {
@@ -455,7 +460,7 @@ async function runGeneration(
       if (!svgMatch) {
         throw new Error('Model did not return an SVG (likely refusal or token limit)')
       }
-      payload = { ai_kind: kind, language, svg: svgMatch[0], model: BOTS[botKey].model }
+      payload = { ai_kind: kind, language, svg: svgMatch[0], model }
     } else {
       if (looksLikeRefusal(content)) {
         throw new Error('Model refused or returned non-answer (likely token/context limit)')
@@ -463,7 +468,7 @@ async function runGeneration(
       if (kind === 'correction' && correctionMissesExercises(text, content)) {
         throw new Error('Correction response did not cover the numbered exercises in the source')
       }
-      payload = { ai_kind: kind, language, content, model: BOTS[botKey].model }
+      payload = { ai_kind: kind, language, content, model }
     }
 
     const dataString = JSON.stringify(payload)
