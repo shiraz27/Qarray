@@ -1305,6 +1305,18 @@ export default function Statistics() {
     }
   };
 
+  const pageMatcher = (count: number | null | undefined, mode: string) => {
+    if (mode === 'all') return true;
+    if (mode === 'none') return count == null;
+    if (mode === 'single') return count === 1;
+    if (mode === 'multi') return typeof count === 'number' && count > 1;
+    return true;
+  };
+  const textMatchesAny = (needle: string, fields: (string | null | undefined)[]) => {
+    const n = needle.trim();
+    if (!n) return true;
+    return fields.some((f) => normalizedIncludes(f ?? '', n));
+  };
   const filteredResources = resources.filter(r => {
     const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
     const matchesWm =
@@ -1325,10 +1337,25 @@ export default function Statistics() {
       readabilityFilter === 'all' ? true :
       readabilityFilter === 'missing' ? !r.ocr_readability :
       r.ocr_readability === readabilityFilter;
-    const q = (searchQuery ?? '').trim();
-    const matchesSearch = !q || [
+    const matchesPages = pageMatcher(r.page_count ?? null, pagesFilter);
+    const matchesTeacher = textMatchesAny(teacherFilter, [r.teacher_name, ...(r.teacher_names ?? [])]);
+    const matchesSchool = textMatchesAny(schoolFilter, [r.school_name, ...(r.school_names ?? [])]);
+    const matchesBook = textMatchesAny(bookFilter, [...(r.books ?? [])]);
+    const matchesType =
+      typeFilter === 'all' ? true : (r.type_ids ?? []).map(String).includes(typeFilter);
+    const desc = (r.description ?? '').trim();
+    const hasProposal = !!(r.description_proposed && r.description_proposed.trim());
+    const matchesDescription =
+      descriptionFilter === 'all' ? true :
+      descriptionFilter === 'missing' ? !desc :
+      descriptionFilter === 'has' ? !!desc :
+      descriptionFilter === 'has_proposal' ? hasProposal :
+      descriptionFilter === 'applied' ? (r.description_proposed_status === 'applied') :
+      true;
+    const matchesSearch = textMatchesAny(searchQuery ?? '', [
       r.title,
       r.description,
+      r.description_proposed,
       r.chapters?.name,
       r.school_name,
       r.teacher_name,
@@ -1336,13 +1363,27 @@ export default function Statistics() {
       r.ocr_readability,
       r.ocr_status,
       r.watermark_status,
+      r.ocr_text,
+      r.ocr_text_proposed,
       ...(r.teacher_names ?? []),
       ...(r.school_names ?? []),
       ...(r.books ?? []),
       String(r.id),
-    ].some((f) => normalizedIncludes(f ?? '', q));
-    return matchesFilter && matchesWm && matchesSource && matchesReadability && matchesSearch;
+    ]);
+    return matchesFilter && matchesWm && matchesSource && matchesReadability
+      && matchesPages && matchesTeacher && matchesSchool && matchesBook
+      && matchesType && matchesDescription && matchesSearch;
   });
+  if (pagesSort !== 'none') {
+    filteredResources.sort((a, b) => {
+      const av = a.page_count ?? null;
+      const bv = b.page_count ?? null;
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      return pagesSort === 'asc' ? av - bv : bv - av;
+    });
+  }
 
   const totalPages = Math.ceil(filteredResources.length / itemsPerPage);
   const paginatedResources = filteredResources.slice(
@@ -1362,20 +1403,36 @@ export default function Statistics() {
       questionReadabilityFilter === 'all' ? true :
       questionReadabilityFilter === 'missing' ? !q.ocr_readability :
       q.ocr_readability === questionReadabilityFilter;
-    const qs = (questionSearchQuery ?? '').trim();
-    const matchesSearch = !qs || [
+    const matchesPages = pageMatcher(q.page_count ?? null, questionPagesFilter);
+    const matchesTeacher = textMatchesAny(questionTeacherFilter, [...(q.teacher_names ?? [])]);
+    const matchesSchool = textMatchesAny(questionSchoolFilter, [...(q.school_names ?? [])]);
+    const matchesBook = textMatchesAny(questionBookFilter, [...(q.books ?? [])]);
+    const matchesSearch = textMatchesAny(questionSearchQuery ?? '', [
       q.data,
       q.chapters?.name,
       q.ocr_readability,
       q.ocr_status,
       q.watermark_status,
+      q.ocr_text,
+      q.ocr_text_proposed,
       ...(q.teacher_names ?? []),
       ...(q.school_names ?? []),
       ...(q.books ?? []),
       String(q.id),
-    ].some((f) => normalizedIncludes(f ?? '', qs));
-    return matchesFilter && matchesWm && matchesReadability && matchesSearch;
+    ]);
+    return matchesFilter && matchesWm && matchesReadability && matchesPages
+      && matchesTeacher && matchesSchool && matchesBook && matchesSearch;
   });
+  if (questionPagesSort !== 'none') {
+    filteredQuestions.sort((a, b) => {
+      const av = a.page_count ?? null;
+      const bv = b.page_count ?? null;
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      return questionPagesSort === 'asc' ? av - bv : bv - av;
+    });
+  }
 
   const questionTotalPages = Math.ceil(filteredQuestions.length / itemsPerPage);
   const paginatedQuestions = filteredQuestions.slice(
