@@ -138,6 +138,8 @@ interface QuestionRow {
   page_count?: number | null;
   watermark_status?: string | null;
   pages_watermarked?: number | null;
+  watermark_stamp_count?: number | null;
+  watermark_overstamped?: boolean | null;
 }
 
 interface QuestionOcrStats {
