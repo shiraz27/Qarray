@@ -40,6 +40,8 @@ import { AiGenerationsCard } from '@/components/statistics/AiGenerationsCard';
 import { ReportsCard } from '@/components/statistics/ReportsCard';
 import { processResourceOCR } from '@/utils/clientOcrProcessor';
 import type { OcrMode } from '@/utils/pdfOcrHelpers';
+import type { OcrRunOptions } from '@/utils/clientOcrProcessor';
+import { OcrScanDialog, type OcrScanContext, type OcrScanSubmit } from '@/components/statistics/OcrScanDialog';
 import { isPdfUrl, isImageUrl, urlsHaveOcrable, textHasOcrableUrl } from '@/utils/mediaTypeUtils';
 import { processQuestionOCR } from '@/utils/clientQuestionOcrProcessor';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
@@ -391,6 +393,11 @@ export default function Statistics() {
     | { kind: 'resource' | 'question'; id: number; mode: OcrMode }
     | null
   >(null);
+  const [ocrScanTarget, setOcrScanTarget] = useState<
+    | { kind: 'resource' | 'question'; id: number; context: OcrScanContext }
+    | null
+  >(null);
+  const [ocrScanRunning, setOcrScanRunning] = useState(false);
 
   useEffect(() => {
     if (!roleLoading && (isModerator || isAdmin)) {
