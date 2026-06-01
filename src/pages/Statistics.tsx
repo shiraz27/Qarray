@@ -2726,7 +2726,7 @@ export default function Statistics() {
                         {/* Questions Table */}
                         <div className="pt-4 border-t">
                           <h4 className="font-medium mb-4">Questions & OCR Status</h4>
-                          <div className="flex gap-2 mb-4">
+                          <div className="flex flex-wrap gap-2 mb-4 items-center">
                             <Select value={questionOcrFilter} onValueChange={setQuestionOcrFilter}>
                               <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Filter by status" />
@@ -2754,6 +2754,58 @@ export default function Statistics() {
                                 <SelectItem value="over_stamped">Watermark: Over-stamped</SelectItem>
                               </SelectContent>
                             </Select>
+                            <Select value={questionReadabilityFilter} onValueChange={setQuestionReadabilityFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Readability filter" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Readability</SelectItem>
+                                <SelectItem value="high">Readability: High</SelectItem>
+                                <SelectItem value="medium">Readability: Medium</SelectItem>
+                                <SelectItem value="low">Readability: Low</SelectItem>
+                                <SelectItem value="unreadable">Readability: Unreadable</SelectItem>
+                                <SelectItem value="missing">Readability: Missing</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={questionPagesFilter} onValueChange={setQuestionPagesFilter}>
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="Pages" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Pages</SelectItem>
+                                <SelectItem value="single">Pages: Single</SelectItem>
+                                <SelectItem value="multi">Pages: Multi</SelectItem>
+                                <SelectItem value="none">Pages: Unknown</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={questionPagesSort} onValueChange={setQuestionPagesSort}>
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="Sort pages" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Sort: Default</SelectItem>
+                                <SelectItem value="asc">Pages ↑</SelectItem>
+                                <SelectItem value="desc">Pages ↓</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              placeholder="Teacher"
+                              value={questionTeacherFilter}
+                              onChange={(e) => setQuestionTeacherFilter(e.target.value)}
+                              className="w-[140px]"
+                            />
+                            <Input
+                              placeholder="School"
+                              value={questionSchoolFilter}
+                              onChange={(e) => setQuestionSchoolFilter(e.target.value)}
+                              className="w-[140px]"
+                            />
+                            <Input
+                              placeholder="Book"
+                              value={questionBookFilter}
+                              onChange={(e) => setQuestionBookFilter(e.target.value)}
+                              className="w-[140px]"
+                            />
                             <Button
                               size="sm"
                               variant="outline"
