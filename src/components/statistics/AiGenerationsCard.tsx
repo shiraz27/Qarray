@@ -519,5 +519,27 @@ export const AiGenerationsCard: React.FC = () => {
         </Tabs>
       </CardContent>
     </Card>
+    {(() => {
+      if (!reviewKey) return null;
+      const s = statusMap[reviewKey];
+      if (!s || !s.id || !s.outputAnswerId || !s.proposedData) return null;
+      // rowKey = `${tab}:${id}:${kind}:${model}` — extract kind/model for header.
+      const parts = reviewKey.split(':');
+      const kind = parts[2] ?? '';
+      const model = parts.slice(3).join(':') ?? '';
+      return (
+        <AiGenerationReviewDialog
+          open={true}
+          onOpenChange={(o) => { if (!o) setReviewKey(null); }}
+          generationId={s.id}
+          answerId={s.outputAnswerId}
+          kind={kind}
+          model={model}
+          proposedDataString={s.proposedData}
+          onResolved={() => { setReviewKey(null); fetchStatuses(); }}
+        />
+      );
+    })()}
+  </>
   );
 };
