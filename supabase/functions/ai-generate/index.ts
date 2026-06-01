@@ -4,36 +4,31 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 // --- Bot registry ---
 type Kind = 'correction' | 'summary' | 'step_by_step' | 'infographic'
 
-const BOTS: Record<string, { email: string; model: string; full_name: string }> = {
-  qwen: {
-    email: 'qwen-bot@ai.local',
-    model: 'google/gemini-2.5-flash',
-    full_name: 'Gemini Tutor',
-  },
-  deepseek: {
-    email: 'deepseek-bot@ai.local',
-    model: 'google/gemini-2.5-flash',
-    full_name: 'Gemini Tutor',
-  },
-  vision: {
-    email: 'vision-bot@ai.local',
-    model: 'google/gemini-2.5-flash-image',
-    full_name: 'Gemini Vision',
-  },
+// Default fallback model per kind when no explicit models[] is provided in the request.
+const DEFAULT_MODEL_FOR_KIND: Record<Kind, string> = {
+  correction: 'google/gemini-3-flash-preview',
+  summary: 'google/gemini-3-flash-preview',
+  step_by_step: 'google/gemini-3-flash-preview',
+  infographic: 'google/gemini-2.5-flash-image',
 }
 
-// Local Ollama mapping (per provider). Falls back to OpenRouter model above if Ollama is unreachable.
-const OLLAMA_MODELS: Record<string, string | undefined> = {
-  qwen: Deno.env.get('OLLAMA_MODEL_QWEN') || 'qwen2.5:7b',
-  deepseek: Deno.env.get('OLLAMA_MODEL_DEEPSEEK') || 'deepseek-r1:8b',
-  // vision: not assumed available locally — stays on OpenRouter
+function isImageModel(model: string): boolean {
+  return /image/i.test(model)
 }
 
-const KIND_TO_BOT: Record<Kind, keyof typeof BOTS> = {
-  correction: 'deepseek',
-  summary: 'qwen',
-  step_by_step: 'qwen',
-  infographic: 'vision',
+function modelSupportsKind(model: string, kind: Kind): boolean {
+  if (kind === 'infographic') return isImageModel(model)
+  return !isImageModel(model)
+}
+
+function sanitizeEmail(model: string): string {
+  return model.replace(/[^a-z0-9]+/gi, '-').toLowerCase()
+}
+
+function botLabelForModel(model: string): string {
+  // Friendly display name for the bot profile
+  if (model.startsWith('ollama:')) return `Ollama · ${model.slice('ollama:'.length)}`
+  return model
 }
 
 const KIND_LABEL_FR: Record<Kind, string> = {
@@ -147,13 +142,14 @@ Hard rules:
   }
 }
 
-async function ensureBot(admin: ReturnType<typeof createClient>, key: keyof typeof BOTS): Promise<string> {
-  const bot = BOTS[key]
+async function ensureBot(admin: ReturnType<typeof createClient>, model: string): Promise<string> {
+  const email = `bot+${sanitizeEmail(model)}@ai.local`
+  const fullName = botLabelForModel(model)
   // Lookup existing profile
   const { data: existing } = await admin
     .from('profiles')
     .select('user_id')
-    .eq('ai_model', bot.model)
+    .eq('ai_model', model)
     .eq('is_bot', true)
     .maybeSingle()
   if (existing?.user_id) return existing.user_id as string
@@ -161,17 +157,17 @@ async function ensureBot(admin: ReturnType<typeof createClient>, key: keyof type
   // Try to find existing auth user by email
   // @ts-ignore admin api
   const { data: list } = await admin.auth.admin.listUsers()
-  const found = (list?.users || []).find((u: any) => u.email === bot.email)
+  const found = (list?.users || []).find((u: any) => u.email === email)
   let userId = found?.id as string | undefined
   if (!userId) {
     // @ts-ignore
     const { data: created, error } = await admin.auth.admin.createUser({
-      email: bot.email,
+      email,
       email_confirm: true,
       password: crypto.randomUUID() + crypto.randomUUID(),
-      user_metadata: { full_name: bot.full_name, is_bot: true },
+      user_metadata: { full_name: fullName, is_bot: true },
     })
-    if (error) throw new Error(`Failed to create bot ${key}: ${error.message}`)
+    if (error) throw new Error(`Failed to create bot for ${model}: ${error.message}`)
     userId = created.user!.id
   }
 
@@ -179,8 +175,8 @@ async function ensureBot(admin: ReturnType<typeof createClient>, key: keyof type
   await admin.from('profiles').upsert(
     {
       user_id: userId,
-      full_name: bot.full_name,
-      ai_model: bot.model,
+      full_name: fullName,
+      ai_model: model,
       is_bot: true,
       user_type: 'ai_bot' as any,
       verified: true,
@@ -339,32 +335,30 @@ async function callOllama(
 }
 
 async function callModel(
-  botKey: keyof typeof BOTS,
+  model: string,
   openrouterKey: string,
   system: string,
   user: string,
 ): Promise<{ content: string; servedBy: 'ollama' | 'openrouter' | 'lovable' }> {
-  const ollamaUrl = Deno.env.get('OLLAMA_BASE_URL')
-  const ollamaModel = OLLAMA_MODELS[botKey as string]
-  if (ollamaUrl && ollamaModel) {
-    try {
-      const content = await callOllama(ollamaUrl, ollamaModel, system, user)
-      console.log(`[ai-generate] served_by=ollama bot=${botKey} model=${ollamaModel}`)
-      return { content, servedBy: 'ollama' }
-    } catch (e: any) {
-      console.warn(`[ai-generate] Ollama failed (${e?.message || e}); falling back to OpenRouter`)
-    }
+  // Ollama: explicit "ollama:<name>" id
+  if (model.startsWith('ollama:')) {
+    const ollamaUrl = Deno.env.get('OLLAMA_BASE_URL')
+    if (!ollamaUrl) throw new Error('OLLAMA_BASE_URL not configured')
+    const ollamaModel = model.slice('ollama:'.length)
+    const content = await callOllama(ollamaUrl, ollamaModel, system, user)
+    console.log(`[ai-generate] served_by=ollama model=${ollamaModel}`)
+    return { content, servedBy: 'ollama' }
   }
-  const model = BOTS[botKey].model
   const lovableKey = Deno.env.get('LOVABLE_API_KEY')
   // Prefer Lovable AI Gateway for google/* and openai/* models when the key is present.
   if (lovableKey && /^(google|openai)\//.test(model)) {
     const content = await callLovableAI(lovableKey, model, system, user)
-    console.log(`[ai-generate] served_by=lovable bot=${botKey} model=${model}`)
+    console.log(`[ai-generate] served_by=lovable model=${model}`)
     return { content, servedBy: 'lovable' }
   }
+  if (!openrouterKey) throw new Error(`No provider available for model "${model}" (set OPENROUTER_API_KEY)`)
   const content = await callOpenRouter(openrouterKey, model, system, user)
-  console.log(`[ai-generate] served_by=openrouter bot=${botKey} model=${model}`)
+  console.log(`[ai-generate] served_by=openrouter model=${model}`)
   return { content, servedBy: 'openrouter' }
 }
 
@@ -399,10 +393,13 @@ async function runGeneration(
   targetType: 'resource' | 'question',
   targetId: number,
   kind: Kind,
+  model: string,
 ): Promise<{ status: 'completed' | 'failed'; error?: string; answerId?: number }> {
+  if (!modelSupportsKind(model, kind)) {
+    return { status: 'failed', error: `Model "${model}" does not support kind "${kind}"` }
+  }
   // upsert generation row to running
-  const botKey = KIND_TO_BOT[kind]
-  const botUserId = await ensureBot(admin, botKey)
+  const botUserId = await ensureBot(admin, model)
 
   const { data: existingGen } = await admin
     .from('ai_generations')
@@ -410,6 +407,7 @@ async function runGeneration(
     .eq('target_type', targetType)
     .eq('target_id', targetId)
     .eq('kind', kind)
+    .eq('model', model)
     .maybeSingle()
 
   // Reset stale 'running' rows (older than 3 minutes) so they don't block reruns
@@ -420,7 +418,7 @@ async function runGeneration(
   ) {
     return {
       status: 'running',
-      error: 'Another generation for this target/kind is already in progress',
+      error: 'Another generation for this target/kind/model is already in progress',
     }
   }
 
@@ -432,11 +430,12 @@ async function runGeneration(
         target_type: targetType,
         target_id: targetId,
         kind,
+        model,
         bot_user_id: botUserId,
         status: 'running',
         error: null,
       },
-      { onConflict: 'target_type,target_id,kind' } as any,
+      { onConflict: 'target_type,target_id,kind,model' } as any,
     )
     .select('id')
     .single()
@@ -453,7 +452,7 @@ async function runGeneration(
     const system = systemPromptFor(kind, language)
     const userPrompt = `TITRE: ${title}\n\n---\n\n${text.slice(0, 12000)}`
 
-    const { content } = await callModel(botKey, openrouterKey, system, userPrompt)
+    const { content } = await callModel(model, openrouterKey, system, userPrompt)
 
     let payload: any
     if (kind === 'infographic') {
@@ -461,7 +460,7 @@ async function runGeneration(
       if (!svgMatch) {
         throw new Error('Model did not return an SVG (likely refusal or token limit)')
       }
-      payload = { ai_kind: kind, language, svg: svgMatch[0], model: BOTS[botKey].model }
+      payload = { ai_kind: kind, language, svg: svgMatch[0], model }
     } else {
       if (looksLikeRefusal(content)) {
         throw new Error('Model refused or returned non-answer (likely token/context limit)')
@@ -469,7 +468,7 @@ async function runGeneration(
       if (kind === 'correction' && correctionMissesExercises(text, content)) {
         throw new Error('Correction response did not cover the numbered exercises in the source')
       }
-      payload = { ai_kind: kind, language, content, model: BOTS[botKey].model }
+      payload = { ai_kind: kind, language, content, model }
     }
 
     const dataString = JSON.stringify(payload)
@@ -574,6 +573,7 @@ Deno.serve(async (req) => {
     const body = await req.json()
     const targets: Array<{ target_type: 'resource' | 'question'; target_id: number }> = body.targets || []
     const kinds: Kind[] = body.kinds || []
+    const requestedModels: string[] = Array.isArray(body.models) ? body.models.filter((m: any) => typeof m === 'string' && m.length > 0) : []
     if (!Array.isArray(targets) || targets.length === 0 || !Array.isArray(kinds) || kinds.length === 0) {
       return new Response(JSON.stringify({ error: 'targets and kinds required' }), {
         status: 400,
@@ -584,8 +584,19 @@ Deno.serve(async (req) => {
     const results: any[] = []
     for (const t of targets) {
       for (const k of kinds) {
-        const r = await runGeneration(admin, OPENROUTER, t.target_type, t.target_id, k)
-        results.push({ ...t, kind: k, ...r })
+        // Per kind, pick the models to run. If caller didn't specify, fall back to default.
+        const modelsForKind = requestedModels.length > 0
+          ? requestedModels.filter((m) => (k === 'infographic' ? /image/i.test(m) : !/image/i.test(m)))
+          : [DEFAULT_MODEL_FOR_KIND[k]]
+        // If user picked models but none matched this kind, log a single failure entry.
+        if (modelsForKind.length === 0) {
+          results.push({ ...t, kind: k, status: 'failed', error: `No selected model supports kind "${k}"` })
+          continue
+        }
+        for (const m of modelsForKind) {
+          const r = await runGeneration(admin, OPENROUTER, t.target_type, t.target_id, k, m)
+          results.push({ ...t, kind: k, model: m, ...r })
+        }
       }
     }
 
