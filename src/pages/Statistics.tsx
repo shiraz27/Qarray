@@ -1479,7 +1479,12 @@ export default function Statistics() {
 
   const filteredResources = resources.filter(r => {
     const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
-    const matchesWm = watermarkFilter === 'all' || (r.watermark_status ?? 'pending') === watermarkFilter;
+    const matchesWm =
+      watermarkFilter === 'all'
+        ? true
+        : watermarkFilter === 'over_stamped'
+          ? !!r.watermark_overstamped
+          : (r.watermark_status ?? 'pending') === watermarkFilter;
     const src = r.source_link ?? '';
     const srcIsUrl = /^https?:\/\//i.test(src);
     const matchesSource =
