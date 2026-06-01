@@ -716,17 +716,12 @@ export default function ResourceDetail() {
                   <h3 className="text-sm font-semibold text-muted-foreground">
                     Attachments ({resource.data.length})
                   </h3>
-                  <div className="grid grid-cols-1 gap-4">
-                    {resource.data.map((url, index) => (
-                      <div key={index} className="w-full">
-                        {isPdfUrl(url) ? (
-                          <PdfInlinePreview url={url} className="w-full" />
-                        ) : (
-                          <MediaPreview url={url} className="w-full" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <MediaGallery
+                    items={resource.data.map((url) => ({
+                      url,
+                      type: detectMediaType(url) as any,
+                    }))}
+                  />
                 </div>
               )}
             </div>
