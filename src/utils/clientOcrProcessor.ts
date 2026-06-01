@@ -154,15 +154,10 @@ export async function processResourceOCR(
 
     if (expandedFiles.length === 0) {
       // No media to process
-      await supabase
-        .from('resources')
-        .update({
-          ocr_status: 'not_applicable',
-          ocr_text: 'No media files found',
-          ocr_processed_at: new Date().toISOString(),
-        })
-        .eq('id', resourceId);
-
+      await writeOcrResult('resources', resourceId, {
+        status: 'not_applicable',
+        text: 'No media files found',
+      });
       return { success: true, message: 'No media to process' };
     }
 
@@ -291,32 +286,25 @@ export async function processResourceOCR(
       ocrText = combinedText;
     }
 
-    // Update resource in database
-    await supabase
-      .from('resources')
-      .update({
-        ocr_status: ocrStatus,
-        ocr_text: ocrText,
-        ocr_readability: computeReadability(ocrText),
-        ocr_processed_at: new Date().toISOString(),
-      })
-      .eq('id', resourceId);
-
-    return { success: true, message: 'OCR completed successfully' };
+    // Update resource in database (proposal flow when prior OCR exists)
+    const { proposed } = await writeOcrResult('resources', resourceId, {
+      status: ocrStatus,
+      text: ocrText,
+    });
+    return {
+      success: true,
+      message: proposed
+        ? 'OCR completed — pending admin review'
+        : 'OCR completed successfully',
+    };
   } catch (error) {
     console.error('OCR processing error:', error);
 
-    // Mark as failed in database
-    await supabase
-      .from('resources')
-      .update({
-        ocr_status: 'failed',
-        ocr_text: `Error: ${error.message}`,
-        ocr_readability: 'unreadable',
-        ocr_processed_at: new Date().toISOString(),
-      })
-      .eq('id', resourceId);
-
+    // Mark as failed in database (failures bypass proposal flow)
+    await writeOcrResult('resources', resourceId, {
+      status: 'failed',
+      text: `Error: ${error.message}`,
+    });
     return { success: false, message: error.message };
   }
 }
