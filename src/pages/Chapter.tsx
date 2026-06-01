@@ -155,6 +155,14 @@ export default function Chapter() {
   const [selectedDevoirFilters, setSelectedDevoirFilters] = useState<number[]>([]);
   const [showWithCorrectionOnly, setShowWithCorrectionOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'votes' | 'newest' | 'pages_asc' | 'pages_desc'>('votes');
+  const [resourceSearch, setResourceSearch] = useState('');
+  const [questionSearch, setQuestionSearch] = useState('');
+  const [teacherFilter, setTeacherFilter] = useState('');
+  const [schoolFilter, setSchoolFilter] = useState('');
+  const [bookFilter, setBookFilter] = useState('');
+  const [pageFilter, setPageFilter] = useState<'all' | 'single' | 'multi' | 'none'>('all');
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState('subjects');
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
   const [isResourceDialogOpen, setIsResourceDialogOpen] = useState(false);
