@@ -250,6 +250,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
               </div>
 
 
+              {showFileDownload && (
               <div className="absolute top-2 right-2">
                 <Button
                   size="sm"
@@ -292,6 +293,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
                   {downloading ? '…' : 'Download'}
                 </Button>
               </div>
+              )}
             </div>
           </Card>
 
