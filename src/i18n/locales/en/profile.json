@@ -24,5 +24,17 @@
   "toasts.deleteAccountFailed": "Failed to delete account",
   "seo.description": "Manage your Qarray profile and settings",
   "seo.schemaTitle": "Profile - Qarray",
-  "seo.schemaDescription": "Manage your profile"
+  "seo.schemaDescription": "Manage your profile",
+  "testing.heading": "Testing",
+  "testing.createNotification": "Create Test Flashcard Notification",
+  "testing.triggerFlashcardCheck": "Trigger Flashcard Review Check",
+  "testing.testNotificationCreated": "Test notification created!",
+  "testing.testNotificationFailed": "Failed to create test notification",
+  "testing.flashcardCheckTriggered": "Flashcard review check triggered!",
+  "testing.flashcardCheckFailed": "Failed to trigger flashcard check",
+  "support.heading": "Tutorial & Support",
+  "support.contactSupport": "Contact Support",
+  "support.contactDeveloper": "Contact Developer",
+  "teacher.documentLabel": "Document {{index}}",
+  "deletingButton": "Deleting..."
 }
