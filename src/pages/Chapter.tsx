@@ -25,6 +25,44 @@ import { SEO, createCourseSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
 import { resourceChapterFilter } from '@/utils/resourceChapterFilter';
 
+type SortKey = 'votes' | 'newest' | 'pages_asc' | 'pages_desc';
+
+function makeSortComparator(sortBy: SortKey) {
+  return (a: { upvotes: number; downvotes: number; created_at: string; page_count?: number | null }, b: typeof a) => {
+    if (sortBy === 'newest') {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+    if (sortBy === 'pages_asc' || sortBy === 'pages_desc') {
+      const av = a.page_count ?? null;
+      const bv = b.page_count ?? null;
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      return sortBy === 'pages_asc' ? av - bv : bv - av;
+    }
+    return (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes);
+  };
+}
+
+function SortSelector({ value, onChange }: { value: SortKey; onChange: (v: SortKey) => void }) {
+  return (
+    <div className="flex items-center gap-2 mb-2">
+      <span className="text-sm text-muted-foreground">Sort by:</span>
+      <Select value={value} onValueChange={(v) => onChange(v as SortKey)}>
+        <SelectTrigger className="w-[180px] h-8">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="votes">Top voted</SelectItem>
+          <SelectItem value="newest">Newest</SelectItem>
+          <SelectItem value="pages_asc">Pages (fewest first)</SelectItem>
+          <SelectItem value="pages_desc">Pages (most first)</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 interface ChapterData {
   id: number;
   name: string;
