@@ -178,6 +178,8 @@ export default function Statistics() {
   const [questionOcrFilter, setQuestionOcrFilter] = useState<string>('all');
   const [watermarkFilter, setWatermarkFilter] = useState<string>('all');
   const [questionWatermarkFilter, setQuestionWatermarkFilter] = useState<string>('all');
+  const [overstampFilter, setOverstampFilter] = useState<string>('all'); // all | over | clean | unscanned
+  const [questionOverstampFilter, setQuestionOverstampFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [readabilityFilter, setReadabilityFilter] = useState<string>('all');
   const [questionReadabilityFilter, setQuestionReadabilityFilter] = useState<string>('all');
@@ -414,7 +416,8 @@ export default function Statistics() {
   useEffect(() => {
     setCurrentPage(1);
   }, [ocrFilter, watermarkFilter, sourceFilter, readabilityFilter, searchQuery,
-      pagesFilter, pagesSort, teacherFilter, schoolFilter, bookFilter, typeFilter, descriptionFilter]);
+      pagesFilter, pagesSort, teacherFilter, schoolFilter, bookFilter, typeFilter, descriptionFilter,
+      overstampFilter]);
 
   // Lazy backfill: compute & persist ocr_readability for rows that are missing it.
   useEffect(() => {
@@ -479,7 +482,8 @@ export default function Statistics() {
   useEffect(() => {
     setQuestionCurrentPage(1);
   }, [questionOcrFilter, questionWatermarkFilter, questionReadabilityFilter, questionSearchQuery,
-      questionPagesFilter, questionPagesSort, questionTeacherFilter, questionSchoolFilter, questionBookFilter]);
+      questionPagesFilter, questionPagesSort, questionTeacherFilter, questionSchoolFilter, questionBookFilter,
+      questionOverstampFilter]);
 
   useEffect(() => {
     if (selectedClass !== 'all') {
@@ -1343,6 +1347,18 @@ export default function Statistics() {
     if (!n) return true;
     return fields.some((f) => normalizedIncludes(f ?? '', n));
   };
+  const overstampMatch = (
+    filter: string,
+    overstamped: boolean | null | undefined,
+    stampCount: number | null | undefined,
+  ): boolean => {
+    if (filter === 'all') return true;
+    const scanned = stampCount !== null && stampCount !== undefined;
+    if (filter === 'unscanned') return !scanned;
+    if (filter === 'over') return !!overstamped;
+    if (filter === 'clean') return scanned && !overstamped;
+    return true;
+  };
   const filteredResources = resources.filter(r => {
     const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
     const matchesWm =
@@ -1351,6 +1367,7 @@ export default function Statistics() {
         : watermarkFilter === 'over_stamped'
           ? !!r.watermark_overstamped
           : (r.watermark_status ?? 'pending') === watermarkFilter;
+    const matchesOverstamp = overstampMatch(overstampFilter, r.watermark_overstamped, r.watermark_stamp_count);
     const src = r.source_link ?? '';
     const srcIsUrl = /^https?:\/\//i.test(src);
     const matchesSource =
@@ -1398,7 +1415,7 @@ export default function Statistics() {
     ]);
     return matchesFilter && matchesWm && matchesSource && matchesReadability
       && matchesPages && matchesTeacher && matchesSchool && matchesBook
-      && matchesType && matchesDescription && matchesSearch;
+      && matchesType && matchesDescription && matchesSearch && matchesOverstamp;
   });
   if (pagesSort !== 'none') {
     filteredResources.sort((a, b) => {
@@ -1433,6 +1450,7 @@ export default function Statistics() {
     const matchesTeacher = textMatchesAny(questionTeacherFilter, [...(q.teacher_names ?? [])]);
     const matchesSchool = textMatchesAny(questionSchoolFilter, [...(q.school_names ?? [])]);
     const matchesBook = textMatchesAny(questionBookFilter, [...(q.books ?? [])]);
+    const matchesOverstamp = overstampMatch(questionOverstampFilter, q.watermark_overstamped, q.watermark_stamp_count);
     const matchesSearch = textMatchesAny(questionSearchQuery ?? '', [
       q.data,
       q.chapters?.name,
@@ -1447,7 +1465,7 @@ export default function Statistics() {
       String(q.id),
     ]);
     return matchesFilter && matchesWm && matchesReadability && matchesPages
-      && matchesTeacher && matchesSchool && matchesBook && matchesSearch;
+      && matchesTeacher && matchesSchool && matchesBook && matchesSearch && matchesOverstamp;
   });
   if (questionPagesSort !== 'none') {
     filteredQuestions.sort((a, b) => {
@@ -2016,6 +2034,17 @@ export default function Statistics() {
                                 <SelectItem value="failed">Watermark: Failed</SelectItem>
                                 <SelectItem value="not_applicable">Watermark: N/A</SelectItem>
                                 <SelectItem value="over_stamped">Watermark: Over-stamped</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={overstampFilter} onValueChange={setOverstampFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Over-stamping" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Stamps</SelectItem>
+                                <SelectItem value="over">Over-stamped (&gt; 1)</SelectItem>
+                                <SelectItem value="clean">Within limit (≤ 1)</SelectItem>
+                                <SelectItem value="unscanned">Not scanned yet</SelectItem>
                               </SelectContent>
                             </Select>
                             <Select value={sourceFilter} onValueChange={setSourceFilter}>
@@ -2739,6 +2768,17 @@ export default function Statistics() {
                                 <SelectItem value="failed">Watermark: Failed</SelectItem>
                                 <SelectItem value="not_applicable">Watermark: N/A</SelectItem>
                                 <SelectItem value="over_stamped">Watermark: Over-stamped</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={questionOverstampFilter} onValueChange={setQuestionOverstampFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Over-stamping" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Stamps</SelectItem>
+                                <SelectItem value="over">Over-stamped (&gt; 1)</SelectItem>
+                                <SelectItem value="clean">Within limit (≤ 1)</SelectItem>
+                                <SelectItem value="unscanned">Not scanned yet</SelectItem>
                               </SelectContent>
                             </Select>
                             <Select value={questionReadabilityFilter} onValueChange={setQuestionReadabilityFilter}>
