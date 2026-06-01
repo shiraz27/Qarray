@@ -220,9 +220,70 @@ async function checkManifestRow(
 }
 
 export async function runPdfHealthAudit(
+  options: AuditOptions = { scope: 'skip-recent-healthy', maxAgeDays: 7, kind: 'all' },
   onProgress?: (p: AuditProgress) => void,
 ): Promise<AuditResult> {
-  const rows = await collectManifestRows();
+  const allRows = await collectManifestRows();
+
+  // Apply kind filter first.
+  const kindFiltered =
+    options.kind === 'all' ? allRows : allRows.filter((r) => r.kind === options.kind);
+  const skippedOutOfScopeKind = allRows.length - kindFiltered.length;
+
+  // Load latest scheduled report index when needed.
+  let reportIndex: Map<string, LatestReport> | null = null;
+  if (options.scope !== 'all') {
+    reportIndex = await loadLatestReportsIndex();
+  }
+
+  const cutoffMs = Date.now() - options.maxAgeDays * 24 * 60 * 60 * 1000;
+  let skippedHealthy = 0;
+  let skippedOutOfScope = skippedOutOfScopeKind;
+
+  const filtered = kindFiltered.filter((r) => {
+    if (!reportIndex) return true;
+    const key = `${r.kind}::${r.id}::${r.manifestUrl}`;
+    const prev = reportIndex.get(key);
+
+    if (options.scope === 'only-unchecked') {
+      if (prev) {
+        skippedOutOfScope++;
+        return false;
+      }
+      return true;
+    }
+
+    if (options.scope === 'only-previously-broken') {
+      const isBroken =
+        !!prev &&
+        (prev.brokenPages.length > 0 ||
+          prev.unavailablePages.length > 0 ||
+          !!prev.manifestError);
+      if (!isBroken) {
+        skippedOutOfScope++;
+        return false;
+      }
+      return true;
+    }
+
+    // skip-recent-healthy
+    if (!prev) return true;
+    const isHealthy =
+      prev.brokenPages.length === 0 &&
+      prev.unavailablePages.length === 0 &&
+      !prev.manifestError;
+    const recent = new Date(prev.checkedAt).getTime() >= cutoffMs;
+    if (isHealthy && recent) {
+      skippedHealthy++;
+      return false;
+    }
+    return true;
+  });
+
+  const rows = typeof options.limit === 'number' ? filtered.slice(0, options.limit) : filtered;
+  if (rows.length < filtered.length) {
+    skippedOutOfScope += filtered.length - rows.length;
+  }
   const total = rows.length;
   let processed = 0;
   let brokenRows = 0;
@@ -273,6 +334,8 @@ export async function runPdfHealthAudit(
     totalPagesChecked,
     totalBrokenPages,
     totalUnavailablePages,
+    skippedHealthy,
+    skippedOutOfScope,
   };
 }
 
