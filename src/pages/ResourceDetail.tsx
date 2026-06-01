@@ -27,6 +27,9 @@ import { EmptyState } from '@/components/EmptyState';
 import { SEO, createLearningResourceSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, X } from 'lucide-react';
 
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -72,6 +75,11 @@ interface Question {
   downvotes: number;
   userVote: string | null;
   answerCount: number;
+  ocr_text?: string | null;
+  books?: string[] | null;
+  school_names?: string[] | null;
+  teacher_names?: string[] | null;
+  type_ids?: number[] | null;
 }
 
 export default function ResourceDetail() {
