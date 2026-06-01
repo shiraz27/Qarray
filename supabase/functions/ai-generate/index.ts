@@ -406,11 +406,23 @@ async function runGeneration(
 
   const { data: existingGen } = await admin
     .from('ai_generations')
-    .select('id, output_answer_id')
+    .select('id, output_answer_id, status, updated_at')
     .eq('target_type', targetType)
     .eq('target_id', targetId)
     .eq('kind', kind)
     .maybeSingle()
+
+  // Reset stale 'running' rows (older than 3 minutes) so they don't block reruns
+  if (
+    existingGen?.status === 'running' &&
+    existingGen.updated_at &&
+    Date.now() - new Date(existingGen.updated_at as any).getTime() < 3 * 60_000
+  ) {
+    return {
+      status: 'running',
+      error: 'Another generation for this target/kind is already in progress',
+    }
+  }
 
   const genUpsert = await admin
     .from('ai_generations')
