@@ -922,6 +922,10 @@ export type Database = {
           data: string[]
           deleted: boolean
           description: string
+          description_proposed: string | null
+          description_proposed_at: string | null
+          description_proposed_model: string | null
+          description_proposed_status: string | null
           devoir_type_id: number | null
           id: number
           institute_id: string | null
@@ -962,6 +966,10 @@ export type Database = {
           data: string[]
           deleted?: boolean
           description: string
+          description_proposed?: string | null
+          description_proposed_at?: string | null
+          description_proposed_model?: string | null
+          description_proposed_status?: string | null
           devoir_type_id?: number | null
           id?: number
           institute_id?: string | null
@@ -1002,6 +1010,10 @@ export type Database = {
           data?: string[]
           deleted?: boolean
           description?: string
+          description_proposed?: string | null
+          description_proposed_at?: string | null
+          description_proposed_model?: string | null
+          description_proposed_status?: string | null
           devoir_type_id?: number | null
           id?: number
           institute_id?: string | null
