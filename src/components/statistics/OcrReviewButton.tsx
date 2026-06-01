@@ -13,6 +13,11 @@ import {
 import { CheckCircle2, X, Loader2, GitCompare } from 'lucide-react';
 import { toast } from 'sonner';
 import { diffWords, diffStats } from '@/utils/textDiff';
+import {
+  READABILITY_LABEL,
+  readabilityBadgeClass,
+  type OcrReadability,
+} from '@/utils/ocrReadability';
 
 interface Props {
   table: 'resources' | 'questions';
@@ -21,6 +26,7 @@ interface Props {
   proposedText: string | null;
   proposedStatus: string | null;
   proposedReadability: string | null;
+  currentReadability?: string | null;
   onResolved: (next: {
     ocr_text: string | null;
     ocr_status: string | null;
@@ -39,6 +45,7 @@ export function OcrReviewButton({
   proposedText,
   proposedStatus,
   proposedReadability,
+  currentReadability,
   onResolved,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -51,6 +58,17 @@ export function OcrReviewButton({
   const stats = useMemo(() => diffStats(chunks), [chunks]);
 
   if (!proposedText) return null;
+
+  const renderReadability = (r: string | null | undefined) => {
+    if (!r) return null;
+    const key = r as OcrReadability;
+    const label = READABILITY_LABEL[key] ?? r;
+    return (
+      <Badge variant="outline" className={`text-[10px] ${readabilityBadgeClass(key)}`}>
+        {label}
+      </Badge>
+    );
+  };
 
   const clearProposal = {
     ocr_text_proposed: null,
@@ -129,6 +147,8 @@ export function OcrReviewButton({
               <Badge variant="outline" className="text-[10px]">
                 +{stats.added} / −{stats.removed} chars
               </Badge>
+              {renderReadability(currentReadability)}
+              {currentReadability !== proposedReadability && renderReadability(proposedReadability)}
             </DialogTitle>
             <DialogDescription>
               Compare the current saved OCR with the new run. Approve to replace,
@@ -138,8 +158,9 @@ export function OcrReviewButton({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[60vh]">
             <div className="border rounded-md overflow-hidden flex flex-col">
-              <div className="px-3 py-1.5 text-xs font-medium bg-muted border-b">
-                Current ({(currentText ?? '').length.toLocaleString()} chars)
+              <div className="px-3 py-1.5 text-xs font-medium bg-muted border-b flex items-center gap-2">
+                <span>Current ({(currentText ?? '').length.toLocaleString()} chars)</span>
+                {renderReadability(currentReadability)}
               </div>
               <pre className="text-xs whitespace-pre-wrap break-words p-3 overflow-auto flex-1 font-mono">
                 {chunks.map((c, i) =>
@@ -157,8 +178,9 @@ export function OcrReviewButton({
               </pre>
             </div>
             <div className="border rounded-md overflow-hidden flex flex-col">
-              <div className="px-3 py-1.5 text-xs font-medium bg-muted border-b">
-                Proposed ({(proposedText ?? '').length.toLocaleString()} chars)
+              <div className="px-3 py-1.5 text-xs font-medium bg-muted border-b flex items-center gap-2">
+                <span>Proposed ({(proposedText ?? '').length.toLocaleString()} chars)</span>
+                {renderReadability(proposedReadability)}
               </div>
               <pre className="text-xs whitespace-pre-wrap break-words p-3 overflow-auto flex-1 font-mono">
                 {chunks.map((c, i) =>
