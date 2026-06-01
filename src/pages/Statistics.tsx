@@ -2908,6 +2908,7 @@ export default function Statistics() {
                                               table="questions"
                                               rowId={question.id}
                                               text={question.ocr_text ?? null}
+                                              readability={question.ocr_readability ?? null}
                                               onChanged={(next) =>
                                                 setQuestions((prev) =>
                                                   prev.map((q) =>
@@ -2925,6 +2926,7 @@ export default function Statistics() {
                                                   proposedText={question.ocr_text_proposed ?? null}
                                                   proposedStatus={question.ocr_text_proposed_status ?? null}
                                                   proposedReadability={question.ocr_text_proposed_readability ?? null}
+                                                  currentReadability={question.ocr_readability ?? null}
                                                   onResolved={(patch) =>
                                                     setQuestions((prev) =>
                                                       prev.map((q) =>
