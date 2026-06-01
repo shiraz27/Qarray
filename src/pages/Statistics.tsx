@@ -149,6 +149,7 @@ interface QuestionOcrStats {
 }
 
 export default function Statistics() {
+  // (watermark integrity fields added in QuestionRow above)
   const { isModerator, isAdmin, loading: roleLoading } = useUserRole();
   const [stats, setStats] = useState<Stats | null>(null);
   const [ocrStats, setOcrStats] = useState<OcrStats | null>(null);
