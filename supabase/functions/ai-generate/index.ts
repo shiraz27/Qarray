@@ -4,36 +4,31 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 // --- Bot registry ---
 type Kind = 'correction' | 'summary' | 'step_by_step' | 'infographic'
 
-const BOTS: Record<string, { email: string; model: string; full_name: string }> = {
-  qwen: {
-    email: 'qwen-bot@ai.local',
-    model: 'google/gemini-2.5-flash',
-    full_name: 'Gemini Tutor',
-  },
-  deepseek: {
-    email: 'deepseek-bot@ai.local',
-    model: 'google/gemini-2.5-flash',
-    full_name: 'Gemini Tutor',
-  },
-  vision: {
-    email: 'vision-bot@ai.local',
-    model: 'google/gemini-2.5-flash-image',
-    full_name: 'Gemini Vision',
-  },
+// Default fallback model per kind when no explicit models[] is provided in the request.
+const DEFAULT_MODEL_FOR_KIND: Record<Kind, string> = {
+  correction: 'google/gemini-3-flash-preview',
+  summary: 'google/gemini-3-flash-preview',
+  step_by_step: 'google/gemini-3-flash-preview',
+  infographic: 'google/gemini-2.5-flash-image',
 }
 
-// Local Ollama mapping (per provider). Falls back to OpenRouter model above if Ollama is unreachable.
-const OLLAMA_MODELS: Record<string, string | undefined> = {
-  qwen: Deno.env.get('OLLAMA_MODEL_QWEN') || 'qwen2.5:7b',
-  deepseek: Deno.env.get('OLLAMA_MODEL_DEEPSEEK') || 'deepseek-r1:8b',
-  // vision: not assumed available locally — stays on OpenRouter
+function isImageModel(model: string): boolean {
+  return /image/i.test(model)
 }
 
-const KIND_TO_BOT: Record<Kind, keyof typeof BOTS> = {
-  correction: 'deepseek',
-  summary: 'qwen',
-  step_by_step: 'qwen',
-  infographic: 'vision',
+function modelSupportsKind(model: string, kind: Kind): boolean {
+  if (kind === 'infographic') return isImageModel(model)
+  return !isImageModel(model)
+}
+
+function sanitizeEmail(model: string): string {
+  return model.replace(/[^a-z0-9]+/gi, '-').toLowerCase()
+}
+
+function botLabelForModel(model: string): string {
+  // Friendly display name for the bot profile
+  if (model.startsWith('ollama:')) return `Ollama · ${model.slice('ollama:'.length)}`
+  return model
 }
 
 const KIND_LABEL_FR: Record<Kind, string> = {
@@ -147,13 +142,14 @@ Hard rules:
   }
 }
 
-async function ensureBot(admin: ReturnType<typeof createClient>, key: keyof typeof BOTS): Promise<string> {
-  const bot = BOTS[key]
+async function ensureBot(admin: ReturnType<typeof createClient>, model: string): Promise<string> {
+  const email = `bot+${sanitizeEmail(model)}@ai.local`
+  const fullName = botLabelForModel(model)
   // Lookup existing profile
   const { data: existing } = await admin
     .from('profiles')
     .select('user_id')
-    .eq('ai_model', bot.model)
+    .eq('ai_model', model)
     .eq('is_bot', true)
     .maybeSingle()
   if (existing?.user_id) return existing.user_id as string
@@ -161,17 +157,17 @@ async function ensureBot(admin: ReturnType<typeof createClient>, key: keyof type
   // Try to find existing auth user by email
   // @ts-ignore admin api
   const { data: list } = await admin.auth.admin.listUsers()
-  const found = (list?.users || []).find((u: any) => u.email === bot.email)
+  const found = (list?.users || []).find((u: any) => u.email === email)
   let userId = found?.id as string | undefined
   if (!userId) {
     // @ts-ignore
     const { data: created, error } = await admin.auth.admin.createUser({
-      email: bot.email,
+      email,
       email_confirm: true,
       password: crypto.randomUUID() + crypto.randomUUID(),
-      user_metadata: { full_name: bot.full_name, is_bot: true },
+      user_metadata: { full_name: fullName, is_bot: true },
     })
-    if (error) throw new Error(`Failed to create bot ${key}: ${error.message}`)
+    if (error) throw new Error(`Failed to create bot for ${model}: ${error.message}`)
     userId = created.user!.id
   }
 
@@ -179,8 +175,8 @@ async function ensureBot(admin: ReturnType<typeof createClient>, key: keyof type
   await admin.from('profiles').upsert(
     {
       user_id: userId,
-      full_name: bot.full_name,
-      ai_model: bot.model,
+      full_name: fullName,
+      ai_model: model,
       is_bot: true,
       user_type: 'ai_bot' as any,
       verified: true,
