@@ -93,7 +93,11 @@ interface ResourceRow {
   ocr_text_proposed_readability?: string | null;
   ocr_text_proposed_at?: string | null;
   chapter_id: number | null;
-  chapters?: { name: string };
+  chapters?: {
+    name: string;
+    subjects?: { name?: string } | null;
+    classes?: { name?: string } | null;
+  };
   resource_types?: { type: string };
   school_name?: string | null;
   teacher_name?: string | null;
@@ -125,7 +129,12 @@ interface QuestionRow {
   ocr_text_proposed_readability?: string | null;
   ocr_text_proposed_at?: string | null;
   chapter_id: number | null;
-  chapters?: { name: string };
+  chapters?: {
+    name: string;
+    subjects?: { name?: string } | null;
+    classes?: { name?: string } | null;
+    subject_id?: number | null;
+  };
   teacher_names?: string[] | null;
   school_names?: string[] | null;
   books?: string[] | null;
