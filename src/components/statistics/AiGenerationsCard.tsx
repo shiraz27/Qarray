@@ -325,11 +325,22 @@ export const AiGenerationsCard: React.FC = () => {
           <div>
             <CardTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5" /> AI Generations
+              {(() => {
+                const n = Object.values(statusMap).filter(
+                  (s) => s.reviewStatus === 'pending' && s.proposedData && s.outputAnswerId,
+                ).length;
+                return n > 0 ? (
+                  <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300">
+                    <AlertCircle className="h-3 w-3 mr-1" /> {n} pending review
+                  </Badge>
+                ) : null;
+              })()}
             </CardTitle>
             <CardDescription>
               Trigger AI bots (Qwen, DeepSeek, Vision) to generate corrections, summaries,
-              step-by-step explanations, and infographics. Output appears as bot-authored
-              answers users can vote on.
+              step-by-step explanations, and infographics. The first run for an item is
+              published immediately; re-runs are held for admin review (Approve / Discard)
+              before they replace the live answer.
             </CardDescription>
           </div>
           <Button size="sm" variant="outline" onClick={() => { fetchRows(); fetchStatuses(); }}>
