@@ -160,6 +160,126 @@ export function formatMetadataForDescription(
  */
 export type MetadataField = 'title' | 'description' | 'teachers' | 'schools' | 'books' | 'types';
 
+const mergeArrays = (existingArr: string[] | null | undefined, incoming: string[]) => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const v of [...(existingArr || []), ...incoming]) {
+    if (!v) continue;
+    const k = v.trim().toLowerCase();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(v.trim());
+  }
+  return out;
+};
+
+/**
+ * Apply already-extracted metadata to a resource, restricted to `fields`.
+ * Returns the updates actually applied (for UI patching).
+ */
+export async function applyResourceMetadata(
+  resourceId: number,
+  metadata: ExtractedMetadata,
+  fields: MetadataField[],
+): Promise<{ success: boolean; updates: Record<string, any>; message: string }> {
+  if (fields.length === 0) {
+    return { success: true, updates: {}, message: 'Nothing selected' };
+  }
+  const want = (f: MetadataField) => fields.includes(f);
+
+  const { data: existing } = await supabase
+    .from('resources')
+    .select('description, teacher_names, school_names, books')
+    .eq('id', resourceId)
+    .maybeSingle();
+
+  const updates: Record<string, any> = {};
+
+  if (want('description')) {
+    updates.description = mergeDescriptionWithAi(existing?.description, metadata);
+  }
+  if (want('title') && metadata.suggested_title) {
+    updates.title = metadata.suggested_title;
+  }
+  if (want('teachers') && metadata.teacher_names.length > 0) {
+    const merged = mergeArrays(existing?.teacher_names as string[] | null, metadata.teacher_names);
+    updates.teacher_names = merged;
+    updates.teacher_name = merged[0] ?? null;
+  }
+  if (want('schools') && metadata.school_names.length > 0) {
+    const merged = mergeArrays(existing?.school_names as string[] | null, metadata.school_names);
+    updates.school_names = merged;
+    updates.school_name = merged[0] ?? null;
+  }
+  if (want('books') && metadata.books.length > 0) {
+    const merged = mergeArrays(existing?.books as string[] | null, metadata.books);
+    updates.books = merged;
+    updates.book = merged[0] ?? null;
+  }
+  if (want('types')) {
+    if (metadata.suggested_type_id) updates.type_id = metadata.suggested_type_id;
+    if (metadata.suggested_devoir_type_id) updates.devoir_type_id = metadata.suggested_devoir_type_id;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return { success: true, updates: {}, message: 'No applicable fields' };
+  }
+
+  const { error } = await supabase.from('resources').update(updates).eq('id', resourceId);
+  if (error) {
+    console.error('Error applying resource metadata:', error);
+    return { success: false, updates: {}, message: 'Failed to update resource' };
+  }
+  return { success: true, updates, message: 'Applied' };
+}
+
+/**
+ * Apply already-extracted metadata to a question, restricted to `fields`.
+ */
+export async function applyQuestionMetadata(
+  questionId: number,
+  metadata: ExtractedMetadata,
+  fields: MetadataField[],
+): Promise<{ success: boolean; updates: Record<string, any>; message: string }> {
+  if (fields.length === 0) {
+    return { success: true, updates: {}, message: 'Nothing selected' };
+  }
+  const want = (f: MetadataField) => fields.includes(f);
+
+  const { data: existing } = await supabase
+    .from('questions')
+    .select('teacher_names, school_names, books')
+    .eq('id', questionId)
+    .maybeSingle();
+
+  const updates: Record<string, any> = {};
+  if (want('teachers') && metadata.teacher_names.length > 0) {
+    updates.teacher_names = mergeArrays(existing?.teacher_names as string[] | null, metadata.teacher_names);
+  }
+  if (want('schools') && metadata.school_names.length > 0) {
+    updates.school_names = mergeArrays(existing?.school_names as string[] | null, metadata.school_names);
+  }
+  if (want('books') && metadata.books.length > 0) {
+    const merged = mergeArrays(existing?.books as string[] | null, metadata.books);
+    updates.books = merged;
+    updates.book = merged[0] ?? null;
+  }
+  if (want('types') && metadata.suggested_type_id) {
+    updates.type_id = metadata.suggested_type_id;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return { success: true, updates: {}, message: 'No applicable fields' };
+  }
+
+  const { error } = await supabase.from('questions').update(updates).eq('id', questionId);
+  if (error) {
+    console.error('Error applying question metadata:', error);
+    return { success: false, updates: {}, message: 'Failed to update question' };
+  }
+  return { success: true, updates, message: 'Applied' };
+}
+
 export async function extractAndUpdateResourceMetadata(
   resourceId: number,
   ocrText: string,
