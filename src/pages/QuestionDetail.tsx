@@ -737,6 +737,10 @@ export default function QuestionDetail() {
             </div>
           </div>
 
+          <div className="flex justify-end">
+            <ReportButton contentType="question" contentId={question.id} variant="inline" />
+          </div>
+
           {canEdit && (
             <div className="flex gap-2 pt-2 border-t">
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
