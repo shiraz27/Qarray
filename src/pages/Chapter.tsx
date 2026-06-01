@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, FileText, ArrowLeft, Bookmark, ThumbsUp, ThumbsDown, Plus, Image as ImageIcon, Video, FileAudio, Share2 } from 'lucide-react';
+import { MessageSquare, FileText, ArrowLeft, Bookmark, ThumbsUp, ThumbsDown, Plus, Image as ImageIcon, Video, FileAudio, Share2, Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
@@ -24,6 +24,8 @@ import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { SEO, createCourseSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
 import { resourceChapterFilter } from '@/utils/resourceChapterFilter';
+import { normalizedIncludes } from '@/utils/textHelpers';
+import { Input } from '@/components/ui/input';
 
 type SortKey = 'votes' | 'newest' | 'pages_asc' | 'pages_desc';
 
@@ -63,6 +65,20 @@ function SortSelector({ value, onChange }: { value: SortKey; onChange: (v: SortK
   );
 }
 
+function matchPageFilter(count: number | null | undefined, mode: 'all' | 'single' | 'multi' | 'none') {
+  if (mode === 'all') return true;
+  if (mode === 'none') return count == null;
+  if (mode === 'single') return count === 1;
+  if (mode === 'multi') return typeof count === 'number' && count > 1;
+  return true;
+}
+
+function textMatchesAny(needle: string, fields: (string | null | undefined)[]) {
+  const n = needle.trim();
+  if (!n) return true;
+  return fields.some((f) => normalizedIncludes(f ?? '', n));
+}
+
 interface ChapterData {
   id: number;
   name: string;
@@ -87,6 +103,11 @@ interface Question {
   isBookmarked?: boolean;
   book?: string | null;
   page_count?: number | null;
+  teacher_names?: string[] | null;
+  school_names?: string[] | null;
+  books?: string[] | null;
+  ocr_text?: string | null;
+  ocr_text_proposed?: string | null;
 }
 
 interface Resource {
@@ -107,6 +128,14 @@ interface Resource {
   isBookmarked?: boolean;
   book?: string | null;
   page_count?: number | null;
+  teacher_name?: string | null;
+  school_name?: string | null;
+  teacher_names?: string[] | null;
+  school_names?: string[] | null;
+  books?: string[] | null;
+  source_link?: string | null;
+  ocr_text?: string | null;
+  ocr_text_proposed?: string | null;
 }
 
 interface ResourceType {
@@ -140,6 +169,14 @@ export default function Chapter() {
   const [selectedDevoirFilters, setSelectedDevoirFilters] = useState<number[]>([]);
   const [showWithCorrectionOnly, setShowWithCorrectionOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'votes' | 'newest' | 'pages_asc' | 'pages_desc'>('votes');
+  const [resourceSearch, setResourceSearch] = useState('');
+  const [questionSearch, setQuestionSearch] = useState('');
+  const [teacherFilter, setTeacherFilter] = useState('');
+  const [schoolFilter, setSchoolFilter] = useState('');
+  const [bookFilter, setBookFilter] = useState('');
+  const [pageFilter, setPageFilter] = useState<'all' | 'single' | 'multi' | 'none'>('all');
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState('subjects');
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
   const [isResourceDialogOpen, setIsResourceDialogOpen] = useState(false);
@@ -340,7 +377,7 @@ export default function Chapter() {
         // Fetch questions with vote counts
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, data, created_at, type_id, verified, contributors, book, page_count')
+          .select('id, data, created_at, type_id, verified, contributors, book, page_count, teacher_names, school_names, books, ocr_text, ocr_text_proposed')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -401,7 +438,7 @@ export default function Chapter() {
         // Fetch resources with vote counts
         const { data: resourcesData } = await (supabase as any)
           .from('resources')
-          .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, book, page_count, shared_with')
+          .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, book, page_count, shared_with, teacher_name, school_name, teacher_names, school_names, books, source_link, ocr_text, ocr_text_proposed')
           .or(resourceChapterFilter(chapterId))
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -754,6 +791,103 @@ export default function Chapter() {
 
   const hasContent = chapter.questionCount > 0 || chapter.answerCount > 0 || chapter.resourceCount > 0;
 
+  const filteredQuestions = questions.filter((q) => {
+    if (verifiedOnly && !q.verified) return false;
+    if (!matchPageFilter(q.page_count, pageFilter)) return false;
+    if (!textMatchesAny(teacherFilter, [...(q.teacher_names ?? [])])) return false;
+    if (!textMatchesAny(schoolFilter, [...(q.school_names ?? [])])) return false;
+    if (!textMatchesAny(bookFilter, [q.book, ...(q.books ?? [])])) return false;
+    if (!textMatchesAny(questionSearch, [
+      q.data, q.book, q.ocr_text, q.ocr_text_proposed,
+      ...(q.teacher_names ?? []), ...(q.school_names ?? []), ...(q.books ?? []),
+      String(q.id),
+    ])) return false;
+    return true;
+  });
+
+  const filteredResources = resources.filter((r) => {
+    if (selectedTypeFilters.length > 0 && !((r.type_ids && r.type_ids.length > 0 ? r.type_ids : [r.type_id]).some((id) => selectedTypeFilters.includes(id as number)))) return false;
+    if (selectedDevoirFilters.length > 0 && !(r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) return false;
+    if (showWithCorrectionOnly && !r.with_correction) return false;
+    if (verifiedOnly && !r.verified) return false;
+    if (!matchPageFilter(r.page_count, pageFilter)) return false;
+    if (!textMatchesAny(teacherFilter, [r.teacher_name, ...(r.teacher_names ?? [])])) return false;
+    if (!textMatchesAny(schoolFilter, [r.school_name, ...(r.school_names ?? [])])) return false;
+    if (!textMatchesAny(bookFilter, [r.book, ...(r.books ?? [])])) return false;
+    if (!textMatchesAny(resourceSearch, [
+      r.title, r.description, r.book, r.teacher_name, r.school_name,
+      r.source_link, r.ocr_text, r.ocr_text_proposed,
+      ...(r.teacher_names ?? []), ...(r.school_names ?? []), ...(r.books ?? []),
+      String(r.id),
+    ])) return false;
+    return true;
+  });
+
+  const renderFiltersBar = (searchValue: string, onSearch: (v: string) => void, placeholder: string) => (
+    <div className="space-y-2 mb-3">
+      <div className="relative">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder={placeholder}
+          value={searchValue}
+          onChange={(e) => onSearch(e.target.value)}
+          className="pl-8 pr-8"
+        />
+        {searchValue && (
+          <button
+            type="button"
+            onClick={() => onSearch('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setShowFilters((s) => !s)}
+          className="text-xs text-muted-foreground hover:text-foreground underline"
+        >
+          {showFilters ? 'Hide filters' : 'More filters'}
+        </button>
+        {(teacherFilter || schoolFilter || bookFilter || pageFilter !== 'all' || verifiedOnly) && (
+          <button
+            type="button"
+            onClick={() => {
+              setTeacherFilter(''); setSchoolFilter(''); setBookFilter('');
+              setPageFilter('all'); setVerifiedOnly(false);
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground underline"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+      {showFilters && (
+        <div className="grid grid-cols-2 gap-2">
+          <Input placeholder="Teacher" value={teacherFilter} onChange={(e) => setTeacherFilter(e.target.value)} className="h-9" />
+          <Input placeholder="School" value={schoolFilter} onChange={(e) => setSchoolFilter(e.target.value)} className="h-9" />
+          <Input placeholder="Book" value={bookFilter} onChange={(e) => setBookFilter(e.target.value)} className="h-9 col-span-2" />
+          <Select value={pageFilter} onValueChange={(v) => setPageFilter(v as typeof pageFilter)}>
+            <SelectTrigger className="h-9"><SelectValue placeholder="Pages" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All pages</SelectItem>
+              <SelectItem value="single">Single page</SelectItem>
+              <SelectItem value="multi">Multiple pages</SelectItem>
+              <SelectItem value="none">Unknown pages</SelectItem>
+            </SelectContent>
+          </Select>
+          <label className="flex items-center gap-2 text-sm px-2">
+            <input type="checkbox" className="rounded" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} />
+            Verified only
+          </label>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
       <SEO
@@ -891,6 +1025,7 @@ export default function Chapter() {
           </TabsList>
 
           <TabsContent value="questions" className="space-y-3">
+            {renderFiltersBar(questionSearch, setQuestionSearch, t('searchQuestions') || 'Search questions...')}
             <SortSelector value={sortBy} onChange={setSortBy} />
             <Dialog open={isQuestionDialogOpen} onOpenChange={setIsQuestionDialogOpen}>
               <DialogTrigger asChild>
@@ -964,13 +1099,13 @@ export default function Chapter() {
               </DialogContent>
             </Dialog>
 
-            {questions.length === 0 ? (
+            {filteredQuestions.length === 0 ? (
               <EmptyState
                 type="questions"
                 message={t('noQuestions') || 'No questions available yet'}
               />
             ) : (
-              questions
+              filteredQuestions
                 .slice()
                 .sort(makeSortComparator(sortBy))
                 .map((question) => {
@@ -1159,6 +1294,7 @@ export default function Chapter() {
                 </label>
               </div>
             </div>
+            {renderFiltersBar(resourceSearch, setResourceSearch, t('searchResources') || 'Search resources...')}
             <SortSelector value={sortBy} onChange={setSortBy} />
 
             <Dialog open={isResourceDialogOpen} onOpenChange={setIsResourceDialogOpen}>
@@ -1235,22 +1371,13 @@ export default function Chapter() {
               </DialogContent>
             </Dialog>
 
-            {resources.filter(r => 
-              (selectedTypeFilters.length === 0 || ((r.type_ids && r.type_ids.length > 0 ? r.type_ids : [r.type_id]).some((id) => selectedTypeFilters.includes(id)))) &&
-              (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
-              (!showWithCorrectionOnly || r.with_correction)
-            ).length === 0 ? (
+            {filteredResources.length === 0 ? (
               <EmptyState
                 type="resources"
                 message={t('noResources') || 'No resources available yet'}
               />
             ) : (
-              resources
-                .filter(r => 
-                  (selectedTypeFilters.length === 0 || ((r.type_ids && r.type_ids.length > 0 ? r.type_ids : [r.type_id]).some((id) => selectedTypeFilters.includes(id)))) &&
-                  (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
-                  (!showWithCorrectionOnly || r.with_correction)
-                )
+              filteredResources
                 .slice()
                 .sort(makeSortComparator(sortBy))
                 .map((resource) => {
