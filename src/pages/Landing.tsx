@@ -253,8 +253,8 @@ const Landing: React.FC = () => {
                 {studentCount === null 
                   ? tl('hero.joinCommunity')
                   : studentCount < 10 
-                    ? tl('hero.joinFewStudents', { count: studentCount })
-                    : tl('hero.joinManyStudents', { count: studentCount.toLocaleString() })
+                    ? tl('hero.joinFewStudents', { count: studentCount as number })
+                    : tl('hero.joinManyStudents', { value: studentCount.toLocaleString() })
                 }
               </span>
             </div>

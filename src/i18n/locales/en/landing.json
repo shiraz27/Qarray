@@ -4,7 +4,7 @@
   "hero.explore": "Explore",
   "hero.joinCommunity": "Join our community",
   "hero.joinFewStudents": "Join our {{count}} students",
-  "hero.joinManyStudents": "Join {{count}}+ students",
+  "hero.joinManyStudents": "Join {{value}}+ students",
   "features.heading": "Key Features",
   "footer.startJourney": "Start your learning journey today"
 }
