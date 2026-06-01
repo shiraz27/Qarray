@@ -1,1 +1,10 @@
-{}
+{
+  "hero.badge": "Learn Smarter, Not Harder",
+  "hero.platformLabel": "Educational Platform",
+  "hero.explore": "Explore",
+  "hero.joinCommunity": "Join our community",
+  "hero.joinFewStudents": "Join our {{count}} students",
+  "hero.joinManyStudents": "Join {{count}}+ students",
+  "features.heading": "Key Features",
+  "footer.startJourney": "Start your learning journey today"
+}

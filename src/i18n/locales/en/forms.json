@@ -1,1 +1,24 @@
-{}
+{
+  "question.label": "Your Question",
+  "question.placeholder": "Ask your question here...",
+  "question.bookOptional": "Book (Optional)",
+  "question.submit": "Submit Question",
+  "question.submitted": "Question submitted successfully",
+  "question.submitFailed": "Failed to submit question: {{error}}",
+  "question.loginRequired": "Please login to ask a question",
+  "answer.label": "Your Answer",
+  "answer.placeholder": "Write your answer here...",
+  "answer.editPlaceholder": "Edit your answer here...",
+  "answer.submit": "Submit Answer",
+  "answer.update": "Update Answer",
+  "answer.submitted": "Answer submitted successfully",
+  "answer.updated": "Answer updated successfully",
+  "answer.submitFailed": "Failed to submit answer",
+  "answer.updateFailed": "Failed to update answer",
+  "answer.loginRequired": "Please login to answer",
+  "answer.editLoginRequired": "Please login to edit answer",
+  "attachments.optional": "Attachments (Optional)",
+  "media.added": "Media added successfully",
+  "uploads.waitForCompletion": "Please wait for uploads to complete",
+  "uploads.inProgress": "Uploading..."
+}
