@@ -1347,6 +1347,18 @@ export default function Statistics() {
     if (!n) return true;
     return fields.some((f) => normalizedIncludes(f ?? '', n));
   };
+  const overstampMatch = (
+    filter: string,
+    overstamped: boolean | null | undefined,
+    stampCount: number | null | undefined,
+  ): boolean => {
+    if (filter === 'all') return true;
+    const scanned = stampCount !== null && stampCount !== undefined;
+    if (filter === 'unscanned') return !scanned;
+    if (filter === 'over') return !!overstamped;
+    if (filter === 'clean') return scanned && !overstamped;
+    return true;
+  };
   const filteredResources = resources.filter(r => {
     const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
     const matchesWm =
@@ -1355,6 +1367,7 @@ export default function Statistics() {
         : watermarkFilter === 'over_stamped'
           ? !!r.watermark_overstamped
           : (r.watermark_status ?? 'pending') === watermarkFilter;
+    const matchesOverstamp = overstampMatch(overstampFilter, r.watermark_overstamped, r.watermark_stamp_count);
     const src = r.source_link ?? '';
     const srcIsUrl = /^https?:\/\//i.test(src);
     const matchesSource =
@@ -1402,7 +1415,7 @@ export default function Statistics() {
     ]);
     return matchesFilter && matchesWm && matchesSource && matchesReadability
       && matchesPages && matchesTeacher && matchesSchool && matchesBook
-      && matchesType && matchesDescription && matchesSearch;
+      && matchesType && matchesDescription && matchesSearch && matchesOverstamp;
   });
   if (pagesSort !== 'none') {
     filteredResources.sort((a, b) => {
