@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -151,7 +151,7 @@ export function MetadataReviewDialog({ open, target, applying, onDiscard, onAppl
   const [selected, setSelected] = useState<Set<MetadataField>>(new Set());
 
   // Reset selection when a new target opens — default to all fields with proposals.
-  useMemo(() => {
+  useEffect(() => {
     if (target) {
       setSelected(new Set(fields.filter((f) => f.hasProposal).map((f) => f.key)));
     } else {
