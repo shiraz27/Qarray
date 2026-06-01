@@ -573,6 +573,7 @@ Deno.serve(async (req) => {
     const body = await req.json()
     const targets: Array<{ target_type: 'resource' | 'question'; target_id: number }> = body.targets || []
     const kinds: Kind[] = body.kinds || []
+    const requestedModels: string[] = Array.isArray(body.models) ? body.models.filter((m: any) => typeof m === 'string' && m.length > 0) : []
     if (!Array.isArray(targets) || targets.length === 0 || !Array.isArray(kinds) || kinds.length === 0) {
       return new Response(JSON.stringify({ error: 'targets and kinds required' }), {
         status: 400,
@@ -583,8 +584,19 @@ Deno.serve(async (req) => {
     const results: any[] = []
     for (const t of targets) {
       for (const k of kinds) {
-        const r = await runGeneration(admin, OPENROUTER, t.target_type, t.target_id, k)
-        results.push({ ...t, kind: k, ...r })
+        // Per kind, pick the models to run. If caller didn't specify, fall back to default.
+        const modelsForKind = requestedModels.length > 0
+          ? requestedModels.filter((m) => (k === 'infographic' ? /image/i.test(m) : !/image/i.test(m)))
+          : [DEFAULT_MODEL_FOR_KIND[k]]
+        // If user picked models but none matched this kind, log a single failure entry.
+        if (modelsForKind.length === 0) {
+          results.push({ ...t, kind: k, status: 'failed', error: `No selected model supports kind "${k}"` })
+          continue
+        }
+        for (const m of modelsForKind) {
+          const r = await runGeneration(admin, OPENROUTER, t.target_type, t.target_id, k, m)
+          results.push({ ...t, kind: k, model: m, ...r })
+        }
       }
     }
 
