@@ -355,7 +355,7 @@ export default function Chapter() {
         // Fetch questions with vote counts
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, data, created_at, type_id, verified, contributors, book, page_count')
+          .select('id, data, created_at, type_id, verified, contributors, book, page_count, teacher_names, school_names, books, ocr_text, ocr_text_proposed')
           .eq('chapter_id', chapterId)
           .eq('deleted', false)
           .order('created_at', { ascending: false });
@@ -416,7 +416,7 @@ export default function Chapter() {
         // Fetch resources with vote counts
         const { data: resourcesData } = await (supabase as any)
           .from('resources')
-          .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, book, page_count, shared_with')
+          .select('id, title, description, data, created_at, type_id, type_ids, devoir_type_id, with_correction, verified, published_by, book, page_count, shared_with, teacher_name, school_name, teacher_names, school_names, books, source_link, ocr_text, ocr_text_proposed')
           .or(resourceChapterFilter(chapterId))
           .eq('deleted', false)
           .order('created_at', { ascending: false });
