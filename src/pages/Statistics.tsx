@@ -2115,6 +2115,7 @@ export default function Statistics() {
                                 <SelectItem value="in_progress">Watermark: In progress</SelectItem>
                                 <SelectItem value="failed">Watermark: Failed</SelectItem>
                                 <SelectItem value="not_applicable">Watermark: N/A</SelectItem>
+                                <SelectItem value="over_stamped">Watermark: Over-stamped</SelectItem>
                               </SelectContent>
                             </Select>
                             <Select value={sourceFilter} onValueChange={setSourceFilter}>
