@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Home, Bookmark, User, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 
 interface BottomNavigationProps {
   onTabChange: (tab: string) => void;
@@ -10,6 +11,7 @@ interface BottomNavigationProps {
 
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({ onTabChange, activeTab }) => {
   const [bookmarkCount, setBookmarkCount] = useState(0);
+  const { enabled: classesEnabled, loading: classesLoading } = useFeatureFlag('classes');
 
   useEffect(() => {
     const fetchBookmarkCount = async () => {
@@ -28,9 +30,10 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ onTabChange,
     fetchBookmarkCount();
   }, []);
 
+  const showClassmates = classesLoading ? false : classesEnabled !== false;
   const navigationItems = [
     { id: 'subjects', label: 'Subjects', Icon: Home },
-    { id: 'classmates', label: 'Classmates', Icon: Users },
+    ...(showClassmates ? [{ id: 'classmates', label: 'Classmates', Icon: Users }] : []),
     { id: 'bookmarks', label: 'Bookmarks', Icon: Bookmark, badge: bookmarkCount },
     { id: 'profile', label: 'Profile', Icon: User }
   ];
