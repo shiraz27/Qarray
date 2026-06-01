@@ -154,25 +154,40 @@ export async function processRowWatermark(
     onProgress?.({ message: `Loading ${table.slice(0, -1)} #${rowId}…` });
     const { data: row, error } = await (supabase as any)
       .from(table)
-      .select('data')
+      .select('data, watermarked_urls')
       .eq('id', rowId)
       .single();
     if (error || !row) throw new Error(`${table} not found`);
 
     const rawText = Array.isArray(row.data) ? (row.data as string[]).join('\n') : (row.data || '');
     const media = extractMediaFromText(rawText).media.map((m) => m.url);
+    const mediaSet = new Set(media);
+
+    // Already-stamped URLs from a previous (possibly partial) run, pruned to
+    // what's still present in the row's current media list.
+    const stampedSet = new Set<string>(
+      ((row.watermarked_urls as string[] | null) || []).filter((u) => mediaSet.has(u)),
+    );
 
     if (media.length === 0) {
       await writeFinal({
         watermark_status: 'not_applicable',
         pages_watermarked: 0,
         watermark_error: null,
+        watermarked_urls: [],
       });
       return { success: true, message: 'No media to watermark', status: 'not_applicable', pagesWatermarked: 0 };
     }
 
     // Mark in_progress so admins see live state.
-    await (supabase as any).from(table).update({ watermark_status: 'in_progress' }).eq('id', rowId);
+    await (supabase as any)
+      .from(table)
+      .update({
+        watermark_status: 'in_progress',
+        // Persist the pruned list so the stored value reflects reality.
+        watermarked_urls: Array.from(stampedSet),
+      })
+      .eq('id', rowId);
 
     // Classify and expand split-PDF manifests.
     const units: ProcessUnit[] = [];
@@ -202,20 +217,31 @@ export async function processRowWatermark(
         watermark_status: 'not_applicable',
         pages_watermarked: 0,
         watermark_error: null,
+        watermarked_urls: [],
       });
       return { success: true, message: 'No PDFs/images to watermark', status: 'not_applicable', pagesWatermarked: 0 };
     }
 
-    let done = 0;
+    // Seed `done` with previously-stamped pages so a successful retry of the
+    // remaining ones can report `completed` instead of staying `partial`.
+    let done = stampedSet.size;
     let failed = 0;
     let lastError: string | null = null;
 
-    const tick = async (delta: number) => {
+    const tick = async (delta: number, stampedUrl?: string) => {
       done += delta;
+      if (stampedUrl) stampedSet.add(stampedUrl);
       onProgress?.({ message: `Stamped ${done}/${total}…`, done, total });
-      // Live-update the running count so admins can watch progress in the table.
+      // Live-update the running count + stamped-URL list so admins can watch
+      // progress and a future retry skips what's already been stamped.
       try {
-        await (supabase as any).from(table).update({ pages_watermarked: done }).eq('id', rowId);
+        await (supabase as any)
+          .from(table)
+          .update({
+            pages_watermarked: done,
+            watermarked_urls: Array.from(stampedSet),
+          })
+          .eq('id', rowId);
       } catch {
         /* non-fatal */
       }
@@ -225,9 +251,10 @@ export async function processRowWatermark(
       if (u.kind === 'unsupported') continue;
 
       if (u.kind === 'pdf' || u.kind === 'image') {
+        if (stampedSet.has(u.url)) continue; // already stamped on a previous run
         try {
           await watermarkAndOverwriteOne(u.url, u.kind);
-          await tick(1);
+          await tick(1, u.url);
         } catch (e: any) {
           failed += 1;
           lastError = e?.message || String(e);
@@ -244,9 +271,10 @@ export async function processRowWatermark(
         continue;
       }
       for (const pageUrl of pages) {
+        if (stampedSet.has(pageUrl)) continue; // already stamped on a previous run
         try {
           await watermarkAndOverwriteOne(pageUrl, 'pdf');
-          await tick(1);
+          await tick(1, pageUrl);
         } catch (e: any) {
           failed += 1;
           lastError = e?.message || String(e);
@@ -265,6 +293,7 @@ export async function processRowWatermark(
       watermark_status: status,
       pages_watermarked: successCount,
       watermark_error: status === 'completed' ? null : lastError,
+      watermarked_urls: Array.from(stampedSet),
     });
 
     return {
