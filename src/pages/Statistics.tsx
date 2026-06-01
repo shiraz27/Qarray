@@ -1813,18 +1813,7 @@ export default function Statistics() {
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <h4 className="font-medium">Resources OCR Stats</h4>
                           <div className="flex gap-2">
-                            {ocrStats.completed > 0 && (
-                              <Button 
-                                onClick={handleExtractAllMetadata} 
-                                disabled={isExtractingBatch}
-                                size="sm"
-                                variant="outline"
-                              >
-                                {isExtractingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                <Sparkles className="mr-1 h-4 w-4" />
-                                Extract All Metadata ({ocrStats.completed})
-                              </Button>
-                            )}
+                            {/* Bulk "Extract All Metadata" removed — metadata extraction now requires per-row review. */}
                             {(ocrStats.pending > 0 || ocrStats.failed > 0) && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -2008,7 +1997,7 @@ export default function Statistics() {
                                 {selectedResourceIds.size} selected
                               </span>
                               <div className="flex flex-wrap items-center gap-2">
-                                {aiBatchChips('resource', () => Array.from(selectedResourceIds))}
+                                {/* Bulk AI metadata chips removed — use the per-row Sparkles button to review each item. */}
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button size="sm" disabled={isProcessingBatch}>
@@ -2096,8 +2085,6 @@ export default function Statistics() {
                                         resource.ocr_status === 'failed' ||
                                         resource.ocr_status === 'not_applicable'
                                       ) && isPdfOrImage;
-                                      const suggestedTitle = suggestedTitles.find(st => st.resourceId === resource.id);
-                                      
                                       return (
                                         <TableRow key={resource.id}>
                                           <TableCell>
@@ -2116,28 +2103,6 @@ export default function Statistics() {
                                                 onSuggest={() => suggestCellValue('resource', resource, 'title')}
                                                 onSave={(v) => saveResourceCell(resource, 'title', v)}
                                               />
-                                              {suggestedTitle && (
-                                                <div className="flex items-center gap-2">
-                                                  <Badge variant="outline" className="text-xs gap-1 text-primary border-primary/30">
-                                                    <FileEdit className="w-3 h-3" />
-                                                    AI: {suggestedTitle.suggestedTitle.substring(0, 40)}{suggestedTitle.suggestedTitle.length > 40 ? '...' : ''}
-                                                  </Badge>
-                                                  <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    className="h-6 px-2"
-                                                    onClick={() => handleApplySuggestedTitle(resource.id)}
-                                                    disabled={applyingTitleId === resource.id}
-                                                    title="Apply suggested title"
-                                                  >
-                                                    {applyingTitleId === resource.id ? (
-                                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                                    ) : (
-                                                      <Check className="h-3 w-3 text-green-600" />
-                                                    )}
-                                                  </Button>
-                                                </div>
-                                              )}
                                               {(resource.school_name || resource.teacher_name) && (
                                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                   {resource.school_name && (
@@ -2384,9 +2349,9 @@ export default function Statistics() {
                                                 <Button
                                                   size="sm"
                                                   variant="ghost"
-                                                  onClick={() => handleExtractMetadata(resource.id)}
+                                                  onClick={() => openMetadataReview('resource', resource.id)}
                                                   disabled={extractingMetadataId === resource.id}
-                                                  title="Extract metadata with AI"
+                                                  title="Extract metadata with AI (review before applying)"
                                                 >
                                                   {extractingMetadataId === resource.id ? (
                                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -2706,7 +2671,7 @@ export default function Statistics() {
                                 {selectedQuestionIds.size} selected
                               </span>
                               <div className="flex flex-wrap items-center gap-2">
-                                {aiBatchChips('question', () => Array.from(selectedQuestionIds))}
+                                {/* Bulk AI metadata chips removed — use the per-row Sparkles button to review each item. */}
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button size="sm" disabled={isProcessingQuestionBatch}>
