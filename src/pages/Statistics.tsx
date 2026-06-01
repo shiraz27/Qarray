@@ -2536,72 +2536,35 @@ export default function Statistics() {
                                                   )
                                                 }
                                               />
-                                              {canProcess && (
-                                                <>
-                                                  <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => handleProcessSingle(resource.id, 'text')}
-                                                    disabled={processingId === resource.id}
-                                                    title="Run OCR — Text only (fast, digital PDFs)"
-                                                  >
-                                                    {processingId === resource.id ? (
-                                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                                    ) : (
-                                                      <FileText className="h-4 w-4" />
-                                                    )}
-                                                  </Button>
-                                                  <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => handleProcessSingle(resource.id, 'image')}
-                                                    disabled={processingId === resource.id}
-                                                    title="Run OCR — Image only (scans/photos)"
-                                                  >
-                                                    <ImageIcon className="h-4 w-4" />
-                                                  </Button>
-                                                  <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => handleProcessSingle(resource.id, 'mixed')}
-                                                    disabled={processingId === resource.id}
-                                                    title="Run OCR — Mixed (most thorough)"
-                                                  >
-                                                    <Layers className="h-4 w-4" />
-                                                  </Button>
-                                                </>
-                                              )}
-                                              <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                  <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    disabled={processingId === resource.id}
-                                                    title="Force retry OCR (any status)"
-                                                  >
-                                                    <RefreshCw className="h-4 w-4" />
-                                                  </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                  {(['text', 'image', 'mixed'] as OcrMode[]).map((m) => (
-                                                    <DropdownMenuItem
-                                                      key={m}
-                                                      onClick={() => {
-                                                        if (resource.ocr_status === 'completed') {
-                                                          setForceRetryConfirm({ kind: 'resource', id: resource.id, mode: m });
-                                                        } else {
-                                                          handleProcessSingle(resource.id, m);
-                                                        }
-                                                      }}
-                                                    >
-                                                      {m === 'text' && <FileText className="mr-2 h-4 w-4" />}
-                                                      {m === 'image' && <ImageIcon className="mr-2 h-4 w-4" />}
-                                                      {m === 'mixed' && <Layers className="mr-2 h-4 w-4" />}
-                                                      Force retry — {m}
-                                                    </DropdownMenuItem>
-                                                  ))}
-                                                </DropdownMenuContent>
-                                              </DropdownMenu>
+                                              <Button
+                                                size="sm"
+                                                variant={canProcess ? 'outline' : 'ghost'}
+                                                onClick={() =>
+                                                  setOcrScanTarget({
+                                                    kind: 'resource',
+                                                    id: resource.id,
+                                                    context: {
+                                                      chapterName: resource.chapters?.name ?? null,
+                                                      subjectName: resource.chapters?.subjects?.name ?? null,
+                                                      className: resource.chapters?.classes?.name ?? null,
+                                                      book: (resource.books && resource.books[0]) || resource.school_name || null,
+                                                      teacher: (resource.teacher_names && resource.teacher_names[0]) || resource.teacher_name || null,
+                                                      school: (resource.school_names && resource.school_names[0]) || resource.school_name || null,
+                                                      resourceType: resource.resource_types?.type ?? null,
+                                                      currentStatus: resource.ocr_status ?? null,
+                                                    },
+                                                  })
+                                                }
+                                                disabled={processingId === resource.id}
+                                                title="Run OCR with context & options"
+                                              >
+                                                {processingId === resource.id ? (
+                                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                  <Layers className="h-4 w-4" />
+                                                )}
+                                                <span className="ml-1 hidden md:inline">OCR…</span>
+                                              </Button>
                                             </div>
                                           </TableCell>
                                         </TableRow>
