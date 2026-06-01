@@ -1966,7 +1966,7 @@ export default function Statistics() {
                         {/* Resources Table */}
                         <div className="pt-4 border-t">
                           <h4 className="font-medium mb-4">Resources & OCR Status</h4>
-                          <div className="flex gap-2 mb-4">
+                          <div className="flex flex-wrap gap-2 mb-4 items-center">
                             <Select value={ocrFilter} onValueChange={setOcrFilter}>
                               <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Filter by status" />
