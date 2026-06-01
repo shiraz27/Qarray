@@ -2977,6 +2977,21 @@ export default function Statistics() {
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
+                                              {question.ocr_status === 'completed' && question.ocr_text && (
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={() => openMetadataReview('question', question.id)}
+                                                  disabled={extractingMetadataId === question.id}
+                                                  title="Extract metadata with AI (review before applying)"
+                                                >
+                                                  {extractingMetadataId === question.id ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                  ) : (
+                                                    <Sparkles className="h-4 w-4" />
+                                                  )}
+                                                </Button>
+                                              )}
                                               {canProcess && (
                                                 <>
                                                   <Button
