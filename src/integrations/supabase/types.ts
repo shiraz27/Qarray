@@ -810,7 +810,10 @@ export type Database = {
           updated_at: string | null
           verified: boolean
           watermark_error: string | null
+          watermark_overstamped: boolean
           watermark_processed_at: string | null
+          watermark_scan_at: string | null
+          watermark_stamp_count: number | null
           watermark_status: string
           watermarked_urls: string[]
         }
@@ -841,7 +844,10 @@ export type Database = {
           updated_at?: string | null
           verified?: boolean
           watermark_error?: string | null
+          watermark_overstamped?: boolean
           watermark_processed_at?: string | null
+          watermark_scan_at?: string | null
+          watermark_stamp_count?: number | null
           watermark_status?: string
           watermarked_urls?: string[]
         }
@@ -872,7 +878,10 @@ export type Database = {
           updated_at?: string | null
           verified?: boolean
           watermark_error?: string | null
+          watermark_overstamped?: boolean
           watermark_processed_at?: string | null
+          watermark_scan_at?: string | null
+          watermark_stamp_count?: number | null
           watermark_status?: string
           watermarked_urls?: string[]
         }
@@ -956,7 +965,10 @@ export type Database = {
           updated_at: string | null
           verified: boolean
           watermark_error: string | null
+          watermark_overstamped: boolean
           watermark_processed_at: string | null
+          watermark_scan_at: string | null
+          watermark_stamp_count: number | null
           watermark_status: string
           watermarked_urls: string[]
           with_correction: boolean
@@ -1001,7 +1013,10 @@ export type Database = {
           updated_at?: string | null
           verified?: boolean
           watermark_error?: string | null
+          watermark_overstamped?: boolean
           watermark_processed_at?: string | null
+          watermark_scan_at?: string | null
+          watermark_stamp_count?: number | null
           watermark_status?: string
           watermarked_urls?: string[]
           with_correction?: boolean
@@ -1046,7 +1061,10 @@ export type Database = {
           updated_at?: string | null
           verified?: boolean
           watermark_error?: string | null
+          watermark_overstamped?: boolean
           watermark_processed_at?: string | null
+          watermark_scan_at?: string | null
+          watermark_stamp_count?: number | null
           watermark_status?: string
           watermarked_urls?: string[]
           with_correction?: boolean
