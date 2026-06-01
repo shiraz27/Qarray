@@ -263,9 +263,23 @@ export const AiGenerationsCard: React.FC = () => {
     return `${m}m${String(sec).padStart(2, '0')}s`;
   };
 
-  const StatusPill: React.FC<{ s?: GenStatus; kind: Kind; model: string }> = ({ s, kind, model }) => {
+  const StatusPill: React.FC<{ s?: GenStatus; kind: Kind; model: string; rowKey: string }> = ({ s, kind, model, rowKey }) => {
     if (!s) return <span className="text-xs text-muted-foreground">—</span>;
-    if (s.status === 'completed') return <CheckCircle2 className="h-3.5 w-3.5 text-green-600 inline" />;
+    if (s.status === 'completed') {
+      if (s.reviewStatus === 'pending' && s.proposedData && s.outputAnswerId) {
+        return (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setReviewKey(rowKey); }}
+            className="inline-flex items-center gap-1 rounded-full border border-amber-400 bg-amber-50 px-1.5 py-0 text-[10px] font-medium text-amber-800 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/60"
+            title="New AI output pending review"
+          >
+            <AlertCircle className="h-3 w-3" /> Review
+          </button>
+        );
+      }
+      return <CheckCircle2 className="h-3.5 w-3.5 text-green-600 inline" />;
+    }
     if (s.status === 'running' || s.status === 'queued') {
       const elapsed = s.startedAt ? Math.max(0, Math.floor((Date.now() - s.startedAt) / 1000)) : 0;
       const eta = etaByKindModel[`${kind}:${model}`];
