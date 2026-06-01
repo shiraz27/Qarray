@@ -812,6 +812,7 @@ export type Database = {
           watermark_error: string | null
           watermark_processed_at: string | null
           watermark_status: string
+          watermarked_urls: string[]
         }
         Insert: {
           book?: string | null
@@ -842,6 +843,7 @@ export type Database = {
           watermark_error?: string | null
           watermark_processed_at?: string | null
           watermark_status?: string
+          watermarked_urls?: string[]
         }
         Update: {
           book?: string | null
@@ -872,6 +874,7 @@ export type Database = {
           watermark_error?: string | null
           watermark_processed_at?: string | null
           watermark_status?: string
+          watermarked_urls?: string[]
         }
         Relationships: [
           {
@@ -955,6 +958,7 @@ export type Database = {
           watermark_error: string | null
           watermark_processed_at: string | null
           watermark_status: string
+          watermarked_urls: string[]
           with_correction: boolean
         }
         Insert: {
@@ -999,6 +1003,7 @@ export type Database = {
           watermark_error?: string | null
           watermark_processed_at?: string | null
           watermark_status?: string
+          watermarked_urls?: string[]
           with_correction?: boolean
         }
         Update: {
@@ -1043,6 +1048,7 @@ export type Database = {
           watermark_error?: string | null
           watermark_processed_at?: string | null
           watermark_status?: string
+          watermarked_urls?: string[]
           with_correction?: boolean
         }
         Relationships: [
