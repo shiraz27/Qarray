@@ -3157,6 +3157,13 @@ export default function Statistics() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <MetadataReviewDialog
+        open={!!metadataReview}
+        target={metadataReview}
+        applying={applyingReview}
+        onDiscard={() => setMetadataReview(null)}
+        onApply={applyMetadataReview}
+      />
     </div>
   );
 }
