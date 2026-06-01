@@ -581,7 +581,7 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
     </div>
   );
 
-  const downloadAllButton = (
+  const downloadAllButton = showBatchDownload ? (
     <Button
       variant="default"
       size="sm"
@@ -597,7 +597,7 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
       )}
       <span className="hidden sm:inline">Full PDF ({total}p)</span>
     </Button>
-  );
+  ) : null;
 
   return (
     <SinglePdfView
@@ -611,6 +611,7 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
       downloadIcon={<FileText className="h-4 w-4" />}
       downloadTitle={`Download only page ${currentPage.n} as a single-page PDF`}
       extraDownloadActions={downloadAllButton}
+      downloadFlag="download_per_page"
     />
   );
 }
