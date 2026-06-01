@@ -19,9 +19,31 @@ export interface ExtractPdfOptions {
    *  - 'mixed' : both, combined per-page (default; most thorough).
    */
   mode?: OcrMode;
+  /**
+   * Force a Tesseract language pack (e.g. "fra", "ara", "eng", "fra+ara").
+   * When provided, the automatic French/Arabic/English probe is skipped.
+   */
+  langs?: string;
+  /**
+   * Page segmentation mode passed to Tesseract. Defaults to '6'
+   * (single uniform block of text) which works for most school PDFs.
+   *  - '3'  : fully automatic page segmentation
+   *  - '4'  : single column of text of variable sizes
+   *  - '6'  : assume a single uniform block of text
+   *  - '11' : sparse text — find as much text as possible in no particular order
+   */
+  psm?: OcrPsm;
+  /**
+   * Free-form context written into the OCR header (chapter, subject, book,
+   * teacher, language notes…). Does NOT influence Tesseract directly but is
+   * persisted alongside the result so downstream AI prompts (descriptions,
+   * proposals) can leverage it.
+   */
+  contextHint?: string;
 }
 
 export type OcrMode = 'text' | 'image' | 'mixed';
+export type OcrPsm = '3' | '4' | '6' | '11';
 
 /**
  * Default OCR language pack. Tunisian scientific subjects are taught in French,
