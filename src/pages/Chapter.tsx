@@ -101,6 +101,7 @@ export default function Chapter() {
   const [selectedTypeFilters, setSelectedTypeFilters] = useState<number[]>([]);
   const [selectedDevoirFilters, setSelectedDevoirFilters] = useState<number[]>([]);
   const [showWithCorrectionOnly, setShowWithCorrectionOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<'votes' | 'newest' | 'pages_asc' | 'pages_desc'>('votes');
   const [activeTab, setActiveTab] = useState('subjects');
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
   const [isResourceDialogOpen, setIsResourceDialogOpen] = useState(false);
