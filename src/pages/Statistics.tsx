@@ -1524,7 +1524,12 @@ export default function Statistics() {
 
   const filteredQuestions = questions.filter(q => {
     const matchesFilter = questionOcrFilter === 'all' || q.ocr_status === questionOcrFilter;
-    const matchesWm = questionWatermarkFilter === 'all' || (q.watermark_status ?? 'pending') === questionWatermarkFilter;
+    const matchesWm =
+      questionWatermarkFilter === 'all'
+        ? true
+        : questionWatermarkFilter === 'over_stamped'
+          ? !!q.watermark_overstamped
+          : (q.watermark_status ?? 'pending') === questionWatermarkFilter;
     const matchesReadability =
       questionReadabilityFilter === 'all' ? true :
       questionReadabilityFilter === 'missing' ? !q.ocr_readability :
