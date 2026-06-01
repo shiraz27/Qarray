@@ -10,15 +10,26 @@ import {
   reportToCsv,
   type AuditProgress,
   type AuditResult,
+  type AuditScope,
+  type AuditKindFilter,
 } from '@/utils/pdfHealthAudit';
 import { PdfHealthScheduledReport } from './PdfHealthScheduledReport';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export function PdfHealthAuditPanel() {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<AuditProgress | null>(null);
   const [result, setResult] = useState<AuditResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [scope, setScope] = useState<AuditScope>('skip-recent-healthy');
+  const [kindFilter, setKindFilter] = useState<AuditKindFilter>('all');
+  const [maxAgeDays, setMaxAgeDays] = useState<number>(7);
+  const [limit, setLimit] = useState<string>('');
 
   const handleRun = async () => {
     setRunning(true);
@@ -26,7 +37,16 @@ export function PdfHealthAuditPanel() {
     setResult(null);
     setProgress({ processed: 0, total: 0, brokenRows: 0 });
     try {
-      const res = await runPdfHealthAudit((p) => setProgress(p));
+      const parsedLimit = limit.trim() ? Math.max(1, Number(limit)) : undefined;
+      const res = await runPdfHealthAudit(
+        {
+          scope,
+          kind: kindFilter,
+          maxAgeDays: Number.isFinite(maxAgeDays) && maxAgeDays > 0 ? maxAgeDays : 7,
+          limit: Number.isFinite(parsedLimit as number) ? parsedLimit : undefined,
+        },
+        (p) => setProgress(p),
+      );
       setResult(res);
       toast.success(
         `Audit complete — ${res.totalBrokenPages} broken page(s) across ${res.rows.length} row(s)`,
@@ -76,6 +96,65 @@ export function PdfHealthAuditPanel() {
             <PdfHealthScheduledReport />
           </TabsContent>
           <TabsContent value="manual" className="pt-4 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Scope</Label>
+            <Select value={scope} onValueChange={(v) => setScope(v as AuditScope)}>
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="skip-recent-healthy">
+                  Skip recently healthy
+                </SelectItem>
+                <SelectItem value="only-previously-broken">
+                  Only previously broken
+                </SelectItem>
+                <SelectItem value="only-unchecked">
+                  Only never-scanned
+                </SelectItem>
+                <SelectItem value="all">Re-check everything</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Kind</Label>
+            <Select value={kindFilter} onValueChange={(v) => setKindFilter(v as AuditKindFilter)}>
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Resources + questions</SelectItem>
+                <SelectItem value="resource">Resources only</SelectItem>
+                <SelectItem value="question">Questions only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">
+              Healthy cache window (days)
+            </Label>
+            <Input
+              type="number"
+              min={1}
+              value={maxAgeDays}
+              onChange={(e) => setMaxAgeDays(Number(e.target.value))}
+              disabled={scope !== 'skip-recent-healthy'}
+              className="h-9"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Max rows (optional)</Label>
+            <Input
+              type="number"
+              min={1}
+              placeholder="No limit"
+              value={limit}
+              onChange={(e) => setLimit(e.target.value)}
+              className="h-9"
+            />
+          </div>
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Button onClick={handleRun} disabled={running} className="gap-2">
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
@@ -106,7 +185,7 @@ export function PdfHealthAuditPanel() {
 
         {result && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-sm">
               <Stat label="Rows scanned" value={result.totalRowsScanned} />
               <Stat label="Pages checked" value={result.totalPagesChecked} />
               <Stat
@@ -119,6 +198,8 @@ export function PdfHealthAuditPanel() {
                 value={result.totalUnavailablePages}
                 tone={result.totalUnavailablePages > 0 ? 'warn' : 'ok'}
               />
+              <Stat label="Skipped (healthy)" value={result.skippedHealthy} />
+              <Stat label="Skipped (filter)" value={result.skippedOutOfScope} />
             </div>
 
             {result.rows.length === 0 ? (
