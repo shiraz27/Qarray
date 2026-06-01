@@ -178,6 +178,8 @@ export default function Statistics() {
   const [questionOcrFilter, setQuestionOcrFilter] = useState<string>('all');
   const [watermarkFilter, setWatermarkFilter] = useState<string>('all');
   const [questionWatermarkFilter, setQuestionWatermarkFilter] = useState<string>('all');
+  const [overstampFilter, setOverstampFilter] = useState<string>('all'); // all | over | clean | unscanned
+  const [questionOverstampFilter, setQuestionOverstampFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [readabilityFilter, setReadabilityFilter] = useState<string>('all');
   const [questionReadabilityFilter, setQuestionReadabilityFilter] = useState<string>('all');
