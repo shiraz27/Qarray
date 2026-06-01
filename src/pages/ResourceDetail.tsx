@@ -13,9 +13,8 @@ import qarayLogo from '@/assets/qarray-logo-new.png';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MediaList } from '@/components/MediaList';
-import { MediaPreview } from '@/components/MediaPreview';
-import { PdfInlinePreview } from '@/components/PdfInlinePreview';
-import { isPdfUrl } from '@/utils/mediaTypeUtils';
+import { MediaGallery } from '@/components/MediaGallery';
+import { detectMediaType } from '@/utils/mediaTypeUtils';
 import { UserAvatar } from '@/components/UserAvatar';
 import { parseAiAnswer, AiAnswerRenderer } from '@/components/AiAnswerRenderer';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
@@ -717,17 +716,12 @@ export default function ResourceDetail() {
                   <h3 className="text-sm font-semibold text-muted-foreground">
                     Attachments ({resource.data.length})
                   </h3>
-                  <div className="grid grid-cols-1 gap-4">
-                    {resource.data.map((url, index) => (
-                      <div key={index} className="w-full">
-                        {isPdfUrl(url) ? (
-                          <PdfInlinePreview url={url} className="w-full" />
-                        ) : (
-                          <MediaPreview url={url} className="w-full" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <MediaGallery
+                    items={resource.data.map((url) => ({
+                      url,
+                      type: detectMediaType(url) as any,
+                    }))}
+                  />
                 </div>
               )}
             </div>

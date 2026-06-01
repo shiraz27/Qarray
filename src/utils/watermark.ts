@@ -1,6 +1,14 @@
 import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 import { supabase } from '@/integrations/supabase/client';
 
+/**
+ * Sentinel stored in a stamped PDF's Keywords metadata. Used as a
+ * defence-in-depth idempotency check so re-running the watermark pass
+ * (e.g. after a partial failure) doesn't draw a second watermark on top
+ * of an existing one and make the page progressively darker.
+ */
+export const WATERMARK_MARKER = 'qarray-watermarked-v1';
+
 export type WatermarkOptions = {
   text: string;
   opacity?: number; // 0..1
@@ -69,6 +77,17 @@ export async function watermarkPdfBytes(
   const marginRatio = opts?.marginRatio ?? full.marginRatio;
 
   const pdfDoc = await PDFDocument.load(inputBytes, { ignoreEncryption: true });
+
+  // Idempotency: if this PDF was already stamped, return its bytes unchanged.
+  try {
+    const existingKeywords = pdfDoc.getKeywords?.() ?? '';
+    if (typeof existingKeywords === 'string' && existingKeywords.includes(WATERMARK_MARKER)) {
+      return new Uint8Array(inputBytes.slice(0));
+    }
+  } catch {
+    /* fall through and stamp normally */
+  }
+
   const font = await ensureFont(pdfDoc);
 
   const { r, g, b } = hexToRgb01(colorHex);
@@ -104,6 +123,17 @@ export async function watermarkPdfBytes(
       rotate: degrees(rotationDegrees),
       opacity: Math.max(0.08, opacity * 0.85),
     });
+  }
+
+  // Mark the document as watermarked so future passes skip it.
+  try {
+    const prev = pdfDoc.getKeywords?.() ?? '';
+    const merged = prev && typeof prev === 'string' && prev.length > 0
+      ? `${prev} ${WATERMARK_MARKER}`
+      : WATERMARK_MARKER;
+    pdfDoc.setKeywords([merged]);
+  } catch {
+    /* metadata is best-effort */
   }
 
     const saved = await pdfDoc.save();
