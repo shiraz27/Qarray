@@ -16,6 +16,7 @@ import {
 import { mediaSrc, isMediaToken, tokenInnerPath } from '@/utils/mediaToken';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
 import { Progress } from '@/components/ui/progress';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 
 
 interface MediaPreviewProps {
@@ -37,6 +38,9 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
   const [downloading, setDownloading] = useState(false);
   const { toast } = useToast();
   const { items: uploadItems } = useUploadManager();
+  const { enabled: downloadFileEnabled, loading: downloadFileFlagLoading } =
+    useFeatureFlag('download_file');
+  const showFileDownload = downloadFileFlagLoading || downloadFileEnabled !== false;
 
   // Internal "browser-loadable" src — always routed through our media proxy so
   // the storage origin never appears in the DOM or in network requests.
@@ -146,20 +150,22 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
             <p className="text-xs text-muted-foreground">PDF document</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleDownload}
-              disabled={downloading}
-              className="gap-1"
-            >
-              {downloading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-              <span className="hidden sm:inline">Download</span>
-            </Button>
+            {showFileDownload && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleDownload}
+                disabled={downloading}
+                className="gap-1"
+              >
+                {downloading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">Download</span>
+              </Button>
+            )}
             <Button variant="ghost" size="sm" asChild className="gap-1">
               <a
                 href={encodedUrl}
@@ -244,6 +250,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
               </div>
 
 
+              {showFileDownload && (
               <div className="absolute top-2 right-2">
                 <Button
                   size="sm"
@@ -286,6 +293,7 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
                   {downloading ? '…' : 'Download'}
                 </Button>
               </div>
+              )}
             </div>
           </Card>
 

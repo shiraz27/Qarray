@@ -113,6 +113,7 @@ function SinglePdfView({
   downloadIcon,
   downloadTitle,
   hideOpenOriginal = false,
+  downloadFlag = 'download_file',
 }: {
   url: string;
   className?: string;
@@ -124,7 +125,11 @@ function SinglePdfView({
   downloadIcon?: React.ReactNode;
   downloadTitle?: string;
   hideOpenOriginal?: boolean;
+  downloadFlag?: 'download_file' | 'download_per_page';
 }) {
+  const { enabled: downloadEnabled, loading: downloadFlagLoading } =
+    useFeatureFlag(downloadFlag);
+  const showDownload = downloadFlagLoading || downloadEnabled !== false;
   const [pages, setPages] = useState<any[]>([]);
   const [scale, setScale] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -250,21 +255,23 @@ function SinglePdfView({
             <ZoomIn className="h-4 w-4" />
           </Button>
           <div className="inline-flex rounded-md shadow-sm overflow-hidden">
-            <Button
-              variant={extraDownloadActions ? 'outline' : 'default'}
-              size="sm"
-              onClick={handleDownload}
-              disabled={downloading}
-              title={downloadTitle ?? 'Download this file'}
-              className={`gap-1 ${extraDownloadActions ? 'rounded-r-none' : ''}`}
-            >
-              {downloading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                downloadIcon ?? <Download className="h-4 w-4" />
-              )}
-              <span className="hidden sm:inline">{downloadLabel ?? 'Download'}</span>
-            </Button>
+            {showDownload && (
+              <Button
+                variant={extraDownloadActions ? 'outline' : 'default'}
+                size="sm"
+                onClick={handleDownload}
+                disabled={downloading}
+                title={downloadTitle ?? 'Download this file'}
+                className={`gap-1 ${extraDownloadActions ? 'rounded-r-none' : ''}`}
+              >
+                {downloading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  downloadIcon ?? <Download className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">{downloadLabel ?? 'Download'}</span>
+              </Button>
+            )}
             {extraDownloadActions}
           </div>
           {!hideOpenOriginal && (
@@ -377,6 +384,9 @@ export function PdfInlinePreview({ url, className = '' }: PdfInlinePreviewProps)
 
 
 function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
+  const { enabled: batchEnabled, loading: batchFlagLoading } =
+    useFeatureFlag('download_batch');
+  const showBatchDownload = batchFlagLoading || batchEnabled !== false;
   const [manifest, setManifest] = useState<SplitPdfManifest | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -571,7 +581,7 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
     </div>
   );
 
-  const downloadAllButton = (
+  const downloadAllButton = showBatchDownload ? (
     <Button
       variant="default"
       size="sm"
@@ -587,7 +597,7 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
       )}
       <span className="hidden sm:inline">Full PDF ({total}p)</span>
     </Button>
-  );
+  ) : null;
 
   return (
     <SinglePdfView
@@ -601,6 +611,7 @@ function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
       downloadIcon={<FileText className="h-4 w-4" />}
       downloadTitle={`Download only page ${currentPage.n} as a single-page PDF`}
       extraDownloadActions={downloadAllButton}
+      downloadFlag="download_per_page"
     />
   );
 }
