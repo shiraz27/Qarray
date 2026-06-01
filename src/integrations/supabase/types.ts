@@ -23,6 +23,9 @@ export type Database = {
           kind: string
           model: string | null
           output_answer_id: number | null
+          proposed_at: string | null
+          proposed_data: string | null
+          review_status: string | null
           status: string
           target_id: number
           target_type: string
@@ -36,6 +39,9 @@ export type Database = {
           kind: string
           model?: string | null
           output_answer_id?: number | null
+          proposed_at?: string | null
+          proposed_data?: string | null
+          review_status?: string | null
           status?: string
           target_id: number
           target_type: string
@@ -49,6 +55,9 @@ export type Database = {
           kind?: string
           model?: string | null
           output_answer_id?: number | null
+          proposed_at?: string | null
+          proposed_data?: string | null
+          review_status?: string | null
           status?: string
           target_id?: number
           target_type?: string
@@ -787,6 +796,10 @@ export type Database = {
           ocr_readability: string | null
           ocr_status: string | null
           ocr_text: string | null
+          ocr_text_proposed: string | null
+          ocr_text_proposed_at: string | null
+          ocr_text_proposed_readability: string | null
+          ocr_text_proposed_status: string | null
           page_count: number | null
           pages_watermarked: number
           resource_id: number | null
@@ -813,6 +826,10 @@ export type Database = {
           ocr_readability?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
+          ocr_text_proposed?: string | null
+          ocr_text_proposed_at?: string | null
+          ocr_text_proposed_readability?: string | null
+          ocr_text_proposed_status?: string | null
           page_count?: number | null
           pages_watermarked?: number
           resource_id?: number | null
@@ -839,6 +856,10 @@ export type Database = {
           ocr_readability?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
+          ocr_text_proposed?: string | null
+          ocr_text_proposed_at?: string | null
+          ocr_text_proposed_readability?: string | null
+          ocr_text_proposed_status?: string | null
           page_count?: number | null
           pages_watermarked?: number
           resource_id?: number | null
@@ -908,6 +929,10 @@ export type Database = {
           ocr_readability: string | null
           ocr_status: string | null
           ocr_text: string | null
+          ocr_text_proposed: string | null
+          ocr_text_proposed_at: string | null
+          ocr_text_proposed_readability: string | null
+          ocr_text_proposed_status: string | null
           page_count: number | null
           pages_watermarked: number
           published_by: string | null
@@ -944,6 +969,10 @@ export type Database = {
           ocr_readability?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
+          ocr_text_proposed?: string | null
+          ocr_text_proposed_at?: string | null
+          ocr_text_proposed_readability?: string | null
+          ocr_text_proposed_status?: string | null
           page_count?: number | null
           pages_watermarked?: number
           published_by?: string | null
@@ -980,6 +1009,10 @@ export type Database = {
           ocr_readability?: string | null
           ocr_status?: string | null
           ocr_text?: string | null
+          ocr_text_proposed?: string | null
+          ocr_text_proposed_at?: string | null
+          ocr_text_proposed_readability?: string | null
+          ocr_text_proposed_status?: string | null
           page_count?: number | null
           pages_watermarked?: number
           published_by?: string | null
