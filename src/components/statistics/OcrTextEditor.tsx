@@ -5,15 +5,22 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Copy, Pencil, Save, X, Loader2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import {
+  READABILITY_LABEL,
+  readabilityBadgeClass,
+  type OcrReadability,
+} from '@/utils/ocrReadability';
 
 interface Props {
   table: 'resources' | 'questions';
   rowId: number;
   text: string | null;
+  readability?: string | null;
   onChanged: (next: string | null) => void;
 }
 
-export function OcrTextEditor({ table, rowId, text, onChanged }: Props) {
+export function OcrTextEditor({ table, rowId, text, readability, onChanged }: Props) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text ?? '');
@@ -53,13 +60,24 @@ export function OcrTextEditor({ table, rowId, text, onChanged }: Props) {
     ? `${text.substring(0, 60)}${text.length > 60 ? '…' : ''}`
     : null;
 
+  const badge = readability ? (
+    <Badge
+      variant="outline"
+      className={`text-[9px] px-1 py-0 leading-none ${readabilityBadgeClass(readability as OcrReadability)}`}
+      title={`Readability: ${READABILITY_LABEL[readability as OcrReadability] ?? readability}`}
+    >
+      {READABILITY_LABEL[readability as OcrReadability] ?? readability}
+    </Badge>
+  ) : null;
+
   return (
     <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) cancel(); }}>
       <PopoverTrigger asChild>
         {preview ? (
-          <button className="text-xs text-left text-muted-foreground hover:text-foreground max-w-[200px] truncate underline-offset-2 hover:underline inline-flex items-center gap-1">
+          <button className="text-xs text-left text-muted-foreground hover:text-foreground max-w-[220px] underline-offset-2 hover:underline inline-flex items-center gap-1">
             <FileText className="h-3 w-3 shrink-0" />
             <span className="truncate">{preview}</span>
+            {badge}
           </button>
         ) : (
           <button className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
@@ -70,8 +88,9 @@ export function OcrTextEditor({ table, rowId, text, onChanged }: Props) {
       </PopoverTrigger>
       <PopoverContent className="w-[520px] max-h-[460px] overflow-auto">
         <div className="flex items-center justify-between mb-2 gap-2">
-          <div className="text-xs font-medium text-muted-foreground">
+          <div className="text-xs font-medium text-muted-foreground inline-flex items-center gap-1.5">
             OCR text {text ? `(${text.length} chars)` : '(empty)'}
+            {badge}
           </div>
           <div className="flex items-center gap-1">
             {!editing && text && (
