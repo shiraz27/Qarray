@@ -1,38 +1,23 @@
-## What's already done
-- **Migration applied**: `resources.description_proposed*` columns added, `ai_generations` uniqueness now per `(target,kind,model)` so multiple models can run side-by-side (the per-action model picker the UI was already showing now actually persists multiple rows).
+# Finalize watermark idempotency + fix missing gallery on ResourceDetail
 
-## What this build does
+The watermark schema migration already ran. Two remaining code changes:
 
-### 1. Unified left-side media gallery
-- **New** `src/components/MediaGallery.tsx` — sidebar (desktop) / horizontal strip (mobile) listing all attachments with per-type thumbs:
-  - PDF / split-PDF manifest → first-page canvas thumb via pdfjs + page count
-  - Image → proxied `<img>` thumb
-  - Video → Film icon; Audio → Music icon; unknown → File icon
-  - Active row highlighted; single attachment skips chrome and just renders the preview.
-- **Edit** `src/components/MediaList.tsx` — replace split PDF viewer + others grid with one `<MediaGallery items={media} />`.
+## 1. Resource detail page — use the gallery (fixes resource 124)
 
-### 2. OCR readability badges in review/edit UI
-- **Edit** `src/components/statistics/OcrReviewButton.tsx` — accept new `currentReadability` prop; render colored readability `Badge` (green/yellow/orange/red via existing `readabilityBadgeClass`) in both the **Current** and **Proposed** pane headers and inline near the dialog title.
-- **Edit** `src/components/statistics/OcrTextEditor.tsx` — accept new `readability` prop; render the same badge in the popover header and as a small chip next to the inline preview button.
-- **Edit** `src/pages/Statistics.tsx` (2 OcrReviewButton sites + the OcrTextEditor sites for resources and questions) — pass `currentReadability={row.ocr_readability}` and `readability={row.ocr_readability}`.
+`src/pages/ResourceDetail.tsx` lines 715–732 still map `resource.data` directly into stacked `PdfInlinePreview` / `MediaPreview` blocks. That's why resource 124 (and every other resource) shows files stacked vertically with no left-side selector. `MediaList` was updated to use `MediaGallery`, but the resource page renders its attachments inline and bypasses `MediaList` entirely — that's the case the previous pass missed.
 
-### 3. "Generate description with AI" button (admin, resource rows)
-- **Edit** `supabase/functions/ai-generate/index.ts` — add a top-level branch in `Deno.serve` for `body.action === 'describe_resource'`:
-  - Validates moderator/admin, loads the resource (title + existing description + ocr_text + book/teacher/school metadata).
-  - Calls `callModel` with `google/gemini-2.5-flash` (default; caller may pass `model`), system prompt: "Write a 2-3 sentence French study description of this resource for Tunisian students. No greeting, no self-intro, plain text."
-  - If `resources.description` already has real content (≥20 chars), writes the output to `description_proposed` + `description_proposed_at` + `description_proposed_status='pending'` + `description_proposed_model`.
-  - Otherwise writes directly to `description`.
-  - Does NOT touch `ai_generations` or create a bot answer — descriptions live on the resource row.
-- **New** `src/components/statistics/DescriptionAiButton.tsx`:
-  - Small "AI describe" button on each resource row (admin-only, only when `ocr_text` is non-empty since we need source material).
-  - Calls the edge function. On success refetches the row.
-  - If a `description_proposed` exists, also renders a "Review proposed description" diff dialog (reuses `diffWords`/`diffStats` from `@/utils/textDiff`) with Approve / Discard buttons that update `resources` directly.
-- **Edit** `src/pages/Statistics.tsx` — drop `<DescriptionAiButton>` into the resource action cell (next to the existing "Extract metadata with AI" button); add the new `description_proposed*` fields to the resource fetch select and `ResourceRow` interface.
+Fix: replace the inline `.map(...)` with a single `<MediaGallery items={resource.data.map((url) => ({ url, type: detectMediaType(url) }))} />`, matching how `MediaList` does it. Keep the existing "Attachments (N)" heading above it.
 
-### Files touched
-- New: `src/components/MediaGallery.tsx`, `src/components/statistics/DescriptionAiButton.tsx`
-- Edit: `src/components/MediaList.tsx`, `src/components/statistics/OcrReviewButton.tsx`, `src/components/statistics/OcrTextEditor.tsx`, `src/pages/Statistics.tsx`, `supabase/functions/ai-generate/index.ts`
+## 2. Watermark code — make stamping idempotent per URL
 
-### Out of scope
-- OCR engine tuning (DPI / binarization / `tessdata_best`) is deferred — current French/Arabic/English language detection + 3× upscale on small pages is already in place; further quality work warrants its own iteration with sample documents.
-- No changes to AiGenerationsCard (the model picker already exists; the migration just unblocked its multi-model persistence).
+Per the approved plan:
+
+- **`src/utils/watermark.ts`** — add a `WATERMARK_MARKER = 'qarray-watermarked-v1'` constant. In `watermarkPdfBytes`, after `PDFDocument.load`, read `pdfDoc.getKeywords()`; if the marker is present, return the bytes unchanged. After stamping, append the marker via `setKeywords([...existing, MARKER])`. Image watermarking stays unchanged (no reliable EXIF round-trip).
+- **`src/utils/clientWatermarkProcessor.ts`** — also select `watermarked_urls` in the initial fetch, build a `Set<string>` of already-stamped URLs, skip those during the loop (counting them toward `done` so a successful retry reports `completed`), append each newly-stamped URL into the set and persist it inside the existing `tick` (piggyback on the `pages_watermarked` update — one DB write per page, same as today). Prune URLs that are no longer in the row's current media list.
+- Final status logic (`completed` / `partial` / `failed`) stays the same; it now reads correctly because `done` includes previously-stamped URLs.
+
+## Out of scope
+
+- No UI changes to the stamp button.
+- No backfill of the marker on historically stamped PDFs — they'll be marked the next time they're processed; pages already over-stamped from past retries stay as they are.
+- No type regeneration steps (handled automatically by the migration that already ran).
