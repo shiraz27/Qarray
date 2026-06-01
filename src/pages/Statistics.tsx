@@ -462,7 +462,8 @@ export default function Statistics() {
 
   useEffect(() => {
     setQuestionCurrentPage(1);
-  }, [questionOcrFilter, questionWatermarkFilter, questionSearchQuery]);
+  }, [questionOcrFilter, questionWatermarkFilter, questionReadabilityFilter, questionSearchQuery,
+      questionPagesFilter, questionPagesSort, questionTeacherFilter, questionSchoolFilter, questionBookFilter]);
 
   useEffect(() => {
     if (selectedClass !== 'all') {
