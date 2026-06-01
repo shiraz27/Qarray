@@ -1,6 +1,6 @@
 import React from 'react';
 import { MediaPreview } from './MediaPreview';
-import { PdfInlinePreview } from './PdfInlinePreview';
+import { PdfAttachmentsViewer } from './PdfAttachmentsViewer';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
 
@@ -13,6 +13,9 @@ interface MediaListProps {
 export function MediaList({ data, showText = true, capitalizeText = false }: MediaListProps) {
   const { text, media } = extractMediaFromText(data);
 
+  const pdfs = media.filter((f) => f.type === 'pdf');
+  const others = media.filter((f) => f.type !== 'pdf');
+
   return (
     <div className="space-y-4">
       {showText && text && (
@@ -24,17 +27,18 @@ export function MediaList({ data, showText = true, capitalizeText = false }: Med
           <h3 className="text-sm font-semibold text-muted-foreground">
             Attachments ({media.length})
           </h3>
-          <div className="grid grid-cols-1 gap-4">
-            {media.map((file, index) => (
-              <div key={index} className="w-full">
-                {file.type === 'pdf' ? (
-                  <PdfInlinePreview url={file.url} className="w-full" />
-                ) : (
+          {pdfs.length > 0 && (
+            <PdfAttachmentsViewer pdfs={pdfs} />
+          )}
+          {others.length > 0 && (
+            <div className="grid grid-cols-1 gap-4">
+              {others.map((file, index) => (
+                <div key={index} className="w-full">
                   <MediaPreview url={file.url} className="w-full" />
-                )}
-              </div>
-            ))}
-          </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
