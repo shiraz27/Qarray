@@ -791,6 +791,103 @@ export default function Chapter() {
 
   const hasContent = chapter.questionCount > 0 || chapter.answerCount > 0 || chapter.resourceCount > 0;
 
+  const filteredQuestions = questions.filter((q) => {
+    if (verifiedOnly && !q.verified) return false;
+    if (!matchPageFilter(q.page_count, pageFilter)) return false;
+    if (!textMatchesAny(teacherFilter, [...(q.teacher_names ?? [])])) return false;
+    if (!textMatchesAny(schoolFilter, [...(q.school_names ?? [])])) return false;
+    if (!textMatchesAny(bookFilter, [q.book, ...(q.books ?? [])])) return false;
+    if (!textMatchesAny(questionSearch, [
+      q.data, q.book, q.ocr_text, q.ocr_text_proposed,
+      ...(q.teacher_names ?? []), ...(q.school_names ?? []), ...(q.books ?? []),
+      String(q.id),
+    ])) return false;
+    return true;
+  });
+
+  const filteredResources = resources.filter((r) => {
+    if (selectedTypeFilters.length > 0 && !((r.type_ids && r.type_ids.length > 0 ? r.type_ids : [r.type_id]).some((id) => selectedTypeFilters.includes(id as number)))) return false;
+    if (selectedDevoirFilters.length > 0 && !(r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) return false;
+    if (showWithCorrectionOnly && !r.with_correction) return false;
+    if (verifiedOnly && !r.verified) return false;
+    if (!matchPageFilter(r.page_count, pageFilter)) return false;
+    if (!textMatchesAny(teacherFilter, [r.teacher_name, ...(r.teacher_names ?? [])])) return false;
+    if (!textMatchesAny(schoolFilter, [r.school_name, ...(r.school_names ?? [])])) return false;
+    if (!textMatchesAny(bookFilter, [r.book, ...(r.books ?? [])])) return false;
+    if (!textMatchesAny(resourceSearch, [
+      r.title, r.description, r.book, r.teacher_name, r.school_name,
+      r.source_link, r.ocr_text, r.ocr_text_proposed,
+      ...(r.teacher_names ?? []), ...(r.school_names ?? []), ...(r.books ?? []),
+      String(r.id),
+    ])) return false;
+    return true;
+  });
+
+  const renderFiltersBar = (searchValue: string, onSearch: (v: string) => void, placeholder: string) => (
+    <div className="space-y-2 mb-3">
+      <div className="relative">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder={placeholder}
+          value={searchValue}
+          onChange={(e) => onSearch(e.target.value)}
+          className="pl-8 pr-8"
+        />
+        {searchValue && (
+          <button
+            type="button"
+            onClick={() => onSearch('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setShowFilters((s) => !s)}
+          className="text-xs text-muted-foreground hover:text-foreground underline"
+        >
+          {showFilters ? 'Hide filters' : 'More filters'}
+        </button>
+        {(teacherFilter || schoolFilter || bookFilter || pageFilter !== 'all' || verifiedOnly) && (
+          <button
+            type="button"
+            onClick={() => {
+              setTeacherFilter(''); setSchoolFilter(''); setBookFilter('');
+              setPageFilter('all'); setVerifiedOnly(false);
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground underline"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+      {showFilters && (
+        <div className="grid grid-cols-2 gap-2">
+          <Input placeholder="Teacher" value={teacherFilter} onChange={(e) => setTeacherFilter(e.target.value)} className="h-9" />
+          <Input placeholder="School" value={schoolFilter} onChange={(e) => setSchoolFilter(e.target.value)} className="h-9" />
+          <Input placeholder="Book" value={bookFilter} onChange={(e) => setBookFilter(e.target.value)} className="h-9 col-span-2" />
+          <Select value={pageFilter} onValueChange={(v) => setPageFilter(v as typeof pageFilter)}>
+            <SelectTrigger className="h-9"><SelectValue placeholder="Pages" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All pages</SelectItem>
+              <SelectItem value="single">Single page</SelectItem>
+              <SelectItem value="multi">Multiple pages</SelectItem>
+              <SelectItem value="none">Unknown pages</SelectItem>
+            </SelectContent>
+          </Select>
+          <label className="flex items-center gap-2 text-sm px-2">
+            <input type="checkbox" className="rounded" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} />
+            Verified only
+          </label>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background flex flex-col pb-24">
       <SEO
