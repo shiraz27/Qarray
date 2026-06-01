@@ -2018,6 +2018,68 @@ export default function Statistics() {
                                 <SelectItem value="missing">Readability: Missing</SelectItem>
                               </SelectContent>
                             </Select>
+                            <Select value={descriptionFilter} onValueChange={setDescriptionFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Description" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Descriptions</SelectItem>
+                                <SelectItem value="has">Description: Present</SelectItem>
+                                <SelectItem value="missing">Description: Missing</SelectItem>
+                                <SelectItem value="has_proposal">Description: AI proposal</SelectItem>
+                                <SelectItem value="applied">Description: AI applied</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={pagesFilter} onValueChange={setPagesFilter}>
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="Pages" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Pages</SelectItem>
+                                <SelectItem value="single">Pages: Single</SelectItem>
+                                <SelectItem value="multi">Pages: Multi</SelectItem>
+                                <SelectItem value="none">Pages: Unknown</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={pagesSort} onValueChange={setPagesSort}>
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="Sort pages" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Sort: Default</SelectItem>
+                                <SelectItem value="asc">Pages ↑</SelectItem>
+                                <SelectItem value="desc">Pages ↓</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={typeFilter} onValueChange={setTypeFilter}>
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="Type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Types</SelectItem>
+                                {resourceTypes.map((t) => (
+                                  <SelectItem key={t.id} value={String(t.id)}>{t.type}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              placeholder="Teacher"
+                              value={teacherFilter}
+                              onChange={(e) => setTeacherFilter(e.target.value)}
+                              className="w-[140px]"
+                            />
+                            <Input
+                              placeholder="School"
+                              value={schoolFilter}
+                              onChange={(e) => setSchoolFilter(e.target.value)}
+                              className="w-[140px]"
+                            />
+                            <Input
+                              placeholder="Book"
+                              value={bookFilter}
+                              onChange={(e) => setBookFilter(e.target.value)}
+                              className="w-[140px]"
+                            />
                             <Button
                               size="sm"
                               variant="outline"
