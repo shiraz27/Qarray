@@ -21,6 +21,7 @@ import { parseAiAnswer, AiAnswerRenderer } from '@/components/AiAnswerRenderer';
 import { AskQuestionForm } from '@/components/AskQuestionForm';
 import { EditResourceForm } from '@/components/EditResourceForm';
 import { BookBadge } from '@/components/BookBadge';
+import { ReportButton } from '@/components/ReportButton';
 import { PageCountBadge } from '@/components/PageCountBadge';
 import { SharedWithBadge } from '@/components/SharedWithBadge';
 import { EmptyState } from '@/components/EmptyState';
