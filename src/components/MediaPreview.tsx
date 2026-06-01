@@ -150,20 +150,22 @@ export function MediaPreview({ url, className = '' }: MediaPreviewProps) {
             <p className="text-xs text-muted-foreground">PDF document</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleDownload}
-              disabled={downloading}
-              className="gap-1"
-            >
-              {downloading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-              <span className="hidden sm:inline">Download</span>
-            </Button>
+            {showFileDownload && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleDownload}
+                disabled={downloading}
+                className="gap-1"
+              >
+                {downloading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">Download</span>
+              </Button>
+            )}
             <Button variant="ghost" size="sm" asChild className="gap-1">
               <a
                 href={encodedUrl}
