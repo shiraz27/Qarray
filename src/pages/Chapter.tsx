@@ -1025,6 +1025,7 @@ export default function Chapter() {
           </TabsList>
 
           <TabsContent value="questions" className="space-y-3">
+            {renderFiltersBar(questionSearch, setQuestionSearch, t('searchQuestions') || 'Search questions...')}
             <SortSelector value={sortBy} onChange={setSortBy} />
             <Dialog open={isQuestionDialogOpen} onOpenChange={setIsQuestionDialogOpen}>
               <DialogTrigger asChild>
@@ -1098,13 +1099,13 @@ export default function Chapter() {
               </DialogContent>
             </Dialog>
 
-            {questions.length === 0 ? (
+            {filteredQuestions.length === 0 ? (
               <EmptyState
                 type="questions"
                 message={t('noQuestions') || 'No questions available yet'}
               />
             ) : (
-              questions
+              filteredQuestions
                 .slice()
                 .sort(makeSortComparator(sortBy))
                 .map((question) => {
