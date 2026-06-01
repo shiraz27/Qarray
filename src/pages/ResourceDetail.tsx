@@ -104,6 +104,10 @@ export default function ResourceDetail() {
   const [editingAiId, setEditingAiId] = useState<number | null>(null);
   const [editingAiText, setEditingAiText] = useState('');
   const [deletingAiId, setDeletingAiId] = useState<number | null>(null);
+  const [questionSearch, setQuestionSearch] = useState('');
+  const [questionTypeFilter, setQuestionTypeFilter] = useState<string>('all');
+  const [questionVerifiedFilter, setQuestionVerifiedFilter] = useState<string>('all');
+  const [questionAnswersFilter, setQuestionAnswersFilter] = useState<string>('all');
 
   const handleDeleteAiAnswer = async (answerId: number) => {
     const { error } = await supabase
