@@ -19,9 +19,31 @@ export interface ExtractPdfOptions {
    *  - 'mixed' : both, combined per-page (default; most thorough).
    */
   mode?: OcrMode;
+  /**
+   * Force a Tesseract language pack (e.g. "fra", "ara", "eng", "fra+ara").
+   * When provided, the automatic French/Arabic/English probe is skipped.
+   */
+  langs?: string;
+  /**
+   * Page segmentation mode passed to Tesseract. Defaults to '6'
+   * (single uniform block of text) which works for most school PDFs.
+   *  - '3'  : fully automatic page segmentation
+   *  - '4'  : single column of text of variable sizes
+   *  - '6'  : assume a single uniform block of text
+   *  - '11' : sparse text — find as much text as possible in no particular order
+   */
+  psm?: OcrPsm;
+  /**
+   * Free-form context written into the OCR header (chapter, subject, book,
+   * teacher, language notes…). Does NOT influence Tesseract directly but is
+   * persisted alongside the result so downstream AI prompts (descriptions,
+   * proposals) can leverage it.
+   */
+  contextHint?: string;
 }
 
 export type OcrMode = 'text' | 'image' | 'mixed';
+export type OcrPsm = '3' | '4' | '6' | '11';
 
 /**
  * Default OCR language pack. Tunisian scientific subjects are taught in French,
@@ -140,13 +162,15 @@ export async function extractPdfTextAndOcr(
   opts: ExtractPdfOptions = {}
 ): Promise<string> {
   const { onPageProgress, signal, mode = 'mixed' } = opts;
+  const forcedLangs = opts.langs && opts.langs.trim() ? opts.langs.trim() : null;
+  const psm: OcrPsm = opts.psm ?? '6';
 
   const arrayBuffer = await blob.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   const totalPages = pdf.numPages;
 
   let worker: TesseractWorker | null = null;
-  let workerLangs: string = DEFAULT_OCR_LANGS;
+  let workerLangs: string = forcedLangs ?? DEFAULT_OCR_LANGS;
   let currentPageIdx = 0;
   let detectedLabel: 'french-default' | 'arabic-majority' | 'english-majority' =
     'french-default';
@@ -163,7 +187,7 @@ export async function extractPdfTextAndOcr(
       await (w as any).setParameters?.({
         preserve_interword_spaces: '1',
         user_defined_dpi: '300',
-        tessedit_pageseg_mode: '6',
+        tessedit_pageseg_mode: psm,
       });
     } catch { /* ignore */ }
     return w;
@@ -188,11 +212,12 @@ export async function extractPdfTextAndOcr(
     const { data } = await w.recognize(imageBlob);
     const txt = (data.text || '').trim();
     if (txt.length >= 20) return txt;
-    // Retry once with automatic page segmentation for sparse-text pages.
+    // Retry once with a different segmentation for sparse-text pages.
+    const retryPsm = psm === '3' ? '11' : '3';
     try {
-      await (w as any).setParameters?.({ tessedit_pageseg_mode: '3' });
+      await (w as any).setParameters?.({ tessedit_pageseg_mode: retryPsm });
       const { data: data2 } = await w.recognize(imageBlob);
-      await (w as any).setParameters?.({ tessedit_pageseg_mode: '6' });
+      await (w as any).setParameters?.({ tessedit_pageseg_mode: psm });
       return (data2.text || '').trim() || txt;
     } catch {
       return txt;
@@ -206,7 +231,7 @@ export async function extractPdfTextAndOcr(
     // ----- Language probe on page 1 (image/mixed only) -----
     let probeOcrPage1 = '';
     let probeTextLayerPage1 = '';
-    if (mode !== 'text' && totalPages >= 1) {
+    if (mode !== 'text' && totalPages >= 1 && !forcedLangs) {
       try {
         const probePage = await pdf.getPage(1);
         probeTextLayerPage1 = mode === 'image' ? '' : await getPageText(probePage);
@@ -223,6 +248,19 @@ export async function extractPdfTextAndOcr(
         }
       } catch (err) {
         console.warn('[pdf-ocr] language probe failed:', err);
+      }
+    } else if (mode !== 'text' && totalPages >= 1 && forcedLangs) {
+      // Forced language pack — pre-OCR page 1 once with the chosen pack so the
+      // main loop can reuse that result instead of re-rendering.
+      try {
+        const probePage = await pdf.getPage(1);
+        probeTextLayerPage1 = mode === 'image' ? '' : await getPageText(probePage);
+        const probeBlob = await renderPageToBlob(probePage);
+        const probeWorker = await ensureWorker(forcedLangs);
+        probeOcrPage1 = await recognizeWithRetry(probeWorker, probeBlob);
+        detectedLabel = detectOcrLanguage(probeOcrPage1).label;
+      } catch (err) {
+        console.warn('[pdf-ocr] forced-langs probe failed:', err);
       }
     } else if (mode === 'text') {
       // Pure text-layer mode — pick a label from the first page text.
@@ -281,7 +319,13 @@ export async function extractPdfTextAndOcr(
       throw new Error(reason);
     }
 
-    const header = `[OCR mode: ${mode} | langs: ${workerLangs} | detected: ${detectedLabel}]`;
+    const headerParts = [
+      `[OCR mode: ${mode} | langs: ${workerLangs}${forcedLangs ? ' (forced)' : ''} | psm: ${psm} | detected: ${detectedLabel}]`,
+    ];
+    if (opts.contextHint && opts.contextHint.trim()) {
+      headerParts.push(`[context: ${opts.contextHint.trim()}]`);
+    }
+    const header = headerParts.join('\n');
     return [header, pageOutputs.join('\n\n')].join('\n\n');
   } finally {
     if (worker) {
