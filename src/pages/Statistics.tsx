@@ -757,7 +757,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('questions')
-        .select('id, data, ocr_status, ocr_text, ocr_readability, ocr_text_proposed, ocr_text_proposed_status, ocr_text_proposed_readability, ocr_text_proposed_at, chapter_id, chapters(name, subject_id), teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked')
+        .select('id, data, ocr_status, ocr_text, ocr_readability, ocr_text_proposed, ocr_text_proposed_status, ocr_text_proposed_readability, ocr_text_proposed_at, chapter_id, chapters(name, subject_id), teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked, watermark_stamp_count, watermark_overstamped')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
