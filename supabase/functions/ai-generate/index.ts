@@ -196,23 +196,35 @@ async function callOpenRouter(
   system: string,
   user: string,
 ): Promise<string> {
-  const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://lovable.dev',
-      'X-Title': 'Lovable AI Tutor',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      temperature: 0.4,
-    }),
-  })
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 120_000)
+  let resp: Response
+  try {
+    resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://lovable.dev',
+        'X-Title': 'Lovable AI Tutor',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        temperature: 0.4,
+        max_tokens: 4096,
+      }),
+      signal: ctrl.signal,
+    })
+  } catch (e: any) {
+    clearTimeout(timer)
+    if (e?.name === 'AbortError') throw new Error('OpenRouter timeout after 120s')
+    throw new Error(`OpenRouter fetch failed: ${e?.message || e}`)
+  }
+  clearTimeout(timer)
   const text = await resp.text()
   if (!resp.ok) {
     throw new Error(`OpenRouter ${resp.status}: ${text.slice(0, 400)}`)
@@ -236,22 +248,34 @@ async function callLovableAI(
   system: string,
   user: string,
 ): Promise<string> {
-  const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Lovable-API-Key': apiKey,
-      'X-Lovable-AIG-SDK': 'edge-function',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      temperature: 0.4,
-    }),
-  })
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 120_000)
+  let resp: Response
+  try {
+    resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Lovable-API-Key': apiKey,
+        'X-Lovable-AIG-SDK': 'edge-function',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        temperature: 0.4,
+        max_tokens: 4096,
+      }),
+      signal: ctrl.signal,
+    })
+  } catch (e: any) {
+    clearTimeout(timer)
+    if (e?.name === 'AbortError') throw new Error('LovableAI timeout after 120s')
+    throw new Error(`LovableAI fetch failed: ${e?.message || e}`)
+  }
+  clearTimeout(timer)
   const text = await resp.text()
   if (!resp.ok) {
     throw new Error(`LovableAI ${resp.status}: ${text.slice(0, 400)}`)
@@ -382,11 +406,23 @@ async function runGeneration(
 
   const { data: existingGen } = await admin
     .from('ai_generations')
-    .select('id, output_answer_id')
+    .select('id, output_answer_id, status, updated_at')
     .eq('target_type', targetType)
     .eq('target_id', targetId)
     .eq('kind', kind)
     .maybeSingle()
+
+  // Reset stale 'running' rows (older than 3 minutes) so they don't block reruns
+  if (
+    existingGen?.status === 'running' &&
+    existingGen.updated_at &&
+    Date.now() - new Date(existingGen.updated_at as any).getTime() < 3 * 60_000
+  ) {
+    return {
+      status: 'running',
+      error: 'Another generation for this target/kind is already in progress',
+    }
+  }
 
   const genUpsert = await admin
     .from('ai_generations')
