@@ -48,6 +48,7 @@ import { MetaCell, type CellValue } from '@/components/statistics/MetaCell';
 import { OcrStatusEditor, type OcrStatus } from '@/components/statistics/OcrStatusEditor';
 import { OcrTextEditor } from '@/components/statistics/OcrTextEditor';
 import { OcrReviewButton } from '@/components/statistics/OcrReviewButton';
+import { DescriptionAiButton } from '@/components/statistics/DescriptionAiButton';
 import { WatermarkStatusEditor, type WatermarkStatus } from '@/components/statistics/WatermarkStatusEditor';
 import { processResourceWatermark, processQuestionWatermark } from '@/utils/clientWatermarkProcessor';
 import { Stamp } from 'lucide-react';
@@ -103,6 +104,10 @@ interface ResourceRow {
   watermark_status?: string | null;
   pages_watermarked?: number | null;
   source_link?: string | null;
+  description_proposed?: string | null;
+  description_proposed_at?: string | null;
+  description_proposed_status?: string | null;
+  description_proposed_model?: string | null;
 }
 
 // Track suggested titles from AI extraction
@@ -718,7 +723,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('resources')
-        .select('id, title, description, data, ocr_status, ocr_text, ocr_readability, ocr_text_proposed, ocr_text_proposed_status, ocr_text_proposed_readability, ocr_text_proposed_at, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked, source_link')
+        .select('id, title, description, data, ocr_status, ocr_text, ocr_readability, ocr_text_proposed, ocr_text_proposed_status, ocr_text_proposed_readability, ocr_text_proposed_at, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked, source_link, description_proposed, description_proposed_at, description_proposed_status, description_proposed_model')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -2338,6 +2343,7 @@ export default function Statistics() {
                                               table="resources"
                                               rowId={resource.id}
                                               text={resource.ocr_text ?? null}
+                                              readability={resource.ocr_readability ?? null}
                                               onChanged={(next) =>
                                                 setResources((prev) =>
                                                   prev.map((r) =>
@@ -2355,6 +2361,7 @@ export default function Statistics() {
                                                   proposedText={resource.ocr_text_proposed ?? null}
                                                   proposedStatus={resource.ocr_text_proposed_status ?? null}
                                                   proposedReadability={resource.ocr_text_proposed_readability ?? null}
+                                                  currentReadability={resource.ocr_readability ?? null}
                                                   onResolved={(patch) =>
                                                     setResources((prev) =>
                                                       prev.map((r) =>
@@ -2398,6 +2405,31 @@ export default function Statistics() {
                                                   )}
                                                 </Button>
                                               )}
+                                              <DescriptionAiButton
+                                                resourceId={resource.id}
+                                                hasOcrText={!!(resource.ocr_text && resource.ocr_text.trim().length > 0)}
+                                                currentDescription={resource.description ?? null}
+                                                proposedDescription={resource.description_proposed ?? null}
+                                                proposedModel={resource.description_proposed_model ?? null}
+                                                onUpdated={(patch) =>
+                                                  setResources((prev) =>
+                                                    prev.map((r) =>
+                                                      r.id === resource.id
+                                                        ? {
+                                                            ...r,
+                                                            ...(patch.description !== undefined
+                                                              ? { description: patch.description ?? '' }
+                                                              : {}),
+                                                            description_proposed: patch.description_proposed,
+                                                            description_proposed_at: patch.description_proposed_at,
+                                                            description_proposed_status: patch.description_proposed_status,
+                                                            description_proposed_model: patch.description_proposed_model,
+                                                          }
+                                                        : r,
+                                                    ),
+                                                  )
+                                                }
+                                              />
                                               {canProcess && (
                                                 <>
                                                   <Button
@@ -2906,6 +2938,7 @@ export default function Statistics() {
                                               table="questions"
                                               rowId={question.id}
                                               text={question.ocr_text ?? null}
+                                              readability={question.ocr_readability ?? null}
                                               onChanged={(next) =>
                                                 setQuestions((prev) =>
                                                   prev.map((q) =>
@@ -2923,6 +2956,7 @@ export default function Statistics() {
                                                   proposedText={question.ocr_text_proposed ?? null}
                                                   proposedStatus={question.ocr_text_proposed_status ?? null}
                                                   proposedReadability={question.ocr_text_proposed_readability ?? null}
+                                                  currentReadability={question.ocr_readability ?? null}
                                                   onResolved={(patch) =>
                                                     setQuestions((prev) =>
                                                       prev.map((q) =>
