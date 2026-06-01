@@ -2483,6 +2483,28 @@ export default function Statistics() {
                                                 Stamp
                                               </Button>
                                             )}
+                                            {resource.watermark_overstamped && (
+                                              <Badge variant="destructive" className="mt-1 block w-fit">
+                                                Over-stamped ×{resource.watermark_stamp_count ?? '?'}
+                                              </Badge>
+                                            )}
+                                            {urlsHaveOcrable(resource.data) && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 px-2 mt-1"
+                                                onClick={() => handleScanResource(resource.id)}
+                                                disabled={scanningWmId === resource.id}
+                                                title="Scan watermark integrity (count stamps per page)"
+                                              >
+                                                {scanningWmId === resource.id ? (
+                                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                                ) : (
+                                                  <Search className="h-3 w-3 mr-1" />
+                                                )}
+                                                Scan
+                                              </Button>
+                                            )}
                                           </TableCell>
                                           <TableCell>
                                             <OcrTextEditor
