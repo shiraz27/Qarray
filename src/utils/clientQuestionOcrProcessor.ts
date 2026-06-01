@@ -7,11 +7,18 @@ import {
   detectOcrLanguage,
   DEFAULT_OCR_LANGS,
   type OcrMode,
+  type OcrPsm,
 } from '@/utils/pdfOcrHelpers';
 import { expandManifestUrls } from '@/utils/splitPdfManifest';
 import { encodeMediaUrl } from '@/utils/mediaToken';
 import { computeReadability } from '@/utils/ocrReadability';
 import { writeOcrResult } from '@/utils/ocrProposalWrite';
+
+export interface OcrRunOptions {
+  langs?: string;
+  psm?: OcrPsm;
+  contextHint?: string;
+}
 
 type FileType = MediaType;
 
@@ -75,21 +82,28 @@ async function maybeUpscale(blob: Blob): Promise<Blob> {
 }
 
 /** French-default standalone image OCR with majority-script switching. */
-async function extractImageText(blob: Blob): Promise<string> {
+async function extractImageText(
+  blob: Blob,
+  runOpts: OcrRunOptions = {},
+): Promise<string> {
   const prepared = await maybeUpscale(blob);
-  let langs = DEFAULT_OCR_LANGS;
+  const forcedLangs = runOpts.langs && runOpts.langs.trim() ? runOpts.langs.trim() : null;
+  const psm: OcrPsm = runOpts.psm ?? '6';
+  let langs = forcedLangs ?? DEFAULT_OCR_LANGS;
   let worker = await createWorker(langs);
   try {
     try {
       await (worker as any).setParameters?.({
         preserve_interword_spaces: '1',
         user_defined_dpi: '300',
-        tessedit_pageseg_mode: '6',
+        tessedit_pageseg_mode: psm,
       });
     } catch { /* ignore */ }
     const first = await worker.recognize(prepared);
     const text1 = (first.data.text || '').trim();
-    const { langs: bestLangs, label } = detectOcrLanguage(text1);
+    const { langs: bestLangs, label } = forcedLangs
+      ? { langs, label: detectOcrLanguage(text1).label }
+      : detectOcrLanguage(text1);
     if (bestLangs !== langs) {
       langs = bestLangs;
       try { await worker.terminate(); } catch { /* ignore */ }
@@ -98,13 +112,13 @@ async function extractImageText(blob: Blob): Promise<string> {
         await (worker as any).setParameters?.({
           preserve_interword_spaces: '1',
           user_defined_dpi: '300',
-          tessedit_pageseg_mode: '6',
+          tessedit_pageseg_mode: psm,
         });
       } catch { /* ignore */ }
       const second = await worker.recognize(prepared);
-      return `[image langs: ${langs} | detected: ${label}]\n${(second.data.text || '').trim()}`;
+      return `[image langs: ${langs}${forcedLangs ? ' (forced)' : ''} | psm: ${psm} | detected: ${label}]\n${(second.data.text || '').trim()}`;
     }
-    return `[image langs: ${langs} | detected: ${label}]\n${text1}`;
+    return `[image langs: ${langs}${forcedLangs ? ' (forced)' : ''} | psm: ${psm} | detected: ${label}]\n${text1}`;
   } finally {
     try { await worker.terminate(); } catch { /* ignore */ }
   }
@@ -116,7 +130,8 @@ async function extractImageText(blob: Blob): Promise<string> {
 export async function processQuestionOCR(
   questionId: number,
   onProgress?: (message: string) => void,
-  mode: OcrMode = 'mixed'
+  mode: OcrMode = 'mixed',
+  runOpts: OcrRunOptions = {},
 ): Promise<{ success: boolean; message: string }> {
   try {
     onProgress?.(`Fetching question #${questionId}...`);
@@ -204,7 +219,12 @@ export async function processQuestionOCR(
         let text = '';
 
         if (fileType === 'pdf') {
-          text = await extractPdfTextAndOcr(blob, { mode });
+          text = await extractPdfTextAndOcr(blob, {
+            mode,
+            langs: runOpts.langs,
+            psm: runOpts.psm,
+            contextHint: runOpts.contextHint,
+          });
           ocrableFileCount++;
         } else if (fileType === 'image') {
           if (mode === 'text') {
@@ -212,7 +232,7 @@ export async function processQuestionOCR(
             extractedTexts.push('[Image — skipped in text-only mode]');
             continue;
           }
-          text = await extractImageText(blob);
+          text = await extractImageText(blob, runOpts);
           ocrableFileCount++;
         }
 
@@ -226,8 +246,11 @@ export async function processQuestionOCR(
     }
 
     // Combine all extracted text
-    const header = `[OCR mode: ${mode}]`;
-    const combinedText = [header, extractedTexts.join('\n\n---\n\n')].join('\n\n');
+    const headerLines = [`[OCR mode: ${mode}${runOpts.langs ? ` | langs: ${runOpts.langs} (forced)` : ''}${runOpts.psm ? ` | psm: ${runOpts.psm}` : ''}]`];
+    if (runOpts.contextHint && runOpts.contextHint.trim()) {
+      headerLines.push(`[context: ${runOpts.contextHint.trim()}]`);
+    }
+    const combinedText = [headerLines.join('\n'), extractedTexts.join('\n\n---\n\n')].join('\n\n');
 
     // Determine OCR status based on file types
     let ocrStatus: 'completed' | 'not_applicable' | 'failed';
