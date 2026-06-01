@@ -3292,6 +3292,35 @@ export default function Statistics() {
         onDiscard={() => setMetadataReview(null)}
         onApply={applyMetadataReview}
       />
+      <OcrScanDialog
+        open={!!ocrScanTarget}
+        onOpenChange={(open) => {
+          if (!open && !ocrScanRunning) setOcrScanTarget(null);
+        }}
+        kind={ocrScanTarget?.kind ?? 'resource'}
+        id={ocrScanTarget?.id ?? null}
+        context={ocrScanTarget?.context ?? {}}
+        running={ocrScanRunning}
+        onRun={async ({ mode, langs, psm, contextHint, force }) => {
+          if (!ocrScanTarget) return;
+          const { kind, id, context } = ocrScanTarget;
+          if (context.currentStatus === 'completed' && !force) {
+            toast.error('Existing OCR present — enable "Overwrite" to force retry.');
+            return;
+          }
+          setOcrScanRunning(true);
+          try {
+            if (kind === 'resource') {
+              await handleProcessSingle(id, mode, { langs, psm, contextHint });
+            } else {
+              await handleProcessSingleQuestion(id, mode, { langs, psm, contextHint });
+            }
+          } finally {
+            setOcrScanRunning(false);
+            setOcrScanTarget(null);
+          }
+        }}
+      />
     </div>
   );
 }
