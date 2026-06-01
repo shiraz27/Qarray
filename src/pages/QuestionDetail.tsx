@@ -932,6 +932,7 @@ export default function QuestionDetail() {
                     />
                     <span className="text-sm font-medium">{answer.downvotes}</span>
                   </button>
+                  <ReportButton contentType="answer" contentId={answer.id} />
                 </div>
 
                 {canEditAnswer(answer) && (
