@@ -335,32 +335,30 @@ async function callOllama(
 }
 
 async function callModel(
-  botKey: keyof typeof BOTS,
+  model: string,
   openrouterKey: string,
   system: string,
   user: string,
 ): Promise<{ content: string; servedBy: 'ollama' | 'openrouter' | 'lovable' }> {
-  const ollamaUrl = Deno.env.get('OLLAMA_BASE_URL')
-  const ollamaModel = OLLAMA_MODELS[botKey as string]
-  if (ollamaUrl && ollamaModel) {
-    try {
-      const content = await callOllama(ollamaUrl, ollamaModel, system, user)
-      console.log(`[ai-generate] served_by=ollama bot=${botKey} model=${ollamaModel}`)
-      return { content, servedBy: 'ollama' }
-    } catch (e: any) {
-      console.warn(`[ai-generate] Ollama failed (${e?.message || e}); falling back to OpenRouter`)
-    }
+  // Ollama: explicit "ollama:<name>" id
+  if (model.startsWith('ollama:')) {
+    const ollamaUrl = Deno.env.get('OLLAMA_BASE_URL')
+    if (!ollamaUrl) throw new Error('OLLAMA_BASE_URL not configured')
+    const ollamaModel = model.slice('ollama:'.length)
+    const content = await callOllama(ollamaUrl, ollamaModel, system, user)
+    console.log(`[ai-generate] served_by=ollama model=${ollamaModel}`)
+    return { content, servedBy: 'ollama' }
   }
-  const model = BOTS[botKey].model
   const lovableKey = Deno.env.get('LOVABLE_API_KEY')
   // Prefer Lovable AI Gateway for google/* and openai/* models when the key is present.
   if (lovableKey && /^(google|openai)\//.test(model)) {
     const content = await callLovableAI(lovableKey, model, system, user)
-    console.log(`[ai-generate] served_by=lovable bot=${botKey} model=${model}`)
+    console.log(`[ai-generate] served_by=lovable model=${model}`)
     return { content, servedBy: 'lovable' }
   }
+  if (!openrouterKey) throw new Error(`No provider available for model "${model}" (set OPENROUTER_API_KEY)`)
   const content = await callOpenRouter(openrouterKey, model, system, user)
-  console.log(`[ai-generate] served_by=openrouter bot=${botKey} model=${model}`)
+  console.log(`[ai-generate] served_by=openrouter model=${model}`)
   return { content, servedBy: 'openrouter' }
 }
 
