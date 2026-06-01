@@ -359,6 +359,11 @@ function SinglePdfView({
                 </Button>
               )}
             </div>
+            {extraDownloadActions && (
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {extraDownloadActions}
+              </div>
+            )}
           </div>
         )}
 
