@@ -17,6 +17,7 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useTranslation();
+  const { t: ta } = useTranslation('auth');
   
   // Check for signup param in URL
   const [isSignUp, setIsSignUp] = useState(() => {
@@ -137,7 +138,7 @@ const Login: React.FC = () => {
 
       toast({
         title: t('success'),
-        description: 'Password reset email sent. Please check your inbox.',
+        description: ta('resetEmailSent'),
       });
       setShowForgotPassword(false);
       setResetEmail('');
@@ -165,7 +166,7 @@ const Login: React.FC = () => {
 
       toast({
         title: t('success'),
-        description: 'Password updated successfully!',
+        description: ta('passwordUpdated'),
       });
       setShowResetPassword(false);
       setNewPassword('');
@@ -305,7 +306,7 @@ const Login: React.FC = () => {
                   onClick={() => setShowForgotPassword(true)}
                   className="text-sm text-[#38A6FF] hover:text-[#2B8FE8]"
                 >
-                  Forgot password?
+                  {ta('forgotPassword')}
                 </button>
               )}
             </div>
@@ -342,18 +343,18 @@ const Login: React.FC = () => {
       <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Reset Password</DialogTitle>
+            <DialogTitle>{ta('resetPasswordTitle')}</DialogTitle>
             <DialogDescription>
-              Enter your email address and we'll send you a link to reset your password.
+              {ta('resetPasswordDesc')}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleForgotPassword} className="space-y-4">
             <div>
-              <Label htmlFor="reset-email">Email</Label>
+              <Label htmlFor="reset-email">{t('email')}</Label>
               <Input
                 id="reset-email"
                 type="email"
-                placeholder="your@email.com"
+                placeholder={ta('emailPlaceholder')}
                 value={resetEmail}
                 onChange={(e) => setResetEmail(e.target.value)}
                 required
@@ -365,7 +366,7 @@ const Login: React.FC = () => {
               disabled={resetLoading}
               className="w-full h-12 bg-[#38A6FF] hover:bg-[#2B8FE8]"
             >
-              {resetLoading ? 'Sending...' : 'Send Reset Link'}
+              {resetLoading ? ta('sending') : ta('sendResetLink')}
             </Button>
           </form>
         </DialogContent>
@@ -375,14 +376,14 @@ const Login: React.FC = () => {
       <Dialog open={showResetPassword} onOpenChange={setShowResetPassword}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Set New Password</DialogTitle>
+            <DialogTitle>{ta('newPasswordTitle')}</DialogTitle>
             <DialogDescription>
-              Enter your new password below.
+              {ta('newPasswordDesc')}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleResetPassword} className="space-y-4">
             <div>
-              <Label htmlFor="new-password">New Password</Label>
+              <Label htmlFor="new-password">{ta('newPasswordLabel')}</Label>
               <Input
                 id="new-password"
                 type="password"
@@ -399,7 +400,7 @@ const Login: React.FC = () => {
               disabled={resetPasswordLoading}
               className="w-full h-12 bg-[#38A6FF] hover:bg-[#2B8FE8]"
             >
-              {resetPasswordLoading ? 'Updating...' : 'Update Password'}
+              {resetPasswordLoading ? ta('updatingPassword') : ta('updatePassword')}
             </Button>
           </form>
         </DialogContent>

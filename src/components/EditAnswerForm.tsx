@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
+import { useTranslation } from 'react-i18next';
 
 const answerSchema = z.object({
   answer: z.string().min(10, 'Answer must be at least 10 characters').max(1000, 'Answer must be less than 1000 characters'),
@@ -36,6 +37,8 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { getUploadsByCallback } = useUploadManager();
+  const { t } = useTranslation();
+  const { t: tf } = useTranslation('forms');
   
   // Generate stable callback ID for tracking uploads
   const callbackId = useMemo(() => `edit-answer-${Date.now()}`, []);
@@ -64,7 +67,7 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
 
   const handleMediaUploaded = (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => {
     setMediaUrls(prev => [...prev, url]);
-    toast.success('Media added successfully');
+    toast.success(tf('media.added'));
   };
 
   const removeMedia = (index: number) => {
@@ -77,7 +80,7 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        toast.error('Please login to edit answer');
+        toast.error(tf('answer.editLoginRequired'));
         return;
       }
 
@@ -95,11 +98,11 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
 
       if (error) throw error;
 
-      toast.success('Answer updated successfully');
+      toast.success(tf('answer.updated'));
       onSuccess();
     } catch (error) {
       console.error('Error updating answer:', error);
-      toast.error('Failed to update answer');
+      toast.error(tf('answer.updateFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -113,10 +116,10 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
           name="answer"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Your Answer</FormLabel>
+              <FormLabel>{tf('answer.label')}</FormLabel>
               <FormControl>
                 <Textarea 
-                  placeholder="Edit your answer here..."
+                  placeholder={tf('answer.editPlaceholder')}
                   className="min-h-32 resize-none"
                   {...field}
                 />
@@ -127,7 +130,7 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
         />
 
         <div>
-          <FormLabel>Attachments (Optional)</FormLabel>
+          <FormLabel>{tf('attachments.optional')}</FormLabel>
           <MediaUploader 
             onMediaUploaded={handleMediaUploaded}
             uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
@@ -140,11 +143,11 @@ export const EditAnswerForm: React.FC<EditAnswerFormProps> = ({
 
         <div className="flex gap-2 justify-end">
           <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button type="submit" disabled={isSubmitting || hasPendingUploads}>
             {(isSubmitting || hasPendingUploads) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {hasPendingUploads ? 'Uploading...' : 'Update Answer'}
+            {hasPendingUploads ? tf('uploads.inProgress') : tf('answer.update')}
           </Button>
         </div>
       </form>

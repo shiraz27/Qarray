@@ -18,6 +18,7 @@ import { mediaSrc } from '@/utils/mediaToken';
 export default function Profile() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { t: tp } = useTranslation('profile');
   const { isModerator, isAdmin } = useUserRole();
   const [session, setSession] = useState<Session | null>(null);
   const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -156,7 +157,7 @@ export default function Profile() {
     if (!file) return;
 
     if (file.type !== 'application/pdf') {
-      toast.error('Only PDF files are allowed');
+      toast.error(tp('toasts.onlyPdfAllowed'));
       return;
     }
 
@@ -182,11 +183,11 @@ export default function Profile() {
 
       if (updateError) throw updateError;
 
-      toast.success('Document uploaded successfully');
+      toast.success(tp('toasts.documentUploaded'));
       if (session) fetchUserProfile(session.user.id);
     } catch (error: any) {
       console.error('Upload error:', error);
-      toast.error('Failed to upload document');
+      toast.error(tp('toasts.documentUploadFailed'));
     } finally {
       setUploadingDoc(false);
       e.target.value = '';
@@ -204,11 +205,11 @@ export default function Profile() {
       .eq('user_id', session.user.id);
 
     if (error) {
-      toast.error('Failed to remove document');
+      toast.error(tp('toasts.documentRemoveFailed'));
       return;
     }
 
-    toast.success('Document removed');
+    toast.success(tp('toasts.documentRemoved'));
     fetchUserProfile(session.user.id);
   };
 
@@ -229,10 +230,10 @@ export default function Profile() {
 
       if (error) throw error;
       
-      toast.success('Test notification created!');
+      toast.success(tp('testing.testNotificationCreated'));
     } catch (error: any) {
       console.error('Error creating test notification:', error);
-      toast.error('Failed to create test notification');
+      toast.error(tp('testing.testNotificationFailed'));
     }
   };
 
@@ -244,10 +245,10 @@ export default function Profile() {
       
       if (error) throw error;
       
-      toast.success('Flashcard review check triggered!');
+      toast.success(tp('testing.flashcardCheckTriggered'));
     } catch (error: any) {
       console.error('Error triggering flashcard check:', error);
-      toast.error('Failed to trigger flashcard check');
+      toast.error(tp('testing.flashcardCheckFailed'));
     }
   };
 
@@ -275,7 +276,7 @@ export default function Profile() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    toast.success(t('signedOut') || 'Signed out successfully');
+    toast.success(tp('toasts.signedOut'));
     navigate('/login');
   };
 
@@ -289,11 +290,11 @@ export default function Profile() {
       if (error) throw error;
       
       await supabase.auth.signOut();
-      toast.success(t('accountDeleted') || 'Account deleted successfully');
+      toast.success(t('accountDeleted'));
       navigate('/login');
     } catch (error) {
       console.error('Error deleting account:', error);
-      toast.error(t('deleteAccountError') || 'Failed to delete account');
+      toast.error(tp('toasts.deleteAccountFailed'));
     } finally {
       setIsDeleting(false);
     }
@@ -315,17 +316,17 @@ export default function Profile() {
     <div className="min-h-screen bg-background flex flex-col pb-24">
       <SEO
         title={t('profile')}
-        description="Manage your Qarray profile and settings"
+        description={tp('seo.description')}
         url="/profile"
         noindex={true}
-        jsonLd={createWebPageSchema('Profile - Qarray', 'Manage your profile', '/profile')}
+        jsonLd={createWebPageSchema(tp('seo.schemaTitle'), tp('seo.schemaDescription'), '/profile')}
       />
       
       <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
           <ArrowLeft size={20} />
         </Button>
-        <h1 className="text-lg font-semibold flex-1">{t('profile') || 'Profile'}</h1>
+        <h1 className="text-lg font-semibold flex-1">{t('profile')}</h1>
       </div>
 
       <div className="flex flex-col items-center justify-start p-4 md:p-8 space-y-6">
@@ -341,7 +342,7 @@ export default function Profile() {
                   {userProfile?.full_name ? getInitials(userProfile.full_name) : '👤'}
                 </div>
                 <div>
-                  <h3 className="font-bold text-xl">{userProfile?.full_name || 'User'}</h3>
+                  <h3 className="font-bold text-xl">{userProfile?.full_name || tp('userFallback')}</h3>
                   <p className="text-sm text-muted-foreground">{session?.user?.email}</p>
                 </div>
               </div>
@@ -360,37 +361,37 @@ export default function Profile() {
           <Card className="gamified-card p-6">
             <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-primary" />
-              Your Statistics
+              {tp('stats.heading')}
             </h3>
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="p-3 rounded-lg gradient-primary text-white hover-glow text-center shadow-lg">
                 <MessageSquare className="w-5 h-5 mx-auto mb-1" />
                 <p className="text-2xl font-bold">{stats.questionsAsked}</p>
-                <span className="text-xs">Questions</span>
+                <span className="text-xs">{tp('stats.questions')}</span>
               </div>
               <div className="p-3 rounded-lg gradient-secondary text-white hover-glow text-center shadow-lg">
                 <MessageSquare className="w-5 h-5 mx-auto mb-1" />
                 <p className="text-2xl font-bold">{stats.answersGiven}</p>
-                <span className="text-xs">Answers</span>
+                <span className="text-xs">{tp('stats.answers')}</span>
               </div>
               <div className="p-3 rounded-lg gradient-accent text-white hover-glow text-center shadow-lg">
                 <FileText className="w-5 h-5 mx-auto mb-1" />
                 <p className="text-2xl font-bold">{stats.resourcesAdded}</p>
-                <span className="text-xs">Resources</span>
+                <span className="text-xs">{tp('stats.resources')}</span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="p-4 rounded-lg bg-green-500 text-white hover-glow shadow-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <ThumbsUp className="w-5 h-5" />
-                  <span className="text-sm font-medium">Upvotes Received</span>
+                  <span className="text-sm font-medium">{tp('stats.upvotesReceived')}</span>
                 </div>
                 <p className="text-3xl font-bold">{stats.upvotes}</p>
               </div>
               <div className="p-4 rounded-lg bg-red-500 text-white hover-glow shadow-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <ThumbsDown className="w-5 h-5" />
-                  <span className="text-sm font-medium">Downvotes Received</span>
+                  <span className="text-sm font-medium">{tp('stats.downvotesReceived')}</span>
                 </div>
                 <p className="text-3xl font-bold">{stats.downvotes}</p>
               </div>
@@ -401,12 +402,12 @@ export default function Profile() {
           <Card className="gamified-card p-6">
             <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
               <Palette className="w-5 h-5 text-primary" />
-              Appearance
+              {tp('appearance.heading')}
             </h3>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
               <div className="flex items-center gap-3">
                 <Moon className="w-5 h-5 text-muted-foreground" />
-                <span className="font-medium">Dark Mode</span>
+                <span className="font-medium">{tp('appearance.darkMode')}</span>
               </div>
               <DarkModeToggle />
             </div>
@@ -418,21 +419,21 @@ export default function Profile() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-lg flex items-center gap-2">
                   <GraduationCap className="w-5 h-5 text-primary" />
-                  Teacher Verification
+                  {tp('teacher.heading')}
                 </h3>
                 {userProfile.teacher_verified ? (
                   <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                    Verified
+                    {tp('teacher.verified')}
                   </span>
                 ) : (
                   <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
-                    {userProfile.teacher_verification_status || 'Pending'}
+                    {userProfile.teacher_verification_status || tp('teacher.pending')}
                   </span>
                 )}
               </div>
               
               <p className="text-sm text-muted-foreground mb-4">
-                Upload your teaching certification, degree, or professional ID to get verified
+                {tp('teacher.uploadDesc')}
               </p>
 
               <Button
@@ -444,12 +445,12 @@ export default function Profile() {
                 {uploadingDoc ? (
                   <>
                     <span className="animate-spin mr-2">⏳</span>
-                    Uploading...
+                    {tp('teacher.uploading')}
                   </>
                 ) : (
                   <>
                     <Upload className="mr-2 h-4 w-4" />
-                    Upload Document
+                    {tp('teacher.uploadDocument')}
                   </>
                 )}
               </Button>
@@ -463,7 +464,7 @@ export default function Profile() {
 
               {userProfile.teacher_documents && userProfile.teacher_documents.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">Uploaded Documents:</p>
+                  <p className="text-sm font-medium">{tp('teacher.uploadedDocuments')}</p>
                   {userProfile.teacher_documents.map((doc, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                       <a 
@@ -472,7 +473,7 @@ export default function Profile() {
                         rel="noopener noreferrer"
                         className="text-sm text-primary hover:underline flex-1 truncate"
                       >
-                        Document {index + 1}
+                        {tp('teacher.documentLabel', { index: index + 1 })}
                       </a>
                       <Button
                         variant="ghost"
@@ -491,14 +492,14 @@ export default function Profile() {
           {/* Test Notifications Card - For moderators only */}
           {(isModerator || isAdmin) && (
             <Card className="gamified-card p-6 space-y-3">
-              <h3 className="font-bold text-lg mb-4">Testing</h3>
+              <h3 className="font-bold text-lg mb-4">{tp('testing.heading')}</h3>
               <Button
                 variant="outline"
                 className="w-full justify-start hover-scale"
                 onClick={createTestNotification}
               >
                 <Bell className="mr-2 h-4 w-4" />
-                Create Test Flashcard Notification
+                {tp('testing.createNotification')}
               </Button>
               <Button
                 variant="outline"
@@ -506,21 +507,21 @@ export default function Profile() {
                 onClick={triggerFlashcardCheck}
               >
                 <Brain className="mr-2 h-4 w-4" />
-                Trigger Flashcard Review Check
+                {tp('testing.triggerFlashcardCheck')}
               </Button>
             </Card>
           )}
 
           {/* Contact Card */}
           <Card className="gamified-card p-6 space-y-3">
-            <h3 className="font-bold text-lg mb-4">Tutorial & Support</h3>
+            <h3 className="font-bold text-lg mb-4">{tp('support.heading')}</h3>
             <Button
               variant="outline"
               className="w-full justify-start hover-scale"
               onClick={() => setTutorialOpen(true)}
             >
               <BookOpen className="mr-2 h-4 w-4" />
-              {t('viewTutorial') || 'View Tutorial'}
+              {t('viewTutorial')}
             </Button>
             <Button
               variant="outline"
@@ -528,7 +529,7 @@ export default function Profile() {
               onClick={() => window.location.href = 'mailto:support@qarray.com?subject=Support Request'}
             >
               <Mail className="mr-2 h-4 w-4" />
-              Contact Support
+              {tp('support.contactSupport')}
             </Button>
             <Button
               variant="outline"
@@ -536,7 +537,7 @@ export default function Profile() {
               onClick={() => window.location.href = 'mailto:shiraz@code-craft-studios.com?subject=Developer Contact'}
             >
               <Mail className="mr-2 h-4 w-4" />
-              Contact Developer
+              {tp('support.contactDeveloper')}
             </Button>
           </Card>
 
@@ -548,7 +549,7 @@ export default function Profile() {
               onClick={handleSignOut}
             >
               <LogOut className="mr-2 h-4 w-4" />
-              {t('signOut') || 'Sign Out'}
+              {t('signOut')}
             </Button>
 
             <Button
@@ -558,7 +559,7 @@ export default function Profile() {
               disabled={isDeleting}
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              {isDeleting ? (t('deleting') || 'Deleting...') : (t('deleteAccount') || 'Delete Account')}
+              {isDeleting ? tp('deletingButton') : t('deleteAccount')}
             </Button>
           </Card>
         </div>

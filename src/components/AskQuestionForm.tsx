@@ -14,6 +14,7 @@ import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
 import { computePageCountFromUrls } from '@/utils/pageCountHelpers';
+import { useTranslation } from 'react-i18next';
 
 const questionSchema = z.object({
   question: z.string().min(10, 'Question must be at least 10 characters').max(500, 'Question must be less than 500 characters'),
@@ -41,6 +42,8 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const { isModerator, isAdmin } = useUserRole();
   const { getUploadsByCallback } = useUploadManager();
+  const { t } = useTranslation();
+  const { t: tf } = useTranslation('forms');
   
   // Generate stable callback ID for tracking uploads
   const callbackId = useMemo(() => `ask-question-${Date.now()}`, []);
@@ -59,7 +62,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
 
   const handleMediaUploaded = (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => {
     setMediaUrls(prev => [...prev, url]);
-    toast.success('Media added successfully');
+    toast.success(tf('media.added'));
   };
 
   const removeMedia = (index: number) => {
@@ -68,7 +71,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
 
   const onSubmit = async (data: QuestionFormData) => {
     if (hasPendingUploads) {
-      toast.warning('Please wait for uploads to complete');
+      toast.warning(tf('uploads.waitForCompletion'));
       return;
     }
     
@@ -77,7 +80,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        toast.error('Please login to ask a question');
+        toast.error(tf('question.loginRequired'));
         setIsSubmitting(false);
         return;
       }
@@ -127,13 +130,13 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
       }
 
       console.log('Question inserted successfully:', insertedData);
-      toast.success('Question submitted successfully');
+      toast.success(tf('question.submitted'));
       form.reset();
       setMediaUrls([]);
       onSuccess();
     } catch (error) {
       console.error('Error submitting question:', error);
-      toast.error(`Failed to submit question: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(tf('question.submitFailed', { error: error instanceof Error ? error.message : 'Unknown error' }));
     } finally {
       setIsSubmitting(false);
     }
@@ -147,10 +150,10 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
           name="question"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Your Question</FormLabel>
+              <FormLabel>{tf('question.label')}</FormLabel>
               <FormControl>
                 <Textarea 
-                  placeholder="Ask your question here..."
+                  placeholder={tf('question.placeholder')}
                   className="min-h-32 resize-none"
                   {...field}
                 />
@@ -165,7 +168,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
           name="book"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Book (Optional)</FormLabel>
+              <FormLabel>{tf('question.bookOptional')}</FormLabel>
               <FormControl>
                 <BookAutocomplete value={field.value || ""} onChange={field.onChange} source="question" />
               </FormControl>
@@ -175,7 +178,7 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
         />
 
         <div>
-          <FormLabel>Attachments (Optional)</FormLabel>
+          <FormLabel>{tf('attachments.optional')}</FormLabel>
           <MediaUploader 
             onMediaUploaded={handleMediaUploaded}
             uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
@@ -187,11 +190,11 @@ export const AskQuestionForm: React.FC<AskQuestionFormProps> = ({
 
         <div className="flex gap-2 justify-end">
           <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button type="submit" disabled={isSubmitting || hasPendingUploads}>
             {(isSubmitting || hasPendingUploads) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {hasPendingUploads ? 'Uploading...' : 'Submit Question'}
+            {hasPendingUploads ? tf('uploads.inProgress') : tf('question.submit')}
           </Button>
         </div>
       </form>
