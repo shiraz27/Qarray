@@ -1214,255 +1214,76 @@ export default function Statistics() {
   };
 
   // Metadata extraction handlers
-  const handleExtractMetadata = async (resourceId: number) => {
-    const resource = resources.find(r => r.id === resourceId);
-    if (!resource || !resource.ocr_text || resource.ocr_status !== 'completed') {
-      toast.error('Resource must have completed OCR first');
+  // Per-row AI metadata extraction: fetch proposal, then open review dialog.
+  // No automatic writes — user must approve via MetadataReviewDialog.
+  const openMetadataReview = async (kind: 'resource' | 'question', id: number) => {
+    const row: any = kind === 'resource'
+      ? resources.find((r) => r.id === id)
+      : questions.find((q) => q.id === id);
+    if (!row || !row.ocr_text || row.ocr_status !== 'completed') {
+      toast.error('Item must have completed OCR first');
       return;
     }
-
-    setExtractingMetadataId(resourceId);
+    setExtractingMetadataId(id);
     try {
-      const result = await extractAndUpdateResourceMetadata(
-        resourceId,
-        resource.ocr_text,
-        (message) => {
-          toast.loading(message, { id: `extracting-${resourceId}` });
-        }
-      );
-      
-      toast.dismiss(`extracting-${resourceId}`);
-      
-      if (result.success) {
-        toast.success(result.message);
-        
-        // Store suggested title if found
-        if (result.metadata.suggested_title) {
-          setSuggestedTitles(prev => {
-            const filtered = prev.filter(st => st.resourceId !== resourceId);
-            return [...filtered, { resourceId, suggestedTitle: result.metadata.suggested_title! }];
-          });
-        }
-        
-        // Refresh resources to show updated fields
-        fetchResources(selectedClass, selectedSubject, selectedChapter);
-      } else {
+      const result = await extractMetadataFromOCR(row.ocr_text, kind === 'resource' ? { resourceId: id } : { questionId: id });
+      if (!result.success) {
         toast.error(result.message);
+        return;
       }
-    } catch (error) {
-      console.error('Metadata extraction error:', error);
+      setMetadataReview({
+        kind,
+        id,
+        proposed: result.metadata,
+        current: kind === 'resource'
+          ? {
+              title: row.title ?? null,
+              description: row.description ?? null,
+              teacher_names: row.teacher_names ?? [],
+              school_names: row.school_names ?? [],
+              books: row.books ?? [],
+              type_id: row.type_id ?? null,
+              devoir_type_id: row.devoir_type_id ?? null,
+            }
+          : {
+              teacher_names: row.teacher_names ?? [],
+              school_names: row.school_names ?? [],
+              books: row.books ?? [],
+              type_id: row.type_id ?? null,
+            },
+      });
+    } catch (err) {
+      console.error('extract metadata error', err);
       toast.error('Failed to extract metadata');
     } finally {
       setExtractingMetadataId(null);
     }
   };
 
-  const handleApplySuggestedTitle = async (resourceId: number) => {
-    const suggestedEntry = suggestedTitles.find(st => st.resourceId === resourceId);
-    if (!suggestedEntry) {
-      toast.error('No suggested title found');
-      return;
-    }
-
-    setApplyingTitleId(resourceId);
+  const applyMetadataReview = async (fields: MetadataField[]) => {
+    if (!metadataReview) return;
+    setApplyingReview(true);
     try {
-      const result = await applySuggestedTitle(resourceId, suggestedEntry.suggestedTitle);
-      
-      if (result.success) {
-        toast.success('Title updated successfully');
-        // Remove from suggested titles
-        setSuggestedTitles(prev => prev.filter(st => st.resourceId !== resourceId));
-        // Refresh resources
-        fetchResources(selectedClass, selectedSubject, selectedChapter);
-      } else {
-        toast.error(result.message);
+      const res = metadataReview.kind === 'resource'
+        ? await applyResourceMetadata(metadataReview.id, metadataReview.proposed, fields)
+        : await applyQuestionMetadata(metadataReview.id, metadataReview.proposed, fields);
+      if (!res.success) {
+        toast.error(res.message);
+        return;
       }
-    } catch (error) {
-      console.error('Error applying title:', error);
-      toast.error('Failed to apply title');
-    } finally {
-      setApplyingTitleId(null);
-    }
-  };
-
-  const handleExtractAllMetadata = async () => {
-    const eligibleResources = resources.filter(
-      r => r.ocr_status === 'completed' && r.ocr_text
-    );
-    
-    if (eligibleResources.length === 0) {
-      toast.info('No resources with completed OCR to process');
-      return;
-    }
-
-    setIsExtractingBatch(true);
-    let successCount = 0;
-    let failCount = 0;
-    let skippedCount = 0;
-    const newSuggestedTitles: SuggestedTitleEntry[] = [];
-    
-    try {
-      for (let i = 0; i < eligibleResources.length; i++) {
-        const resource = eligibleResources[i];
-        
-        toast.loading(`[${i + 1}/${eligibleResources.length}] Extracting metadata...`, {
-          id: 'batch-metadata-progress',
-        });
-        
-        try {
-          const result = await extractAndUpdateResourceMetadata(
-            resource.id,
-            resource.ocr_text!
-          );
-          
-          if (result.success && (result.metadata.school_name || result.metadata.teacher_name || result.metadata.suggested_title)) {
-            successCount++;
-            
-            // Store suggested title
-            if (result.metadata.suggested_title) {
-              newSuggestedTitles.push({
-                resourceId: resource.id,
-                suggestedTitle: result.metadata.suggested_title
-              });
-            }
-          } else if (result.success) {
-            skippedCount++;
-          } else {
-            failCount++;
-          }
-        } catch (error) {
-          failCount++;
-        }
-        
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-      toast.dismiss('batch-metadata-progress');
-      toast.success(`Completed: ${successCount} extracted, ${skippedCount} no data found, ${failCount} failed`);
-      
-      // Update suggested titles
-      setSuggestedTitles(prev => {
-        const existingIds = new Set(newSuggestedTitles.map(st => st.resourceId));
-        const filtered = prev.filter(st => !existingIds.has(st.resourceId));
-        return [...filtered, ...newSuggestedTitles];
-      });
-      
-      // Refresh resources
-      fetchResources(selectedClass, selectedSubject, selectedChapter);
-    } catch (error) {
-      console.error('Batch metadata extraction error:', error);
-      toast.error('Failed to process resources');
-    } finally {
-      setIsExtractingBatch(false);
-    }
-  };
-
-  // Generic AI metadata batch runner for selected resources or questions.
-  // `fields` undefined = fill all fields.
-  const runAiMetadataBatch = async (
-    kind: 'resource' | 'question',
-    ids: number[],
-    fields?: MetadataField[]
-  ) => {
-    if (ids.length === 0) return;
-    const items = kind === 'resource'
-      ? resources.filter(r => ids.includes(r.id))
-      : questions.filter(q => ids.includes(q.id));
-    const eligible = items.filter((it: any) => it.ocr_status === 'completed' && it.ocr_text);
-    const skippedNoOcr = ids.length - eligible.length;
-    if (eligible.length === 0) {
-      toast.info('Selected items have no completed OCR yet — run OCR first');
-      return;
-    }
-    setIsExtractingBatch(true);
-    let success = 0, failed = 0;
-    const newSuggestedTitles: SuggestedTitleEntry[] = [];
-    const label = !fields ? 'all fields' : fields.join(', ');
-    try {
-      for (let i = 0; i < eligible.length; i++) {
-        const it: any = eligible[i];
-        toast.loading(`[${i + 1}/${eligible.length}] AI: ${label}…`, { id: 'ai-batch' });
-        try {
-          const result = kind === 'resource'
-            ? await extractAndUpdateResourceMetadata(it.id, it.ocr_text, undefined, fields)
-            : await extractAndUpdateQuestionMetadata(it.id, it.ocr_text, undefined, fields);
-          if (result.success) {
-            success++;
-            if (kind === 'resource' && result.metadata.suggested_title && (!fields || fields.includes('title'))) {
-              newSuggestedTitles.push({ resourceId: it.id, suggestedTitle: result.metadata.suggested_title });
-            }
-          } else {
-            failed++;
-          }
-        } catch {
-          failed++;
-        }
-        await new Promise(r => setTimeout(r, 400));
-      }
-      toast.dismiss('ai-batch');
-      toast.success(`AI done — ${success} ok, ${failed} failed${skippedNoOcr ? `, ${skippedNoOcr} skipped (no OCR)` : ''}`);
-      if (newSuggestedTitles.length) {
-        setSuggestedTitles(prev => {
-          const ids = new Set(newSuggestedTitles.map(s => s.resourceId));
-          return [...prev.filter(s => !ids.has(s.resourceId)), ...newSuggestedTitles];
-        });
-      }
-      if (kind === 'resource') {
+      toast.success(`Applied ${Object.keys(res.updates).length} field(s)`);
+      if (metadataReview.kind === 'resource') {
         fetchResources(selectedClass, selectedSubject, selectedChapter);
       } else {
         fetchQuestions(selectedClass, selectedSubject, selectedChapter);
       }
+      setMetadataReview(null);
+    } catch (err) {
+      console.error('apply metadata error', err);
+      toast.error('Failed to apply metadata');
     } finally {
-      setIsExtractingBatch(false);
+      setApplyingReview(false);
     }
-  };
-
-  const aiBatchChips = (kind: 'resource' | 'question', getIds: () => number[]) => {
-    const fieldsList: Array<{ key: MetadataField; label: string }> =
-      kind === 'resource'
-        ? [
-            { key: 'title', label: 'Title' },
-            { key: 'description', label: 'Description' },
-            { key: 'teachers', label: 'Teachers' },
-            { key: 'schools', label: 'Schools' },
-            { key: 'books', label: 'Books' },
-            { key: 'types', label: 'Types' },
-          ]
-        : [
-            { key: 'teachers', label: 'Teachers' },
-            { key: 'schools', label: 'Schools' },
-            { key: 'books', label: 'Books' },
-            { key: 'types', label: 'Types' },
-          ];
-    return (
-      <div className="flex flex-wrap items-center gap-1">
-        <Button
-          size="sm"
-          variant="default"
-          disabled={isExtractingBatch}
-          onClick={() => runAiMetadataBatch(kind, getIds())}
-        >
-          {isExtractingBatch ? (
-            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-          ) : (
-            <Sparkles className="mr-1 h-4 w-4" />
-          )}
-          AI: All
-        </Button>
-        {fieldsList.map(({ key, label }) => (
-          <Button
-            key={key}
-            size="sm"
-            variant="outline"
-            disabled={isExtractingBatch}
-            onClick={() => runAiMetadataBatch(kind, getIds(), [key])}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
-    );
   };
 
   const getOcrStatusBadge = (status: string | null) => {
