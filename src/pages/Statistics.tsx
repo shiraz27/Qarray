@@ -179,6 +179,10 @@ export default function Statistics() {
   const [isProcessingWatermarkQuestionBatch, setIsProcessingWatermarkQuestionBatch] = useState(false);
   const [processingWatermarkId, setProcessingWatermarkId] = useState<number | null>(null);
   const [processingWatermarkQuestionId, setProcessingWatermarkQuestionId] = useState<number | null>(null);
+  const [isScanningWmBatch, setIsScanningWmBatch] = useState(false);
+  const [isScanningWmQuestionBatch, setIsScanningWmQuestionBatch] = useState(false);
+  const [scanningWmId, setScanningWmId] = useState<number | null>(null);
+  const [scanningWmQuestionId, setScanningWmQuestionId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [questionSearchQuery, setQuestionSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
