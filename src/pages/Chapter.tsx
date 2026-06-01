@@ -853,6 +853,7 @@ export default function Chapter() {
           </TabsList>
 
           <TabsContent value="questions" className="space-y-3">
+            <SortSelector value={sortBy} onChange={setSortBy} />
             <Dialog open={isQuestionDialogOpen} onOpenChange={setIsQuestionDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="w-full mb-4">
@@ -932,7 +933,8 @@ export default function Chapter() {
               />
             ) : (
               questions
-                .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
+                .slice()
+                .sort(makeSortComparator(sortBy))
                 .map((question) => {
                   const { text, media } = extractMediaFromText(question.data);
                   const hasAudio = media.some(m => m.type === 'audio');
