@@ -51,6 +51,7 @@ import { OcrReviewButton } from '@/components/statistics/OcrReviewButton';
 import { DescriptionAiButton } from '@/components/statistics/DescriptionAiButton';
 import { WatermarkStatusEditor, type WatermarkStatus } from '@/components/statistics/WatermarkStatusEditor';
 import { processResourceWatermark, processQuestionWatermark } from '@/utils/clientWatermarkProcessor';
+import { scanResourceIntegrity, scanQuestionIntegrity } from '@/utils/watermarkIntegrityScanner';
 import { Stamp } from 'lucide-react';
 import { PdfSplitCell } from '@/components/statistics/PdfSplitCell';
 import { PdfHealthAuditPanel } from '@/components/statistics/PdfHealthAuditPanel';
@@ -103,6 +104,8 @@ interface ResourceRow {
   page_count?: number | null;
   watermark_status?: string | null;
   pages_watermarked?: number | null;
+  watermark_stamp_count?: number | null;
+  watermark_overstamped?: boolean | null;
   source_link?: string | null;
   description_proposed?: string | null;
   description_proposed_at?: string | null;
@@ -135,6 +138,8 @@ interface QuestionRow {
   page_count?: number | null;
   watermark_status?: string | null;
   pages_watermarked?: number | null;
+  watermark_stamp_count?: number | null;
+  watermark_overstamped?: boolean | null;
 }
 
 interface QuestionOcrStats {
@@ -146,6 +151,7 @@ interface QuestionOcrStats {
 }
 
 export default function Statistics() {
+  // (watermark integrity fields added in QuestionRow above)
   const { isModerator, isAdmin, loading: roleLoading } = useUserRole();
   const [stats, setStats] = useState<Stats | null>(null);
   const [ocrStats, setOcrStats] = useState<OcrStats | null>(null);
@@ -173,6 +179,10 @@ export default function Statistics() {
   const [isProcessingWatermarkQuestionBatch, setIsProcessingWatermarkQuestionBatch] = useState(false);
   const [processingWatermarkId, setProcessingWatermarkId] = useState<number | null>(null);
   const [processingWatermarkQuestionId, setProcessingWatermarkQuestionId] = useState<number | null>(null);
+  const [isScanningWmBatch, setIsScanningWmBatch] = useState(false);
+  const [isScanningWmQuestionBatch, setIsScanningWmQuestionBatch] = useState(false);
+  const [scanningWmId, setScanningWmId] = useState<number | null>(null);
+  const [scanningWmQuestionId, setScanningWmQuestionId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [questionSearchQuery, setQuestionSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -723,7 +733,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('resources')
-        .select('id, title, description, data, ocr_status, ocr_text, ocr_readability, ocr_text_proposed, ocr_text_proposed_status, ocr_text_proposed_readability, ocr_text_proposed_at, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked, source_link, description_proposed, description_proposed_at, description_proposed_status, description_proposed_model')
+        .select('id, title, description, data, ocr_status, ocr_text, ocr_readability, ocr_text_proposed, ocr_text_proposed_status, ocr_text_proposed_readability, ocr_text_proposed_at, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked, watermark_stamp_count, watermark_overstamped, source_link, description_proposed, description_proposed_at, description_proposed_status, description_proposed_model')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -751,7 +761,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('questions')
-        .select('id, data, ocr_status, ocr_text, ocr_readability, ocr_text_proposed, ocr_text_proposed_status, ocr_text_proposed_readability, ocr_text_proposed_at, chapter_id, chapters(name, subject_id), teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked')
+        .select('id, data, ocr_status, ocr_text, ocr_readability, ocr_text_proposed, ocr_text_proposed_status, ocr_text_proposed_readability, ocr_text_proposed_at, chapter_id, chapters(name, subject_id), teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked, watermark_stamp_count, watermark_overstamped')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
@@ -1091,6 +1101,117 @@ export default function Statistics() {
     }
   };
 
+  // ---------- Watermark integrity scan ----------
+  const handleScanResource = async (id: number) => {
+    setScanningWmId(id);
+    try {
+      const res = await scanResourceIntegrity(id, (p) => {
+        toast.loading(p.message, { id: `wm-scan-r-${id}` });
+      });
+      toast.dismiss(`wm-scan-r-${id}`);
+      (res.success ? toast.success : toast.error)(res.message);
+      setResources((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? { ...r, watermark_stamp_count: res.maxStampCount, watermark_overstamped: res.overStamped }
+            : r,
+        ),
+      );
+    } finally {
+      setScanningWmId(null);
+    }
+  };
+
+  const handleScanQuestion = async (id: number) => {
+    setScanningWmQuestionId(id);
+    try {
+      const res = await scanQuestionIntegrity(id, (p) => {
+        toast.loading(p.message, { id: `wm-scan-q-${id}` });
+      });
+      toast.dismiss(`wm-scan-q-${id}`);
+      (res.success ? toast.success : toast.error)(res.message);
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === id
+            ? { ...q, watermark_stamp_count: res.maxStampCount, watermark_overstamped: res.overStamped }
+            : q,
+        ),
+      );
+    } finally {
+      setScanningWmQuestionId(null);
+    }
+  };
+
+  const handleScanAllResources = async () => {
+    const targets = resources.filter((r) => {
+      const s = r.watermark_status ?? 'pending';
+      return ['completed', 'partial'].includes(s);
+    });
+    if (targets.length === 0) {
+      toast.info('No watermarked resources to scan');
+      return;
+    }
+    setIsScanningWmBatch(true);
+    let bad = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        try {
+          const res = await scanResourceIntegrity(t.id, (p) => {
+            toast.loading(`[${i + 1}/${targets.length}] ${p.message}`, { id: 'wm-scan-r-batch' });
+          });
+          if (res.overStamped) bad++;
+          setResources((prev) =>
+            prev.map((r) =>
+              r.id === t.id
+                ? { ...r, watermark_stamp_count: res.maxStampCount, watermark_overstamped: res.overStamped }
+                : r,
+            ),
+          );
+        } catch { /* ignore */ }
+      }
+      toast.dismiss('wm-scan-r-batch');
+      toast.success(`Scan complete: ${bad} over-stamped of ${targets.length}`);
+    } finally {
+      setIsScanningWmBatch(false);
+    }
+  };
+
+  const handleScanAllQuestions = async () => {
+    const targets = questions.filter((q) => {
+      const s = q.watermark_status ?? 'pending';
+      return ['completed', 'partial'].includes(s);
+    });
+    if (targets.length === 0) {
+      toast.info('No watermarked questions to scan');
+      return;
+    }
+    setIsScanningWmQuestionBatch(true);
+    let bad = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        try {
+          const res = await scanQuestionIntegrity(t.id, (p) => {
+            toast.loading(`[${i + 1}/${targets.length}] ${p.message}`, { id: 'wm-scan-q-batch' });
+          });
+          if (res.overStamped) bad++;
+          setQuestions((prev) =>
+            prev.map((q) =>
+              q.id === t.id
+                ? { ...q, watermark_stamp_count: res.maxStampCount, watermark_overstamped: res.overStamped }
+                : q,
+            ),
+          );
+        } catch { /* ignore */ }
+      }
+      toast.dismiss('wm-scan-q-batch');
+      toast.success(`Scan complete: ${bad} over-stamped of ${targets.length}`);
+    } finally {
+      setIsScanningWmQuestionBatch(false);
+    }
+  };
+
   // Metadata extraction handlers
   const handleExtractMetadata = async (resourceId: number) => {
     const resource = resources.find(r => r.id === resourceId);
@@ -1358,7 +1479,12 @@ export default function Statistics() {
 
   const filteredResources = resources.filter(r => {
     const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
-    const matchesWm = watermarkFilter === 'all' || (r.watermark_status ?? 'pending') === watermarkFilter;
+    const matchesWm =
+      watermarkFilter === 'all'
+        ? true
+        : watermarkFilter === 'over_stamped'
+          ? !!r.watermark_overstamped
+          : (r.watermark_status ?? 'pending') === watermarkFilter;
     const src = r.source_link ?? '';
     const srcIsUrl = /^https?:\/\//i.test(src);
     const matchesSource =
@@ -1398,7 +1524,12 @@ export default function Statistics() {
 
   const filteredQuestions = questions.filter(q => {
     const matchesFilter = questionOcrFilter === 'all' || q.ocr_status === questionOcrFilter;
-    const matchesWm = questionWatermarkFilter === 'all' || (q.watermark_status ?? 'pending') === questionWatermarkFilter;
+    const matchesWm =
+      questionWatermarkFilter === 'all'
+        ? true
+        : questionWatermarkFilter === 'over_stamped'
+          ? !!q.watermark_overstamped
+          : (q.watermark_status ?? 'pending') === questionWatermarkFilter;
     const matchesReadability =
       questionReadabilityFilter === 'all' ? true :
       questionReadabilityFilter === 'missing' ? !q.ocr_readability :
@@ -1984,6 +2115,7 @@ export default function Statistics() {
                                 <SelectItem value="in_progress">Watermark: In progress</SelectItem>
                                 <SelectItem value="failed">Watermark: Failed</SelectItem>
                                 <SelectItem value="not_applicable">Watermark: N/A</SelectItem>
+                                <SelectItem value="over_stamped">Watermark: Over-stamped</SelectItem>
                               </SelectContent>
                             </Select>
                             <Select value={sourceFilter} onValueChange={setSourceFilter}>
@@ -2023,6 +2155,20 @@ export default function Statistics() {
                                 <Stamp className="mr-2 h-4 w-4" />
                               )}
                               Watermark all
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleScanAllResources}
+                              disabled={isScanningWmBatch}
+                              title="Scan watermarked PDFs for over-stamping"
+                            >
+                              {isScanningWmBatch ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Search className="mr-2 h-4 w-4" />
+                              )}
+                              Scan integrity
                             </Button>
                             <div className="relative flex-1">
                               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -2335,6 +2481,28 @@ export default function Statistics() {
                                                   <Stamp className="h-3 w-3 mr-1" />
                                                 )}
                                                 Stamp
+                                              </Button>
+                                            )}
+                                            {resource.watermark_overstamped && (
+                                              <Badge variant="destructive" className="mt-1 block w-fit">
+                                                Over-stamped ×{resource.watermark_stamp_count ?? '?'}
+                                              </Badge>
+                                            )}
+                                            {urlsHaveOcrable(resource.data) && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 px-2 mt-1"
+                                                onClick={() => handleScanResource(resource.id)}
+                                                disabled={scanningWmId === resource.id}
+                                                title="Scan watermark integrity (count stamps per page)"
+                                              >
+                                                {scanningWmId === resource.id ? (
+                                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                                ) : (
+                                                  <Search className="h-3 w-3 mr-1" />
+                                                )}
+                                                Scan
                                               </Button>
                                             )}
                                           </TableCell>
@@ -2669,6 +2837,7 @@ export default function Statistics() {
                                 <SelectItem value="in_progress">Watermark: In progress</SelectItem>
                                 <SelectItem value="failed">Watermark: Failed</SelectItem>
                                 <SelectItem value="not_applicable">Watermark: N/A</SelectItem>
+                                <SelectItem value="over_stamped">Watermark: Over-stamped</SelectItem>
                               </SelectContent>
                             </Select>
                             <Button
@@ -2684,6 +2853,20 @@ export default function Statistics() {
                                 <Stamp className="mr-2 h-4 w-4" />
                               )}
                               Watermark all
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleScanAllQuestions}
+                              disabled={isScanningWmQuestionBatch}
+                              title="Scan watermarked PDFs for over-stamping"
+                            >
+                              {isScanningWmQuestionBatch ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Search className="mr-2 h-4 w-4" />
+                              )}
+                              Scan integrity
                             </Button>
                             <div className="relative flex-1">
                               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -2921,6 +3104,28 @@ export default function Statistics() {
                                                   <Stamp className="h-3 w-3 mr-1" />
                                                 )}
                                                 Stamp
+                                              </Button>
+                                            )}
+                                            {question.watermark_overstamped && (
+                                              <Badge variant="destructive" className="mt-1 block w-fit">
+                                                Over-stamped ×{question.watermark_stamp_count ?? '?'}
+                                              </Badge>
+                                            )}
+                                            {textHasOcrableUrl(question.data) && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 px-2 mt-1"
+                                                onClick={() => handleScanQuestion(question.id)}
+                                                disabled={scanningWmQuestionId === question.id}
+                                                title="Scan watermark integrity (count stamps per page)"
+                                              >
+                                                {scanningWmQuestionId === question.id ? (
+                                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                                ) : (
+                                                  <Search className="h-3 w-3 mr-1" />
+                                                )}
+                                                Scan
                                               </Button>
                                             )}
                                           </TableCell>
