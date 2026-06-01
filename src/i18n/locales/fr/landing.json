@@ -1,1 +1,10 @@
-{}
+{
+  "hero.badge": "Apprenez plus intelligemment, pas plus difficilement",
+  "hero.platformLabel": "Plateforme éducative",
+  "hero.explore": "Explorez",
+  "hero.joinCommunity": "Rejoignez notre communauté",
+  "hero.joinFewStudents": "Rejoignez nos {{count}} étudiants",
+  "hero.joinManyStudents": "Rejoignez {{value}}+ étudiants",
+  "features.heading": "Fonctionnalités clés",
+  "footer.startJourney": "Commencez votre parcours d'apprentissage dès aujourd'hui"
+}

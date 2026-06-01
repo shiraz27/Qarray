@@ -1,1 +1,10 @@
-{}
+{
+  "hero.badge": "تعلم بذكاء، موش بجهد",
+  "hero.platformLabel": "منصة تعليمية",
+  "hero.explore": "استكشف",
+  "hero.joinCommunity": "انضم لمجتمعنا",
+  "hero.joinFewStudents": "انضم إلى {{count}} طلابنا",
+  "hero.joinManyStudents": "انضم إلى أكثر من {{value}}+ طالب",
+  "features.heading": "الميزات الرئيسية",
+  "footer.startJourney": "ابدأ رحلتك التعليمية اليوم"
+}

@@ -1,1 +1,24 @@
-{}
+{
+  "question.label": "Votre question",
+  "question.placeholder": "Posez votre question ici...",
+  "question.bookOptional": "Livre (facultatif)",
+  "question.submit": "Soumettre la question",
+  "question.submitted": "Question soumise avec succès",
+  "question.submitFailed": "Échec de l'envoi de la question : {{error}}",
+  "question.loginRequired": "Veuillez vous connecter pour poser une question",
+  "answer.label": "Votre réponse",
+  "answer.placeholder": "Écrivez votre réponse ici...",
+  "answer.editPlaceholder": "Modifiez votre réponse ici...",
+  "answer.submit": "Soumettre la réponse",
+  "answer.update": "Mettre à jour la réponse",
+  "answer.submitted": "Réponse soumise avec succès",
+  "answer.updated": "Réponse mise à jour avec succès",
+  "answer.submitFailed": "Échec de l'envoi de la réponse",
+  "answer.updateFailed": "Échec de la mise à jour de la réponse",
+  "answer.loginRequired": "Veuillez vous connecter pour répondre",
+  "answer.editLoginRequired": "Veuillez vous connecter pour modifier la réponse",
+  "attachments.optional": "Pièces jointes (facultatif)",
+  "media.added": "Média ajouté avec succès",
+  "uploads.waitForCompletion": "Veuillez attendre que les téléchargements soient terminés",
+  "uploads.inProgress": "Téléchargement en cours..."
+}
