@@ -1101,6 +1101,117 @@ export default function Statistics() {
     }
   };
 
+  // ---------- Watermark integrity scan ----------
+  const handleScanResource = async (id: number) => {
+    setScanningWmId(id);
+    try {
+      const res = await scanResourceIntegrity(id, (p) => {
+        toast.loading(p.message, { id: `wm-scan-r-${id}` });
+      });
+      toast.dismiss(`wm-scan-r-${id}`);
+      (res.success ? toast.success : toast.error)(res.message);
+      setResources((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? { ...r, watermark_stamp_count: res.maxStampCount, watermark_overstamped: res.overStamped }
+            : r,
+        ),
+      );
+    } finally {
+      setScanningWmId(null);
+    }
+  };
+
+  const handleScanQuestion = async (id: number) => {
+    setScanningWmQuestionId(id);
+    try {
+      const res = await scanQuestionIntegrity(id, (p) => {
+        toast.loading(p.message, { id: `wm-scan-q-${id}` });
+      });
+      toast.dismiss(`wm-scan-q-${id}`);
+      (res.success ? toast.success : toast.error)(res.message);
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === id
+            ? { ...q, watermark_stamp_count: res.maxStampCount, watermark_overstamped: res.overStamped }
+            : q,
+        ),
+      );
+    } finally {
+      setScanningWmQuestionId(null);
+    }
+  };
+
+  const handleScanAllResources = async () => {
+    const targets = resources.filter((r) => {
+      const s = r.watermark_status ?? 'pending';
+      return ['completed', 'partial'].includes(s);
+    });
+    if (targets.length === 0) {
+      toast.info('No watermarked resources to scan');
+      return;
+    }
+    setIsScanningWmBatch(true);
+    let bad = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        try {
+          const res = await scanResourceIntegrity(t.id, (p) => {
+            toast.loading(`[${i + 1}/${targets.length}] ${p.message}`, { id: 'wm-scan-r-batch' });
+          });
+          if (res.overStamped) bad++;
+          setResources((prev) =>
+            prev.map((r) =>
+              r.id === t.id
+                ? { ...r, watermark_stamp_count: res.maxStampCount, watermark_overstamped: res.overStamped }
+                : r,
+            ),
+          );
+        } catch { /* ignore */ }
+      }
+      toast.dismiss('wm-scan-r-batch');
+      toast.success(`Scan complete: ${bad} over-stamped of ${targets.length}`);
+    } finally {
+      setIsScanningWmBatch(false);
+    }
+  };
+
+  const handleScanAllQuestions = async () => {
+    const targets = questions.filter((q) => {
+      const s = q.watermark_status ?? 'pending';
+      return ['completed', 'partial'].includes(s);
+    });
+    if (targets.length === 0) {
+      toast.info('No watermarked questions to scan');
+      return;
+    }
+    setIsScanningWmQuestionBatch(true);
+    let bad = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        try {
+          const res = await scanQuestionIntegrity(t.id, (p) => {
+            toast.loading(`[${i + 1}/${targets.length}] ${p.message}`, { id: 'wm-scan-q-batch' });
+          });
+          if (res.overStamped) bad++;
+          setQuestions((prev) =>
+            prev.map((q) =>
+              q.id === t.id
+                ? { ...q, watermark_stamp_count: res.maxStampCount, watermark_overstamped: res.overStamped }
+                : q,
+            ),
+          );
+        } catch { /* ignore */ }
+      }
+      toast.dismiss('wm-scan-q-batch');
+      toast.success(`Scan complete: ${bad} over-stamped of ${targets.length}`);
+    } finally {
+      setIsScanningWmQuestionBatch(false);
+    }
+  };
+
   // Metadata extraction handlers
   const handleExtractMetadata = async (resourceId: number) => {
     const resource = resources.find(r => r.id === resourceId);
