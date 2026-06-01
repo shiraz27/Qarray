@@ -1294,6 +1294,7 @@ export default function Chapter() {
                 </label>
               </div>
             </div>
+            {renderFiltersBar(resourceSearch, setResourceSearch, t('searchResources') || 'Search resources...')}
             <SortSelector value={sortBy} onChange={setSortBy} />
 
             <Dialog open={isResourceDialogOpen} onOpenChange={setIsResourceDialogOpen}>
@@ -1370,22 +1371,13 @@ export default function Chapter() {
               </DialogContent>
             </Dialog>
 
-            {resources.filter(r => 
-              (selectedTypeFilters.length === 0 || ((r.type_ids && r.type_ids.length > 0 ? r.type_ids : [r.type_id]).some((id) => selectedTypeFilters.includes(id)))) &&
-              (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
-              (!showWithCorrectionOnly || r.with_correction)
-            ).length === 0 ? (
+            {filteredResources.length === 0 ? (
               <EmptyState
                 type="resources"
                 message={t('noResources') || 'No resources available yet'}
               />
             ) : (
-              resources
-                .filter(r => 
-                  (selectedTypeFilters.length === 0 || ((r.type_ids && r.type_ids.length > 0 ? r.type_ids : [r.type_id]).some((id) => selectedTypeFilters.includes(id)))) &&
-                  (selectedDevoirFilters.length === 0 || (r.devoir_type_id && selectedDevoirFilters.includes(r.devoir_type_id))) &&
-                  (!showWithCorrectionOnly || r.with_correction)
-                )
+              filteredResources
                 .slice()
                 .sort(makeSortComparator(sortBy))
                 .map((resource) => {
