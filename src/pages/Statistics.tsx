@@ -47,6 +47,7 @@ import { extractAndUpdateResourceMetadata, extractAndUpdateQuestionMetadata, app
 import { MetaCell, type CellValue } from '@/components/statistics/MetaCell';
 import { OcrStatusEditor, type OcrStatus } from '@/components/statistics/OcrStatusEditor';
 import { OcrTextEditor } from '@/components/statistics/OcrTextEditor';
+import { OcrReviewButton } from '@/components/statistics/OcrReviewButton';
 import { WatermarkStatusEditor, type WatermarkStatus } from '@/components/statistics/WatermarkStatusEditor';
 import { processResourceWatermark, processQuestionWatermark } from '@/utils/clientWatermarkProcessor';
 import { Stamp } from 'lucide-react';
