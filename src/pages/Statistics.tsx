@@ -2036,6 +2036,17 @@ export default function Statistics() {
                                 <SelectItem value="over_stamped">Watermark: Over-stamped</SelectItem>
                               </SelectContent>
                             </Select>
+                            <Select value={overstampFilter} onValueChange={setOverstampFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Over-stamping" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Stamps</SelectItem>
+                                <SelectItem value="over">Over-stamped (&gt; 1)</SelectItem>
+                                <SelectItem value="clean">Within limit (≤ 1)</SelectItem>
+                                <SelectItem value="unscanned">Not scanned yet</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <Select value={sourceFilter} onValueChange={setSourceFilter}>
                               <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Source filter" />
