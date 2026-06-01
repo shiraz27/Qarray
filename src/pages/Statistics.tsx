@@ -2815,6 +2815,7 @@ export default function Statistics() {
                                 <SelectItem value="in_progress">Watermark: In progress</SelectItem>
                                 <SelectItem value="failed">Watermark: Failed</SelectItem>
                                 <SelectItem value="not_applicable">Watermark: N/A</SelectItem>
+                                <SelectItem value="over_stamped">Watermark: Over-stamped</SelectItem>
                               </SelectContent>
                             </Select>
                             <Button
@@ -2830,6 +2831,20 @@ export default function Statistics() {
                                 <Stamp className="mr-2 h-4 w-4" />
                               )}
                               Watermark all
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleScanAllQuestions}
+                              disabled={isScanningWmQuestionBatch}
+                              title="Scan watermarked PDFs for over-stamping"
+                            >
+                              {isScanningWmQuestionBatch ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Search className="mr-2 h-4 w-4" />
+                              )}
+                              Scan integrity
                             </Button>
                             <div className="relative flex-1">
                               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
