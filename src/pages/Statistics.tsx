@@ -722,7 +722,7 @@ export default function Statistics() {
 
       let query = supabase
         .from('resources')
-        .select('id, title, description, data, ocr_status, ocr_text, ocr_readability, ocr_text_proposed, ocr_text_proposed_status, ocr_text_proposed_readability, ocr_text_proposed_at, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked, source_link')
+        .select('id, title, description, data, ocr_status, ocr_text, ocr_readability, ocr_text_proposed, ocr_text_proposed_status, ocr_text_proposed_readability, ocr_text_proposed_at, chapter_id, chapters(name), resource_types(type), school_name, teacher_name, teacher_names, school_names, books, type_ids, page_count, watermark_status, pages_watermarked, source_link, description_proposed, description_proposed_at, description_proposed_status, description_proposed_model')
         .eq('deleted', false);
 
       if (classFilter) query = query.eq('chapters.class_id', classFilter);
