@@ -29,6 +29,7 @@ import { DarkModeToggle } from '@/components/DarkModeToggle';
 const Landing: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { t: tl } = useTranslation('landing');
   const [searchOpen, setSearchOpen] = useState(false);
   const [studentCount, setStudentCount] = useState<number | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -182,7 +183,7 @@ const Landing: React.FC = () => {
           {/* Welcome Badge */}
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6 animate-bounce-slow">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Learn Smarter, Not Harder</span>
+            <span className="text-sm font-medium text-primary">{tl('hero.badge')}</span>
           </div>
 
           {/* Logo with glow effect */}
@@ -203,7 +204,7 @@ const Landing: React.FC = () => {
           {/* Achievement Badge */}
           <div className="flex items-center gap-2 mt-2">
             <Trophy className="w-5 h-5 text-[hsl(45,93%,47%)]" />
-            <span className="text-sm text-muted-foreground">Educational Platform</span>
+            <span className="text-sm text-muted-foreground">{tl('hero.platformLabel')}</span>
             <Trophy className="w-5 h-5 text-[hsl(45,93%,47%)]" />
           </div>
         </div>
@@ -226,7 +227,7 @@ const Landing: React.FC = () => {
             <span className="text-muted-foreground group-hover:text-foreground transition-colors">{t('searchPublicContent')}</span>
             <div className="ml-auto flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
               <Sparkles className="w-3 h-3" />
-              Explore
+              {tl('hero.explore')}
             </div>
           </button>
 
@@ -250,10 +251,10 @@ const Landing: React.FC = () => {
               <Users className="w-4 h-4" />
               <span>
                 {studentCount === null 
-                  ? 'Join our community' 
+                  ? tl('hero.joinCommunity')
                   : studentCount < 10 
-                    ? `Join our ${studentCount} students`
-                    : `Join ${studentCount.toLocaleString()}+ students`
+                    ? tl('hero.joinFewStudents', { count: studentCount })
+                    : tl('hero.joinManyStudents', { count: studentCount.toLocaleString() })
                 }
               </span>
             </div>
@@ -269,7 +270,7 @@ const Landing: React.FC = () => {
         <div className="w-full max-w-5xl px-4 animate-slide-up" style={{ animationDelay: '0.4s' }}>
           <div className="flex items-center justify-center gap-2 mb-6">
             <Award className="w-5 h-5 text-primary" />
-            <h3 className="text-lg sm:text-xl font-bold text-foreground">Key Features</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-foreground">{tl('features.heading')}</h3>
             <Award className="w-5 h-5 text-primary" />
           </div>
 
@@ -329,7 +330,7 @@ const Landing: React.FC = () => {
         <div className="mt-12 text-center animate-slide-up" style={{ animationDelay: '0.5s' }}>
           <div className="flex items-center justify-center gap-2 mb-4">
             <Star className="w-5 h-5 text-[hsl(45,93%,47%)] animate-sparkle" />
-            <span className="text-sm text-muted-foreground">Start your learning journey today</span>
+            <span className="text-sm text-muted-foreground">{tl('footer.startJourney')}</span>
             <Star className="w-5 h-5 text-[hsl(45,93%,47%)] animate-sparkle" style={{ animationDelay: '0.5s' }} />
           </div>
         </div>

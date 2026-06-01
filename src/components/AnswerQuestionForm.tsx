@@ -11,6 +11,7 @@ import { Loader2 } from 'lucide-react';
 import { MediaUploader } from './MediaUploader';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUploadManager } from '@/contexts/UploadManagerContext';
+import { useTranslation } from 'react-i18next';
 
 const answerSchema = z.object({
   answer: z.string().min(10, 'Answer must be at least 10 characters').max(1000, 'Answer must be less than 1000 characters'),
@@ -35,6 +36,8 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const { isModerator, isAdmin } = useUserRole();
   const { getUploadsByCallback } = useUploadManager();
+  const { t } = useTranslation();
+  const { t: tf } = useTranslation('forms');
   
   // Generate stable callback ID for tracking uploads
   const callbackId = useMemo(() => `answer-${Date.now()}`, []);
@@ -52,7 +55,7 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
 
   const handleMediaUploaded = (url: string, type: 'image' | 'video' | 'audio' | 'pdf') => {
     setMediaUrls(prev => [...prev, url]);
-    toast.success('Media added successfully');
+    toast.success(tf('media.added'));
   };
 
   const removeMedia = (index: number) => {
@@ -61,7 +64,7 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
 
   const onSubmit = async (data: AnswerFormData) => {
     if (hasPendingUploads) {
-      toast.warning('Please wait for uploads to complete');
+      toast.warning(tf('uploads.waitForCompletion'));
       return;
     }
     
@@ -70,7 +73,7 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        toast.error('Please login to answer');
+        toast.error(tf('answer.loginRequired'));
         return;
       }
 
@@ -90,13 +93,13 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
 
       if (error) throw error;
 
-      toast.success('Answer submitted successfully');
+      toast.success(tf('answer.submitted'));
       form.reset();
       setMediaUrls([]);
       onSuccess();
     } catch (error) {
       console.error('Error submitting answer:', error);
-      toast.error('Failed to submit answer');
+      toast.error(tf('answer.submitFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -110,10 +113,10 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
           name="answer"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Your Answer</FormLabel>
+              <FormLabel>{tf('answer.label')}</FormLabel>
               <FormControl>
                 <Textarea 
-                  placeholder="Write your answer here..."
+                  placeholder={tf('answer.placeholder')}
                   className="min-h-32 resize-none"
                   {...field}
                 />
@@ -124,7 +127,7 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
         />
 
         <div>
-          <FormLabel>Attachments (Optional)</FormLabel>
+          <FormLabel>{tf('attachments.optional')}</FormLabel>
           <MediaUploader 
             onMediaUploaded={handleMediaUploaded}
             uploadedMedia={mediaUrls.map(url => ({ url, type: 'mixed', name: url }))}
@@ -137,11 +140,11 @@ export const AnswerQuestionForm: React.FC<AnswerQuestionFormProps> = ({
 
         <div className="flex gap-2 justify-end">
           <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button type="submit" disabled={isSubmitting || hasPendingUploads}>
             {(isSubmitting || hasPendingUploads) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {hasPendingUploads ? 'Uploading...' : 'Submit Answer'}
+            {hasPendingUploads ? tf('uploads.inProgress') : tf('answer.submit')}
           </Button>
         </div>
       </form>
