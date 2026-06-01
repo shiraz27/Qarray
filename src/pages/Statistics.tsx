@@ -861,12 +861,16 @@ export default function Statistics() {
     }
   };
 
-  const handleProcessSingle = async (resourceId: number, mode: OcrMode = 'mixed') => {
+  const handleProcessSingle = async (
+    resourceId: number,
+    mode: OcrMode = 'mixed',
+    runOpts: OcrRunOptions = {},
+  ) => {
     setProcessingId(resourceId);
     try {
       const result = await processResourceOCR(resourceId, (message) => {
         toast.loading(`(${mode}) ${message}`, { id: `processing-${resourceId}` });
-      }, mode);
+      }, mode, runOpts);
       
       toast.dismiss(`processing-${resourceId}`);
       
@@ -942,12 +946,16 @@ export default function Statistics() {
     }
   };
 
-  const handleProcessSingleQuestion = async (questionId: number, mode: OcrMode = 'mixed') => {
+  const handleProcessSingleQuestion = async (
+    questionId: number,
+    mode: OcrMode = 'mixed',
+    runOpts: OcrRunOptions = {},
+  ) => {
     setProcessingQuestionId(questionId);
     try {
       const result = await processQuestionOCR(questionId, (message) => {
         toast.loading(`(${mode}) ${message}`, { id: `processing-question-${questionId}` });
-      }, mode);
+      }, mode, runOpts);
       
       toast.dismiss(`processing-question-${questionId}`);
       
