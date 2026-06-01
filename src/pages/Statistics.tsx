@@ -114,12 +114,6 @@ interface ResourceRow {
   description_proposed_model?: string | null;
 }
 
-// Track suggested titles from AI extraction
-interface SuggestedTitleEntry {
-  resourceId: number;
-  suggestedTitle: string;
-}
-
 interface QuestionRow {
   id: number;
   data: string;
