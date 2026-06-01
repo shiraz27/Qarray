@@ -89,6 +89,11 @@ interface Question {
   isBookmarked?: boolean;
   book?: string | null;
   page_count?: number | null;
+  teacher_names?: string[] | null;
+  school_names?: string[] | null;
+  books?: string[] | null;
+  ocr_text?: string | null;
+  ocr_text_proposed?: string | null;
 }
 
 interface Resource {
@@ -109,6 +114,14 @@ interface Resource {
   isBookmarked?: boolean;
   book?: string | null;
   page_count?: number | null;
+  teacher_name?: string | null;
+  school_name?: string | null;
+  teacher_names?: string[] | null;
+  school_names?: string[] | null;
+  books?: string[] | null;
+  source_link?: string | null;
+  ocr_text?: string | null;
+  ocr_text_proposed?: string | null;
 }
 
 interface ResourceType {
