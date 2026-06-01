@@ -2338,6 +2338,7 @@ export default function Statistics() {
                                               table="resources"
                                               rowId={resource.id}
                                               text={resource.ocr_text ?? null}
+                                              readability={resource.ocr_readability ?? null}
                                               onChanged={(next) =>
                                                 setResources((prev) =>
                                                   prev.map((r) =>
@@ -2355,6 +2356,7 @@ export default function Statistics() {
                                                   proposedText={resource.ocr_text_proposed ?? null}
                                                   proposedStatus={resource.ocr_text_proposed_status ?? null}
                                                   proposedReadability={resource.ocr_text_proposed_readability ?? null}
+                                                  currentReadability={resource.ocr_readability ?? null}
                                                   onResolved={(patch) =>
                                                     setResources((prev) =>
                                                       prev.map((r) =>
