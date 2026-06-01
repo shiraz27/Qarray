@@ -582,6 +582,121 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json()
+
+    // ----- Branch: AI description for a resource -----
+    if (body?.action === 'describe_resource') {
+      const resourceId = Number(body.resource_id)
+      if (!Number.isFinite(resourceId)) {
+        return new Response(JSON.stringify({ error: 'resource_id required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const model: string = typeof body.model === 'string' && body.model.length > 0
+        ? body.model
+        : 'google/gemini-2.5-flash'
+
+      const { data: res, error: resErr } = await admin
+        .from('resources')
+        .select('id, title, description, ocr_text, book, teacher_name, school_name')
+        .eq('id', resourceId)
+        .maybeSingle()
+      if (resErr || !res) {
+        return new Response(JSON.stringify({ error: `Resource ${resourceId} not found` }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const sourceText = (res as any).ocr_text || ''
+      if (!sourceText || sourceText.trim().length < 20) {
+        return new Response(JSON.stringify({ error: 'Resource has no OCR text — run OCR first' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const language = detectLanguage(sourceText)
+      const langName = language === 'ar' ? 'Arabic' : 'French'
+      const system = `You are an expert Tunisian high-school content cataloger. Write a 2-3 sentence ${langName} study description of the resource for students browsing a catalog. Mention the topic/chapter and what students will find inside. NO greeting, NO self-introduction, NO emoji, NO Markdown — plain prose only.`
+      const meta = [
+        `Titre: ${(res as any).title || ''}`,
+        (res as any).book ? `Manuel: ${(res as any).book}` : '',
+        (res as any).teacher_name ? `Enseignant: ${(res as any).teacher_name}` : '',
+        (res as any).school_name ? `Établissement: ${(res as any).school_name}` : '',
+        (res as any).description ? `Description actuelle: ${(res as any).description}` : '',
+      ].filter(Boolean).join('\n')
+      const userPrompt = `${meta}\n\n---\n\nContenu OCR (extrait):\n${sourceText.slice(0, 8000)}`
+
+      let generated: string
+      try {
+        const { content } = await callModel(model, OPENROUTER, system, userPrompt)
+        generated = (content || '').trim().replace(/^["“”]+|["“”]+$/g, '')
+      } catch (e: any) {
+        return new Response(JSON.stringify({ error: e?.message || 'AI call failed' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (!generated || generated.length < 10 || looksLikeRefusal(generated)) {
+        return new Response(JSON.stringify({ error: 'Model returned an unusable response' }), {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const now = new Date().toISOString()
+      const existing = ((res as any).description || '').trim()
+      const isRealDescription = existing.length >= 20
+
+      if (isRealDescription) {
+        // Hold as a proposal for admin review
+        await admin
+          .from('resources')
+          .update({
+            description_proposed: generated,
+            description_proposed_at: now,
+            description_proposed_status: 'pending',
+            description_proposed_model: model,
+          })
+          .eq('id', resourceId)
+        return new Response(
+          JSON.stringify({
+            proposed: true,
+            description: existing,
+            description_proposed: generated,
+            description_proposed_at: now,
+            description_proposed_status: 'pending',
+            description_proposed_model: model,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+
+      // No real prior description — write directly
+      await admin
+        .from('resources')
+        .update({
+          description: generated,
+          description_proposed: null,
+          description_proposed_at: null,
+          description_proposed_status: null,
+          description_proposed_model: null,
+        })
+        .eq('id', resourceId)
+      return new Response(
+        JSON.stringify({
+          proposed: false,
+          description: generated,
+          description_proposed: null,
+          description_proposed_at: null,
+          description_proposed_status: null,
+          description_proposed_model: null,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
     const targets: Array<{ target_type: 'resource' | 'question'; target_id: number }> = body.targets || []
     const kinds: Kind[] = body.kinds || []
     const requestedModels: string[] = Array.isArray(body.models) ? body.models.filter((m: any) => typeof m === 'string' && m.length > 0) : []
