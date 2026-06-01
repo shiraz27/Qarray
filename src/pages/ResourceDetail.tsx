@@ -27,6 +27,9 @@ import { EmptyState } from '@/components/EmptyState';
 import { SEO, createLearningResourceSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, X } from 'lucide-react';
 
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -72,6 +75,11 @@ interface Question {
   downvotes: number;
   userVote: string | null;
   answerCount: number;
+  ocr_text?: string | null;
+  books?: string[] | null;
+  school_names?: string[] | null;
+  teacher_names?: string[] | null;
+  type_ids?: number[] | null;
 }
 
 export default function ResourceDetail() {
@@ -96,6 +104,10 @@ export default function ResourceDetail() {
   const [editingAiId, setEditingAiId] = useState<number | null>(null);
   const [editingAiText, setEditingAiText] = useState('');
   const [deletingAiId, setDeletingAiId] = useState<number | null>(null);
+  const [questionSearch, setQuestionSearch] = useState('');
+  const [questionTypeFilter, setQuestionTypeFilter] = useState<string>('all');
+  const [questionVerifiedFilter, setQuestionVerifiedFilter] = useState<string>('all');
+  const [questionAnswersFilter, setQuestionAnswersFilter] = useState<string>('all');
 
   const handleDeleteAiAnswer = async (answerId: number) => {
     const { error } = await supabase
@@ -960,7 +972,110 @@ export default function ResourceDetail() {
             message="No questions yet. Be the first to ask something about this resource!" 
           />
         ) : (
-          questions.map((question) => (
+          <>
+          {/* Search & filters */}
+          <div className="space-y-2 mb-3">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={questionSearch}
+                onChange={(e) => setQuestionSearch(e.target.value)}
+                placeholder="Search questions, OCR, school, teacher, book…"
+                className="pl-9 pr-9"
+              />
+              {questionSearch && (
+                <button
+                  type="button"
+                  onClick={() => setQuestionSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Select value={questionTypeFilter} onValueChange={setQuestionTypeFilter}>
+                <SelectTrigger className="w-auto min-w-[140px] h-9 text-xs">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All types</SelectItem>
+                  {resourceTypes.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>{t.type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={questionVerifiedFilter} onValueChange={setQuestionVerifiedFilter}>
+                <SelectTrigger className="w-auto min-w-[140px] h-9 text-xs">
+                  <SelectValue placeholder="Verification" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="verified">Verified</SelectItem>
+                  <SelectItem value="unverified">Unverified</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={questionAnswersFilter} onValueChange={setQuestionAnswersFilter}>
+                <SelectTrigger className="w-auto min-w-[140px] h-9 text-xs">
+                  <SelectValue placeholder="Answers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any</SelectItem>
+                  <SelectItem value="with">With answers</SelectItem>
+                  <SelectItem value="without">Without answers</SelectItem>
+                </SelectContent>
+              </Select>
+              {(questionSearch || questionTypeFilter !== 'all' || questionVerifiedFilter !== 'all' || questionAnswersFilter !== 'all') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-xs"
+                  onClick={() => {
+                    setQuestionSearch('');
+                    setQuestionTypeFilter('all');
+                    setQuestionVerifiedFilter('all');
+                    setQuestionAnswersFilter('all');
+                  }}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {(() => {
+            const needle = questionSearch.trim().toLowerCase();
+            const filtered = questions.filter((q) => {
+              if (questionTypeFilter !== 'all') {
+                const typeId = Number(questionTypeFilter);
+                const ids = [q.type_id, ...(q.type_ids || [])].filter((v): v is number => v != null);
+                if (!ids.includes(typeId)) return false;
+              }
+              if (questionVerifiedFilter === 'verified' && !q.verified) return false;
+              if (questionVerifiedFilter === 'unverified' && q.verified) return false;
+              if (questionAnswersFilter === 'with' && q.answerCount === 0) return false;
+              if (questionAnswersFilter === 'without' && q.answerCount > 0) return false;
+              if (needle) {
+                const haystack = [
+                  q.data,
+                  q.ocr_text || '',
+                  ...(q.books || []),
+                  ...(q.school_names || []),
+                  ...(q.teacher_names || []),
+                ].join(' \u0001 ').toLowerCase();
+                if (!haystack.includes(needle)) return false;
+              }
+              return true;
+            });
+            if (filtered.length === 0) {
+              return (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No questions match your filters.
+                </p>
+              );
+            }
+            return filtered.map((question) => (
             <Card 
               key={question.id} 
               className="p-4 space-y-3 cursor-pointer hover:shadow-md transition-shadow"
@@ -1004,7 +1119,9 @@ export default function ResourceDetail() {
                 </div>
               </div>
             </Card>
-          ))
+            ));
+          })()}
+          </>
         )}
       </div>
 
