@@ -170,6 +170,18 @@ export default function Statistics() {
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [readabilityFilter, setReadabilityFilter] = useState<string>('all');
   const [questionReadabilityFilter, setQuestionReadabilityFilter] = useState<string>('all');
+  const [pagesFilter, setPagesFilter] = useState<string>('all'); // all | none | single | multi
+  const [questionPagesFilter, setQuestionPagesFilter] = useState<string>('all');
+  const [pagesSort, setPagesSort] = useState<string>('none'); // none | asc | desc
+  const [questionPagesSort, setQuestionPagesSort] = useState<string>('none');
+  const [teacherFilter, setTeacherFilter] = useState<string>('');
+  const [schoolFilter, setSchoolFilter] = useState<string>('');
+  const [bookFilter, setBookFilter] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<string>('all'); // 'all' | type id as string
+  const [descriptionFilter, setDescriptionFilter] = useState<string>('all'); // all | missing | has | has_proposal | applied
+  const [questionTeacherFilter, setQuestionTeacherFilter] = useState<string>('');
+  const [questionSchoolFilter, setQuestionSchoolFilter] = useState<string>('');
+  const [questionBookFilter, setQuestionBookFilter] = useState<string>('');
   const [isProcessingWatermarkBatch, setIsProcessingWatermarkBatch] = useState(false);
   const [isProcessingWatermarkQuestionBatch, setIsProcessingWatermarkQuestionBatch] = useState(false);
   const [processingWatermarkId, setProcessingWatermarkId] = useState<number | null>(null);
@@ -385,7 +397,8 @@ export default function Statistics() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [ocrFilter, watermarkFilter, sourceFilter, readabilityFilter, searchQuery]);
+  }, [ocrFilter, watermarkFilter, sourceFilter, readabilityFilter, searchQuery,
+      pagesFilter, pagesSort, teacherFilter, schoolFilter, bookFilter, typeFilter, descriptionFilter]);
 
   // Lazy backfill: compute & persist ocr_readability for rows that are missing it.
   useEffect(() => {
@@ -449,7 +462,8 @@ export default function Statistics() {
 
   useEffect(() => {
     setQuestionCurrentPage(1);
-  }, [questionOcrFilter, questionWatermarkFilter, questionSearchQuery]);
+  }, [questionOcrFilter, questionWatermarkFilter, questionReadabilityFilter, questionSearchQuery,
+      questionPagesFilter, questionPagesSort, questionTeacherFilter, questionSchoolFilter, questionBookFilter]);
 
   useEffect(() => {
     if (selectedClass !== 'all') {
@@ -1293,6 +1307,18 @@ export default function Statistics() {
     }
   };
 
+  const pageMatcher = (count: number | null | undefined, mode: string) => {
+    if (mode === 'all') return true;
+    if (mode === 'none') return count == null;
+    if (mode === 'single') return count === 1;
+    if (mode === 'multi') return typeof count === 'number' && count > 1;
+    return true;
+  };
+  const textMatchesAny = (needle: string, fields: (string | null | undefined)[]) => {
+    const n = needle.trim();
+    if (!n) return true;
+    return fields.some((f) => normalizedIncludes(f ?? '', n));
+  };
   const filteredResources = resources.filter(r => {
     const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
     const matchesWm =
@@ -1313,10 +1339,25 @@ export default function Statistics() {
       readabilityFilter === 'all' ? true :
       readabilityFilter === 'missing' ? !r.ocr_readability :
       r.ocr_readability === readabilityFilter;
-    const q = (searchQuery ?? '').trim();
-    const matchesSearch = !q || [
+    const matchesPages = pageMatcher(r.page_count ?? null, pagesFilter);
+    const matchesTeacher = textMatchesAny(teacherFilter, [r.teacher_name, ...(r.teacher_names ?? [])]);
+    const matchesSchool = textMatchesAny(schoolFilter, [r.school_name, ...(r.school_names ?? [])]);
+    const matchesBook = textMatchesAny(bookFilter, [...(r.books ?? [])]);
+    const matchesType =
+      typeFilter === 'all' ? true : (r.type_ids ?? []).map(String).includes(typeFilter);
+    const desc = (r.description ?? '').trim();
+    const hasProposal = !!(r.description_proposed && r.description_proposed.trim());
+    const matchesDescription =
+      descriptionFilter === 'all' ? true :
+      descriptionFilter === 'missing' ? !desc :
+      descriptionFilter === 'has' ? !!desc :
+      descriptionFilter === 'has_proposal' ? hasProposal :
+      descriptionFilter === 'applied' ? (r.description_proposed_status === 'applied') :
+      true;
+    const matchesSearch = textMatchesAny(searchQuery ?? '', [
       r.title,
       r.description,
+      r.description_proposed,
       r.chapters?.name,
       r.school_name,
       r.teacher_name,
@@ -1324,13 +1365,27 @@ export default function Statistics() {
       r.ocr_readability,
       r.ocr_status,
       r.watermark_status,
+      r.ocr_text,
+      r.ocr_text_proposed,
       ...(r.teacher_names ?? []),
       ...(r.school_names ?? []),
       ...(r.books ?? []),
       String(r.id),
-    ].some((f) => normalizedIncludes(f ?? '', q));
-    return matchesFilter && matchesWm && matchesSource && matchesReadability && matchesSearch;
+    ]);
+    return matchesFilter && matchesWm && matchesSource && matchesReadability
+      && matchesPages && matchesTeacher && matchesSchool && matchesBook
+      && matchesType && matchesDescription && matchesSearch;
   });
+  if (pagesSort !== 'none') {
+    filteredResources.sort((a, b) => {
+      const av = a.page_count ?? null;
+      const bv = b.page_count ?? null;
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      return pagesSort === 'asc' ? av - bv : bv - av;
+    });
+  }
 
   const totalPages = Math.ceil(filteredResources.length / itemsPerPage);
   const paginatedResources = filteredResources.slice(
@@ -1350,20 +1405,36 @@ export default function Statistics() {
       questionReadabilityFilter === 'all' ? true :
       questionReadabilityFilter === 'missing' ? !q.ocr_readability :
       q.ocr_readability === questionReadabilityFilter;
-    const qs = (questionSearchQuery ?? '').trim();
-    const matchesSearch = !qs || [
+    const matchesPages = pageMatcher(q.page_count ?? null, questionPagesFilter);
+    const matchesTeacher = textMatchesAny(questionTeacherFilter, [...(q.teacher_names ?? [])]);
+    const matchesSchool = textMatchesAny(questionSchoolFilter, [...(q.school_names ?? [])]);
+    const matchesBook = textMatchesAny(questionBookFilter, [...(q.books ?? [])]);
+    const matchesSearch = textMatchesAny(questionSearchQuery ?? '', [
       q.data,
       q.chapters?.name,
       q.ocr_readability,
       q.ocr_status,
       q.watermark_status,
+      q.ocr_text,
+      q.ocr_text_proposed,
       ...(q.teacher_names ?? []),
       ...(q.school_names ?? []),
       ...(q.books ?? []),
       String(q.id),
-    ].some((f) => normalizedIncludes(f ?? '', qs));
-    return matchesFilter && matchesWm && matchesReadability && matchesSearch;
+    ]);
+    return matchesFilter && matchesWm && matchesReadability && matchesPages
+      && matchesTeacher && matchesSchool && matchesBook && matchesSearch;
   });
+  if (questionPagesSort !== 'none') {
+    filteredQuestions.sort((a, b) => {
+      const av = a.page_count ?? null;
+      const bv = b.page_count ?? null;
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      return questionPagesSort === 'asc' ? av - bv : bv - av;
+    });
+  }
 
   const questionTotalPages = Math.ceil(filteredQuestions.length / itemsPerPage);
   const paginatedQuestions = filteredQuestions.slice(
@@ -1895,7 +1966,7 @@ export default function Statistics() {
                         {/* Resources Table */}
                         <div className="pt-4 border-t">
                           <h4 className="font-medium mb-4">Resources & OCR Status</h4>
-                          <div className="flex gap-2 mb-4">
+                          <div className="flex flex-wrap gap-2 mb-4 items-center">
                             <Select value={ocrFilter} onValueChange={setOcrFilter}>
                               <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Filter by status" />
@@ -1947,6 +2018,68 @@ export default function Statistics() {
                                 <SelectItem value="missing">Readability: Missing</SelectItem>
                               </SelectContent>
                             </Select>
+                            <Select value={descriptionFilter} onValueChange={setDescriptionFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Description" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Descriptions</SelectItem>
+                                <SelectItem value="has">Description: Present</SelectItem>
+                                <SelectItem value="missing">Description: Missing</SelectItem>
+                                <SelectItem value="has_proposal">Description: AI proposal</SelectItem>
+                                <SelectItem value="applied">Description: AI applied</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={pagesFilter} onValueChange={setPagesFilter}>
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="Pages" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Pages</SelectItem>
+                                <SelectItem value="single">Pages: Single</SelectItem>
+                                <SelectItem value="multi">Pages: Multi</SelectItem>
+                                <SelectItem value="none">Pages: Unknown</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={pagesSort} onValueChange={setPagesSort}>
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="Sort pages" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Sort: Default</SelectItem>
+                                <SelectItem value="asc">Pages ↑</SelectItem>
+                                <SelectItem value="desc">Pages ↓</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={typeFilter} onValueChange={setTypeFilter}>
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="Type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Types</SelectItem>
+                                {resourceTypes.map((t) => (
+                                  <SelectItem key={t.id} value={String(t.id)}>{t.type}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              placeholder="Teacher"
+                              value={teacherFilter}
+                              onChange={(e) => setTeacherFilter(e.target.value)}
+                              className="w-[140px]"
+                            />
+                            <Input
+                              placeholder="School"
+                              value={schoolFilter}
+                              onChange={(e) => setSchoolFilter(e.target.value)}
+                              className="w-[140px]"
+                            />
+                            <Input
+                              placeholder="Book"
+                              value={bookFilter}
+                              onChange={(e) => setBookFilter(e.target.value)}
+                              className="w-[140px]"
+                            />
                             <Button
                               size="sm"
                               variant="outline"
@@ -2593,7 +2726,7 @@ export default function Statistics() {
                         {/* Questions Table */}
                         <div className="pt-4 border-t">
                           <h4 className="font-medium mb-4">Questions & OCR Status</h4>
-                          <div className="flex gap-2 mb-4">
+                          <div className="flex flex-wrap gap-2 mb-4 items-center">
                             <Select value={questionOcrFilter} onValueChange={setQuestionOcrFilter}>
                               <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Filter by status" />
@@ -2621,6 +2754,58 @@ export default function Statistics() {
                                 <SelectItem value="over_stamped">Watermark: Over-stamped</SelectItem>
                               </SelectContent>
                             </Select>
+                            <Select value={questionReadabilityFilter} onValueChange={setQuestionReadabilityFilter}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Readability filter" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Readability</SelectItem>
+                                <SelectItem value="high">Readability: High</SelectItem>
+                                <SelectItem value="medium">Readability: Medium</SelectItem>
+                                <SelectItem value="low">Readability: Low</SelectItem>
+                                <SelectItem value="unreadable">Readability: Unreadable</SelectItem>
+                                <SelectItem value="missing">Readability: Missing</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={questionPagesFilter} onValueChange={setQuestionPagesFilter}>
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="Pages" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Pages</SelectItem>
+                                <SelectItem value="single">Pages: Single</SelectItem>
+                                <SelectItem value="multi">Pages: Multi</SelectItem>
+                                <SelectItem value="none">Pages: Unknown</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={questionPagesSort} onValueChange={setQuestionPagesSort}>
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="Sort pages" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Sort: Default</SelectItem>
+                                <SelectItem value="asc">Pages ↑</SelectItem>
+                                <SelectItem value="desc">Pages ↓</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              placeholder="Teacher"
+                              value={questionTeacherFilter}
+                              onChange={(e) => setQuestionTeacherFilter(e.target.value)}
+                              className="w-[140px]"
+                            />
+                            <Input
+                              placeholder="School"
+                              value={questionSchoolFilter}
+                              onChange={(e) => setQuestionSchoolFilter(e.target.value)}
+                              className="w-[140px]"
+                            />
+                            <Input
+                              placeholder="Book"
+                              value={questionBookFilter}
+                              onChange={(e) => setQuestionBookFilter(e.target.value)}
+                              className="w-[140px]"
+                            />
                             <Button
                               size="sm"
                               variant="outline"
