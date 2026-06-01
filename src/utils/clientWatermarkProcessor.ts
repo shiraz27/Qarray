@@ -161,12 +161,12 @@ export async function processRowWatermark(
 
     const rawText = Array.isArray(row.data) ? (row.data as string[]).join('\n') : (row.data || '');
     const media = extractMediaFromText(rawText).media.map((m) => m.url);
-    const mediaSet = new Set(media);
-
-    // Already-stamped URLs from a previous (possibly partial) run, pruned to
-    // what's still present in the row's current media list.
+    // Already-stamped URLs from a previous (possibly partial) run. We don't
+    // prune against the current media list here because manifest URLs in
+    // `media` expand to per-page URLs that aren't directly listed — pruning
+    // would wrongly drop them.
     const stampedSet = new Set<string>(
-      ((row.watermarked_urls as string[] | null) || []).filter((u) => mediaSet.has(u)),
+      (row.watermarked_urls as string[] | null) || [],
     );
 
     if (media.length === 0) {
