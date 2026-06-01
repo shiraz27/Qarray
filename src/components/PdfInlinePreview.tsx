@@ -384,6 +384,9 @@ export function PdfInlinePreview({ url, className = '' }: PdfInlinePreviewProps)
 
 
 function SplitPdfPreview({ url, className = '' }: PdfInlinePreviewProps) {
+  const { enabled: batchEnabled, loading: batchFlagLoading } =
+    useFeatureFlag('download_batch');
+  const showBatchDownload = batchFlagLoading || batchEnabled !== false;
   const [manifest, setManifest] = useState<SplitPdfManifest | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
