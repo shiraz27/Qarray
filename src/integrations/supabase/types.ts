@@ -21,6 +21,7 @@ export type Database = {
           error: string | null
           id: string
           kind: string
+          model: string | null
           output_answer_id: number | null
           status: string
           target_id: number
@@ -33,6 +34,7 @@ export type Database = {
           error?: string | null
           id?: string
           kind: string
+          model?: string | null
           output_answer_id?: number | null
           status?: string
           target_id: number
@@ -45,6 +47,7 @@ export type Database = {
           error?: string | null
           id?: string
           kind?: string
+          model?: string | null
           output_answer_id?: number | null
           status?: string
           target_id?: number
