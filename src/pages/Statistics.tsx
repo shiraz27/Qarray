@@ -1450,6 +1450,7 @@ export default function Statistics() {
     const matchesTeacher = textMatchesAny(questionTeacherFilter, [...(q.teacher_names ?? [])]);
     const matchesSchool = textMatchesAny(questionSchoolFilter, [...(q.school_names ?? [])]);
     const matchesBook = textMatchesAny(questionBookFilter, [...(q.books ?? [])]);
+    const matchesOverstamp = overstampMatch(questionOverstampFilter, q.watermark_overstamped, q.watermark_stamp_count);
     const matchesSearch = textMatchesAny(questionSearchQuery ?? '', [
       q.data,
       q.chapters?.name,
@@ -1464,7 +1465,7 @@ export default function Statistics() {
       String(q.id),
     ]);
     return matchesFilter && matchesWm && matchesReadability && matchesPages
-      && matchesTeacher && matchesSchool && matchesBook && matchesSearch;
+      && matchesTeacher && matchesSchool && matchesBook && matchesSearch && matchesOverstamp;
   });
   if (questionPagesSort !== 'none') {
     filteredQuestions.sort((a, b) => {
