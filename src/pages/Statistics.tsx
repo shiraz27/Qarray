@@ -2156,6 +2156,20 @@ export default function Statistics() {
                               )}
                               Watermark all
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleScanAllResources}
+                              disabled={isScanningWmBatch}
+                              title="Scan watermarked PDFs for over-stamping"
+                            >
+                              {isScanningWmBatch ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Search className="mr-2 h-4 w-4" />
+                              )}
+                              Scan integrity
+                            </Button>
                             <div className="relative flex-1">
                               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                               <Input 
