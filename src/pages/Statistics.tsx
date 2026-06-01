@@ -51,6 +51,7 @@ import { OcrReviewButton } from '@/components/statistics/OcrReviewButton';
 import { DescriptionAiButton } from '@/components/statistics/DescriptionAiButton';
 import { WatermarkStatusEditor, type WatermarkStatus } from '@/components/statistics/WatermarkStatusEditor';
 import { processResourceWatermark, processQuestionWatermark } from '@/utils/clientWatermarkProcessor';
+import { scanResourceIntegrity, scanQuestionIntegrity } from '@/utils/watermarkIntegrityScanner';
 import { Stamp } from 'lucide-react';
 import { PdfSplitCell } from '@/components/statistics/PdfSplitCell';
 import { PdfHealthAuditPanel } from '@/components/statistics/PdfHealthAuditPanel';
@@ -103,6 +104,8 @@ interface ResourceRow {
   page_count?: number | null;
   watermark_status?: string | null;
   pages_watermarked?: number | null;
+  watermark_stamp_count?: number | null;
+  watermark_overstamped?: boolean | null;
   source_link?: string | null;
   description_proposed?: string | null;
   description_proposed_at?: string | null;
