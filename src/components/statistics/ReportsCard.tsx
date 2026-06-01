@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { Fragment, useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -192,8 +192,8 @@ export function ReportsCard() {
                 {reports.map((r) => {
                   const isOpen = expanded === r.id;
                   return (
-                    <>
-                      <TableRow key={r.id}>
+                    <Fragment key={r.id}>
+                      <TableRow>
                         <TableCell>
                           <button
                             onClick={() => setExpanded(isOpen ? null : r.id)}
@@ -244,7 +244,7 @@ export function ReportsCard() {
                         </TableCell>
                       </TableRow>
                       {isOpen && (
-                        <TableRow key={`${r.id}-x`}>
+                        <TableRow>
                           <TableCell colSpan={8} className="bg-muted/40">
                             <div className="p-3 space-y-3">
                               {r.details && (
@@ -273,7 +273,7 @@ export function ReportsCard() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </TableBody>
