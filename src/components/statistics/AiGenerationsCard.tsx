@@ -26,6 +26,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Bot, ChevronDown, Loader2, RefreshCw, Sparkles, FileText, ListOrdered, Image as ImageIcon, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { AI_MODELS, DEFAULT_MODELS, PROVIDER_LABEL, modelsForKind as modelsForKindFn, type AiProvider, type Kind as ModelKind } from './aiModels';
+import { AiGenerationReviewDialog } from './AiGenerationReviewDialog';
 
 type Kind = 'correction' | 'summary' | 'step_by_step' | 'infographic';
 type TargetType = 'resource' | 'question';
@@ -48,6 +49,10 @@ interface GenStatus {
   status: 'queued' | 'running' | 'completed' | 'failed';
   error?: string | null;
   startedAt?: number; // epoch ms (from updated_at when running)
+  id?: string;
+  outputAnswerId?: number | null;
+  proposedData?: string | null;
+  reviewStatus?: 'pending' | 'approved' | 'discarded' | null;
 }
 
 const MODELS_STORAGE_KEY = 'ai-generations.selected-models';
@@ -74,6 +79,8 @@ export const AiGenerationsCard: React.FC = () => {
   const [running, setRunning] = useState(false);
   // map key `${target_type}:${target_id}:${kind}:${model}` -> status
   const [statusMap, setStatusMap] = useState<Record<string, GenStatus>>({});
+  // currently-open review dialog (keyed by statusMap key)
+  const [reviewKey, setReviewKey] = useState<string | null>(null);
   // median duration in seconds, per `${kind}:${model}` (from recent completed runs of current tab)
   const [etaByKindModel, setEtaByKindModel] = useState<Record<string, { sec: number; n: number }>>({});
   // selected models (multi-select)
@@ -115,7 +122,7 @@ export const AiGenerationsCard: React.FC = () => {
   const fetchStatuses = async () => {
     const { data } = await supabase
       .from('ai_generations')
-      .select('target_type, target_id, kind, model, status, error, updated_at')
+      .select('id, target_type, target_id, kind, model, status, error, updated_at, output_answer_id, proposed_data, review_status')
       .eq('target_type', tab)
       .order('updated_at', { ascending: false })
       .limit(1000);
@@ -126,6 +133,10 @@ export const AiGenerationsCard: React.FC = () => {
         status: r.status,
         error: r.error,
         startedAt: r.updated_at ? new Date(r.updated_at).getTime() : undefined,
+        id: r.id,
+        outputAnswerId: r.output_answer_id ?? null,
+        proposedData: r.proposed_data ?? null,
+        reviewStatus: r.review_status ?? null,
       };
     }
     setStatusMap(next);
