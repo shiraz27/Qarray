@@ -113,6 +113,7 @@ function SinglePdfView({
   downloadIcon,
   downloadTitle,
   hideOpenOriginal = false,
+  downloadFlag = 'download_file',
 }: {
   url: string;
   className?: string;
@@ -124,7 +125,11 @@ function SinglePdfView({
   downloadIcon?: React.ReactNode;
   downloadTitle?: string;
   hideOpenOriginal?: boolean;
+  downloadFlag?: 'download_file' | 'download_per_page';
 }) {
+  const { enabled: downloadEnabled, loading: downloadFlagLoading } =
+    useFeatureFlag(downloadFlag);
+  const showDownload = downloadFlagLoading || downloadEnabled !== false;
   const [pages, setPages] = useState<any[]>([]);
   const [scale, setScale] = useState(1);
   const [loading, setLoading] = useState(true);
