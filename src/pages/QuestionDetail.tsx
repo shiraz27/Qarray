@@ -20,6 +20,7 @@ import { EditQuestionForm } from '@/components/EditQuestionForm';
 import { BookBadge } from '@/components/BookBadge';
 import { PageCountBadge } from '@/components/PageCountBadge';
 import { EditAnswerForm } from '@/components/EditAnswerForm';
+import { ReportButton } from '@/components/ReportButton';
 import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { EmptyState } from '@/components/EmptyState';
 import { SEO, createQAPageSchema } from '@/components/SEO';
