@@ -804,6 +804,7 @@ export type Database = {
           pages_watermarked: number
           resource_id: number | null
           school_names: string[]
+          shared_with: number[]
           teacher_names: string[]
           type_id: number | null
           type_ids: number[] | null
@@ -838,6 +839,7 @@ export type Database = {
           pages_watermarked?: number
           resource_id?: number | null
           school_names?: string[]
+          shared_with?: number[]
           teacher_names?: string[]
           type_id?: number | null
           type_ids?: number[] | null
@@ -872,6 +874,7 @@ export type Database = {
           pages_watermarked?: number
           resource_id?: number | null
           school_names?: string[]
+          shared_with?: number[]
           teacher_names?: string[]
           type_id?: number | null
           type_ids?: number[] | null

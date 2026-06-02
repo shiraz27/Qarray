@@ -12,7 +12,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 
-import { MessageSquare, FileText, Bookmark, Plus, Edit, Search, X } from 'lucide-react';
+import { MessageSquare, FileText, Bookmark, Plus, Edit, Search, X, Share2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import chapterPattern from '@/assets/chapter-pattern.png';
@@ -20,6 +20,7 @@ import { ChapterSkeleton } from '@/components/LoadingSkeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { MemorizationsList } from '@/components/MemorizationsList';
 import { ManageChapterDialog } from '@/components/ManageChapterDialog';
+import { ShareChapterDialog } from '@/components/ShareChapterDialog';
 import { PageCountBadge } from '@/components/PageCountBadge';
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -66,6 +67,7 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
 
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
   const [editingChapterId, setEditingChapterId] = useState<number | null>(null);
+  const [shareChapter, setShareChapter] = useState<{ id: number; name: string } | null>(null);
   const [classId, setClassId] = useState<number | null>(initialCache?.classId ?? null);
   const { isModerator, isAdmin } = useUserRole();
   const [filterResources, setFilterResources] = useState(false);
@@ -161,6 +163,11 @@ export const MainContent: React.FC<MainContentProps> = ({ subjectId, viewingClas
     e.stopPropagation();
     setEditingChapterId(chapterId);
     setManageDialogOpen(true);
+  };
+
+  const handleShareChapter = (chapter: { id: number; name: string }, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShareChapter(chapter);
   };
 
   const handleDialogClose = () => {
@@ -290,13 +297,22 @@ const handleSuccess = async () => {
                   </h3>
                   <div className="flex items-center gap-2">
                     {(isModerator || isAdmin) && (
-                      <button
-                        onClick={(e) => handleEditChapter(chapter.id, e)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
-                        title="Edit Chapter"
-                      >
-                        <Edit size={16} className="text-gray-700" />
-                      </button>
+                      <>
+                        <button
+                          onClick={(e) => handleShareChapter({ id: chapter.id, name: chapter.name }, e)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
+                          title="Share chapter into other chapters"
+                        >
+                          <Share2 size={16} className="text-gray-700" />
+                        </button>
+                        <button
+                          onClick={(e) => handleEditChapter(chapter.id, e)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
+                          title="Edit Chapter"
+                        >
+                          <Edit size={16} className="text-gray-700" />
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={(e) => {
@@ -506,6 +522,15 @@ const handleSuccess = async () => {
           classId={classId}
           chapterId={editingChapterId}
           onSuccess={handleSuccess}
+        />
+      )}
+
+      {shareChapter && (
+        <ShareChapterDialog
+          open={!!shareChapter}
+          onClose={() => setShareChapter(null)}
+          chapterId={shareChapter.id}
+          chapterName={shareChapter.name}
         />
       )}
     </main>
