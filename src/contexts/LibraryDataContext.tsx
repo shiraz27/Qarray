@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { resourceChapterFilter } from '@/utils/resourceChapterFilter';
+import { questionChapterFilter } from '@/utils/questionChapterFilter';
 
 type SubjectRow = { id: number; name: string; logo: string | null; class_id?: number | null };
 
@@ -236,14 +237,14 @@ export const LibraryDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
             const { count: questionCount } = await supabase
               .from('questions')
               .select('*', { count: 'exact', head: true })
-              .eq('chapter_id', chapter.id)
+              .or(questionChapterFilter(chapter.id))
               .eq('deleted', false);
 
             // answers count via question ids
             const qIds = await supabase
               .from('questions')
               .select('id')
-              .eq('chapter_id', chapter.id)
+              .or(questionChapterFilter(chapter.id))
               .eq('deleted', false)
               .then(res => (res.data?.map((q: { id: number }) => q.id) || []) as number[]);
 
@@ -268,7 +269,7 @@ export const LibraryDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
               supabase
                 .from('questions')
                 .select('page_count')
-                .eq('chapter_id', chapter.id)
+                .or(questionChapterFilter(chapter.id))
                 .eq('deleted', false),
             ]);
 
@@ -335,13 +336,13 @@ export const LibraryDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 const { count: questionCount } = await supabase
                   .from('questions')
                   .select('*', { count: 'exact', head: true })
-                  .eq('chapter_id', ch.id)
+                  .or(questionChapterFilter(ch.id))
                   .eq('deleted', false);
 
                 const qIds = await supabase
                   .from('questions')
                   .select('id')
-                  .eq('chapter_id', ch.id)
+                  .or(questionChapterFilter(ch.id))
                   .eq('deleted', false)
 .then((res) => res.data?.map((q: { id: number }) => q.id) || []);
 
@@ -366,7 +367,7 @@ export const LibraryDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
                   supabase
                     .from('questions')
                     .select('page_count')
-                    .eq('chapter_id', ch.id)
+                    .or(questionChapterFilter(ch.id))
                     .eq('deleted', false),
                 ]);
 
