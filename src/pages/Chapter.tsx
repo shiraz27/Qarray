@@ -24,6 +24,7 @@ import { extractMediaFromText } from '@/utils/mediaHelpers';
 import { SEO, createCourseSchema } from '@/components/SEO';
 import { capitalizeEveryWord } from '@/utils/textHelpers';
 import { resourceChapterFilter } from '@/utils/resourceChapterFilter';
+import { questionChapterFilter } from '@/utils/questionChapterFilter';
 import { normalizedIncludes } from '@/utils/textHelpers';
 import { Input } from '@/components/ui/input';
 
@@ -280,14 +281,14 @@ export default function Chapter() {
         const { count: questionCount } = await supabase
           .from('questions')
           .select('*', { count: 'exact', head: true })
-          .eq('chapter_id', chapterId)
+          .or(questionChapterFilter(chapterId))
           .eq('deleted', false);
 
         // Count answers
         const questionIds = await supabase
           .from('questions')
           .select('id')
-          .eq('chapter_id', chapterId)
+          .or(questionChapterFilter(chapterId))
           .eq('deleted', false)
           .then(res => res.data?.map(q => q.id) || []);
 
@@ -314,7 +315,7 @@ export default function Chapter() {
           supabase
             .from('questions')
             .select('page_count')
-            .eq('chapter_id', chapterId)
+            .or(questionChapterFilter(chapterId))
             .eq('deleted', false),
         ]);
         const totalPages =
@@ -378,7 +379,7 @@ export default function Chapter() {
         const { data: questionsData } = await supabase
           .from('questions')
           .select('id, data, created_at, type_id, verified, contributors, book, page_count, teacher_names, school_names, books, ocr_text, ocr_text_proposed')
-          .eq('chapter_id', chapterId)
+          .or(questionChapterFilter(chapterId))
           .eq('deleted', false)
           .order('created_at', { ascending: false });
 
@@ -661,7 +662,7 @@ export default function Chapter() {
         const { data: questionsData } = await supabase
           .from('questions')
           .select('id, data, created_at, type_id, verified, contributors, page_count')
-          .eq('chapter_id', chapter?.id)
+          .or(questionChapterFilter(chapter?.id ?? 0))
           .eq('deleted', false)
           .order('created_at', { ascending: false });
 
