@@ -205,6 +205,11 @@ export default function Statistics() {
   const [isScanningWmQuestionBatch, setIsScanningWmQuestionBatch] = useState(false);
   const [scanningWmId, setScanningWmId] = useState<number | null>(null);
   const [scanningWmQuestionId, setScanningWmQuestionId] = useState<number | null>(null);
+  const [rollbackTarget, setRollbackTarget] = useState<
+    { table: 'resources' | 'questions'; id: number } | null
+  >(null);
+  const [isRollbackBatch, setIsRollbackBatch] = useState(false);
+  const [isRollbackQuestionBatch, setIsRollbackQuestionBatch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [questionSearchQuery, setQuestionSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
