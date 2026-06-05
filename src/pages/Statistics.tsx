@@ -3209,6 +3209,18 @@ export default function Statistics() {
                                                 size="sm"
                                                 variant="ghost"
                                                 className="h-7 px-2 mt-1"
+                                                onClick={() => setRollbackTarget({ table: 'questions', id: question.id })}
+                                                title="Restore a healthy earlier version from Archive.org history"
+                                              >
+                                                <History className="h-3 w-3 mr-1" />
+                                                Rollback
+                                              </Button>
+                                            )}
+                                            {textHasOcrableUrl(question.data) && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 px-2 mt-1"
                                                 onClick={() => handleScanQuestion(question.id)}
                                                 disabled={scanningWmQuestionId === question.id}
                                                 title="Scan watermark integrity (count stamps per page)"
