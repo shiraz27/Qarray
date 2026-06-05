@@ -1,23 +1,66 @@
-# Finalize watermark idempotency + fix missing gallery on ResourceDetail
+## PDF Rollback via Archive.org History
 
-The watermark schema migration already ran. Two remaining code changes:
+Restore an overstamped (or otherwise damaged) PDF to a healthy earlier version using Archive.org's built-in file history — no extra backup storage needed.
 
-## 1. Resource detail page — use the gallery (fixes resource 124)
+### How Archive.org history works
 
-`src/pages/ResourceDetail.tsx` lines 715–732 still map `resource.data` directly into stacked `PdfInlinePreview` / `MediaPreview` blocks. That's why resource 124 (and every other resource) shows files stacked vertically with no left-side selector. `MediaList` was updated to use `MediaGallery`, but the resource page renders its attachments inline and bypasses `MediaList` entirely — that's the case the previous pass missed.
+Each time a file in an item is overwritten via S3, Archive.org keeps the previous version in `history/files/<filename>.~N~`. `~1~` is the very first original (pre any overwrite), `~2~` the next, etc. The current live file is the unsuffixed one. We list these versions via the item's metadata API:
 
-Fix: replace the inline `.map(...)` with a single `<MediaGallery items={resource.data.map((url) => ({ url, type: detectMediaType(url) }))} />`, matching how `MediaList` does it. Keep the existing "Attachments (N)" heading above it.
+```
+GET https://archive.org/metadata/qarray-educational-content
+→ files[]  // includes entries with name "history/files/<key>.~N~"
+```
 
-## 2. Watermark code — make stamping idempotent per URL
+### Backend
 
-Per the approved plan:
+1. **New edge function `pdf-rollback`** (verify_jwt=false, validates JWT in code, requires admin/moderator)
+   - Input: `{ table: 'resources'|'questions', id: number, version?: 'earliest'|'previous'|number }` — defaults to `earliest` (the `~1~` version = pristine original).
+   - For each Archive.org URL on the row (expand split-PDF manifests too):
+     - Fetch item metadata, filter `files[]` for `history/files/<key>.~N~`.
+     - Pick the requested version (default `~1~`).
+     - Download that history file via the `fetch-media` proxy.
+     - Re-upload to the current key via the existing `upload-to-archive` `overwrite` action.
+   - After all URLs restored, reset DB fields:
+     - `watermark_status = 'pending'`
+     - `pages_watermarked = 0`
+     - `watermark_processed_at = null`
+     - `watermark_error = null`
+     - `watermarked_urls = '{}'`
+     - `watermark_stamp_count = null`
+     - `watermark_overstamped = false`
+     - `watermark_scan_at = null`
+   - Returns `{ restored: number, skipped: number, errors: string[] }`.
 
-- **`src/utils/watermark.ts`** — add a `WATERMARK_MARKER = 'qarray-watermarked-v1'` constant. In `watermarkPdfBytes`, after `PDFDocument.load`, read `pdfDoc.getKeywords()`; if the marker is present, return the bytes unchanged. After stamping, append the marker via `setKeywords([...existing, MARKER])`. Image watermarking stays unchanged (no reliable EXIF round-trip).
-- **`src/utils/clientWatermarkProcessor.ts`** — also select `watermarked_urls` in the initial fetch, build a `Set<string>` of already-stamped URLs, skip those during the loop (counting them toward `done` so a successful retry reports `completed`), append each newly-stamped URL into the set and persist it inside the existing `tick` (piggyback on the `pages_watermarked` update — one DB write per page, same as today). Prune URLs that are no longer in the row's current media list.
-- Final status logic (`completed` / `partial` / `failed`) stays the same; it now reads correctly because `done` includes previously-stamped URLs.
+2. **New endpoint `pdf-rollback-list-versions`** (or same function with `action=list`)
+   - Given a row, return the list of available history versions per URL (N, size, mtime) so the per-row UI can let the admin pick which version to roll back to instead of always defaulting to earliest.
 
-## Out of scope
+### UI
 
-- No UI changes to the stamp button.
-- No backfill of the marker on historically stamped PDFs — they'll be marked the next time they're processed; pages already over-stamped from past retries stay as they are.
-- No type regeneration steps (handled automatically by the migration that already ran).
+1. **Per-row button — `RollbackVersionDialog.tsx`**
+   - Added to the watermark cell in Statistics, next to `WatermarkStatusEditor`.
+   - Opens a dialog that:
+     - Calls list-versions, shows a table of `~N~ | mtime | size` per file.
+     - Default selection: earliest (`~1~`).
+     - Confirm → calls `pdf-rollback` with the chosen version.
+     - Shows per-URL progress and final status.
+
+2. **Bulk action in Statistics toolbar**
+   - "Rollback over-stamped" button (admin only).
+   - Confirms count, then iterates rows with `watermark_overstamped = true` and calls `pdf-rollback` with `version='earliest'` for each. Progress toast.
+
+### Files
+
+**Created**
+- `supabase/functions/pdf-rollback/index.ts`
+- `src/components/statistics/RollbackVersionDialog.tsx`
+- `src/utils/pdfRollback.ts` (client wrapper: list versions, invoke rollback, bulk loop)
+
+**Edited**
+- `src/pages/Statistics.tsx` — wire per-row button into watermark cell and add bulk toolbar action.
+
+### Notes / limitations
+
+- Archive.org's metadata refresh after an overwrite has eventual-consistency lag (often minutes). The function uses the same retry/backoff pattern as `fetch-media`.
+- If a row has no `history/files/*` entries, the current file IS the original — the dialog tells the admin "no history available" and disables rollback.
+- Split-PDF manifests: each per-page PDF is rolled back independently; the manifest itself isn't touched.
+- No new database tables are added — Archive.org IS the version store.

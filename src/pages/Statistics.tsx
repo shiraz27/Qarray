@@ -55,7 +55,9 @@ import { DescriptionAiButton } from '@/components/statistics/DescriptionAiButton
 import { WatermarkStatusEditor, type WatermarkStatus } from '@/components/statistics/WatermarkStatusEditor';
 import { processResourceWatermark, processQuestionWatermark } from '@/utils/clientWatermarkProcessor';
 import { scanResourceIntegrity, scanQuestionIntegrity } from '@/utils/watermarkIntegrityScanner';
-import { Stamp } from 'lucide-react';
+import { Stamp, History } from 'lucide-react';
+import { RollbackVersionDialog } from '@/components/statistics/RollbackVersionDialog';
+import { restoreRowToVersion } from '@/utils/pdfRollback';
 import { PdfSplitCell } from '@/components/statistics/PdfSplitCell';
 import { PdfHealthAuditPanel } from '@/components/statistics/PdfHealthAuditPanel';
 import { MonitoringPanel } from '@/components/statistics/MonitoringPanel';
@@ -203,6 +205,11 @@ export default function Statistics() {
   const [isScanningWmQuestionBatch, setIsScanningWmQuestionBatch] = useState(false);
   const [scanningWmId, setScanningWmId] = useState<number | null>(null);
   const [scanningWmQuestionId, setScanningWmQuestionId] = useState<number | null>(null);
+  const [rollbackTarget, setRollbackTarget] = useState<
+    { table: 'resources' | 'questions'; id: number } | null
+  >(null);
+  const [isRollbackBatch, setIsRollbackBatch] = useState(false);
+  const [isRollbackQuestionBatch, setIsRollbackQuestionBatch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [questionSearchQuery, setQuestionSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -1135,6 +1142,59 @@ export default function Statistics() {
       fetchQuestions(selectedClass, selectedSubject, selectedChapter);
     } finally {
       setIsProcessingWatermarkQuestionBatch(false);
+    }
+  };
+
+  // ---------- Bulk rollback (over-stamped) ----------
+  const handleRollbackAllOverstampedResources = async () => {
+    const targets = resources.filter((r) => !!r.watermark_overstamped);
+    if (targets.length === 0) {
+      toast.info('No over-stamped resources to rollback');
+      return;
+    }
+    if (!confirm(`Rollback ${targets.length} over-stamped resource(s) to their earliest version?`)) return;
+    setIsRollbackBatch(true);
+    let ok = 0, ko = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        toast.loading(`[${i + 1}/${targets.length}] Rolling back #${t.id}…`, { id: 'rb-r-batch' });
+        try {
+          const res = await restoreRowToVersion('resources', t.id, 'earliest');
+          res.restored > 0 ? ok++ : ko++;
+        } catch { ko++; }
+      }
+      toast.dismiss('rb-r-batch');
+      toast.success(`Rollback batch: ${ok} ok, ${ko} failed`);
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsRollbackBatch(false);
+    }
+  };
+
+  const handleRollbackAllOverstampedQuestions = async () => {
+    const targets = questions.filter((q) => !!q.watermark_overstamped);
+    if (targets.length === 0) {
+      toast.info('No over-stamped questions to rollback');
+      return;
+    }
+    if (!confirm(`Rollback ${targets.length} over-stamped question(s) to their earliest version?`)) return;
+    setIsRollbackQuestionBatch(true);
+    let ok = 0, ko = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        toast.loading(`[${i + 1}/${targets.length}] Rolling back #${t.id}…`, { id: 'rb-q-batch' });
+        try {
+          const res = await restoreRowToVersion('questions', t.id, 'earliest');
+          res.restored > 0 ? ok++ : ko++;
+        } catch { ko++; }
+      }
+      toast.dismiss('rb-q-batch');
+      toast.success(`Rollback batch: ${ok} ok, ${ko} failed`);
+      fetchQuestions(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsRollbackQuestionBatch(false);
     }
   };
 
@@ -2161,6 +2221,20 @@ export default function Statistics() {
                               )}
                               Scan integrity
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleRollbackAllOverstampedResources}
+                              disabled={isRollbackBatch}
+                              title="Rollback every over-stamped resource to its earliest healthy version"
+                            >
+                              {isRollbackBatch ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <History className="mr-2 h-4 w-4" />
+                              )}
+                              Rollback over-stamped
+                            </Button>
                             <div className="relative flex-1">
                               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                               <Input 
@@ -2454,6 +2528,18 @@ export default function Statistics() {
                                               <Badge variant="destructive" className="mt-1 block w-fit">
                                                 Over-stamped ×{resource.watermark_stamp_count ?? '?'}
                                               </Badge>
+                                            )}
+                                            {urlsHaveOcrable(resource.data) && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 px-2 mt-1"
+                                                onClick={() => setRollbackTarget({ table: 'resources', id: resource.id })}
+                                                title="Restore a healthy earlier version from Archive.org history"
+                                              >
+                                                <History className="h-3 w-3 mr-1" />
+                                                Rollback
+                                              </Button>
                                             )}
                                             {urlsHaveOcrable(resource.data) && (
                                               <Button
@@ -2861,6 +2947,20 @@ export default function Statistics() {
                               )}
                               Scan integrity
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleRollbackAllOverstampedQuestions}
+                              disabled={isRollbackQuestionBatch}
+                              title="Rollback every over-stamped question to its earliest healthy version"
+                            >
+                              {isRollbackQuestionBatch ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <History className="mr-2 h-4 w-4" />
+                              )}
+                              Rollback over-stamped
+                            </Button>
                             <div className="relative flex-1">
                               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                               <Input 
@@ -3103,6 +3203,18 @@ export default function Statistics() {
                                               <Badge variant="destructive" className="mt-1 block w-fit">
                                                 Over-stamped ×{question.watermark_stamp_count ?? '?'}
                                               </Badge>
+                                            )}
+                                            {textHasOcrableUrl(question.data) && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 px-2 mt-1"
+                                                onClick={() => setRollbackTarget({ table: 'questions', id: question.id })}
+                                                title="Restore a healthy earlier version from Archive.org history"
+                                              >
+                                                <History className="h-3 w-3 mr-1" />
+                                                Rollback
+                                              </Button>
                                             )}
                                             {textHasOcrableUrl(question.data) && (
                                               <Button
@@ -3361,6 +3473,21 @@ export default function Statistics() {
           }
         }}
       />
+      {rollbackTarget && (
+        <RollbackVersionDialog
+          open={!!rollbackTarget}
+          onOpenChange={(v) => !v && setRollbackTarget(null)}
+          table={rollbackTarget.table}
+          rowId={rollbackTarget.id}
+          onRestored={() => {
+            if (rollbackTarget.table === 'resources') {
+              fetchResources(selectedClass, selectedSubject, selectedChapter);
+            } else {
+              fetchQuestions(selectedClass, selectedSubject, selectedChapter);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
