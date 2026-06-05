@@ -2221,6 +2221,20 @@ export default function Statistics() {
                               )}
                               Scan integrity
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleRollbackAllOverstampedResources}
+                              disabled={isRollbackBatch}
+                              title="Rollback every over-stamped resource to its earliest healthy version"
+                            >
+                              {isRollbackBatch ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <History className="mr-2 h-4 w-4" />
+                              )}
+                              Rollback over-stamped
+                            </Button>
                             <div className="relative flex-1">
                               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                               <Input 
