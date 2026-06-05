@@ -16,6 +16,11 @@ export type WatermarkOptions = {
   colorHex?: string;
   rotationDegrees?: number; // e.g. -35
   marginRatio?: number; // relative to page size
+  /**
+   * 1-indexed page numbers to skip (already watermarked). Pages not in this
+   * list are stamped as usual.
+   */
+  skipPages?: number[];
 };
 
 function hexToRgb01(hex: string): { r: number; g: number; b: number } {
@@ -54,6 +59,7 @@ export function defaultWatermarkOptions(text: string): Required<WatermarkOptions
     colorHex: '#000000',
     rotationDegrees: -35,
     marginRatio: 0.08,
+    skipPages: [],
   };
 }
 
@@ -93,7 +99,11 @@ export async function watermarkPdfBytes(
   const { r, g, b } = hexToRgb01(colorHex);
 
   const pages = pdfDoc.getPages();
-  for (const page of pages) {
+  const skip = new Set<number>(opts?.skipPages ?? []);
+  for (let pageIdx = 0; pageIdx < pages.length; pageIdx++) {
+    const pageNum = pageIdx + 1;
+    if (skip.has(pageNum)) continue; // already watermarked — don't overstamp
+    const page = pages[pageIdx];
     const { width, height } = page.getSize();
 
     // Put multiple lines for better coverage

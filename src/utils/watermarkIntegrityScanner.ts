@@ -81,6 +81,30 @@ export async function countStampsInPdfBlob(blob: Blob): Promise<number> {
   return max;
 }
 
+/**
+ * Count watermark stamps per page (1-indexed positions in the returned
+ * array are at `index + 1`). Used by the watermark processor to skip
+ * pages that are already stamped instead of overstamping them.
+ */
+export async function countStampsPerPageInPdfBlob(blob: Blob): Promise<number[]> {
+  const buf = await blob.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const counts: number[] = [];
+  try {
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const tc = await page.getTextContent();
+      const joined = (tc.items as any[]).map((it) => it.str || '').join('\n');
+      const occurrences = (joined.match(WATERMARK_REGEX) || []).length;
+      counts.push(Math.floor(occurrences / 2));
+      try { page.cleanup(); } catch { /* ignore */ }
+    }
+  } finally {
+    try { await pdf.destroy(); } catch { /* ignore */ }
+  }
+  return counts;
+}
+
 /** Expand a row's media list into the actual PDF URLs to scan. */
 async function collectPdfUrls(media: string[]): Promise<string[]> {
   const out: string[] = [];

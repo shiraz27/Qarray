@@ -4,6 +4,8 @@ import { detectMediaType, mediaTypeFromMime, isSplitPdfManifestUrl } from '@/uti
 import { fetchSplitPdfManifest } from '@/utils/splitPdfManifest';
 import { decodeMediaToken, encodeMediaUrl, isMediaToken } from '@/utils/mediaToken';
 import { watermarkPdfBlob, watermarkImageBlob } from '@/utils/watermark';
+import { watermarkPdfBytes } from '@/utils/watermark';
+import { countStampsPerPageInPdfBlob } from '@/utils/watermarkIntegrityScanner';
 
 /**
  * Persistent watermark backfill.
@@ -114,9 +116,32 @@ async function watermarkAndOverwriteOne(url: string, fallbackKind?: 'pdf' | 'ima
     throw new Error(`Unsupported type for watermark: ${blob.type || 'unknown'}`);
   }
 
-  const stamped =
-    kind === 'pdf' ? await watermarkPdfBlob(blob) : await watermarkImageBlob(blob);
-  await overwriteArchiveKey(key, stamped, kind === 'pdf' ? 'texts' : 'image');
+  if (kind === 'image') {
+    const stamped = await watermarkImageBlob(blob);
+    await overwriteArchiveKey(key, stamped, 'image');
+    return;
+  }
+
+  // PDF: detect pages that are already watermarked (via text scan) and
+  // skip them so we don't overstamp. If every page is already stamped,
+  // there's nothing to do — return without re-uploading.
+  let perPage: number[] = [];
+  try {
+    perPage = await countStampsPerPageInPdfBlob(blob);
+  } catch {
+    perPage = [];
+  }
+  const skipPages = perPage
+    .map((c, idx) => (c >= 1 ? idx + 1 : 0))
+    .filter((n) => n > 0);
+  if (perPage.length > 0 && skipPages.length === perPage.length) {
+    // Already fully stamped — don't re-upload.
+    return;
+  }
+  const ab = await blob.arrayBuffer();
+  const stampedBytes = await watermarkPdfBytes(ab, { skipPages });
+  const stamped = new Blob([new Uint8Array(stampedBytes).buffer], { type: 'application/pdf' });
+  await overwriteArchiveKey(key, stamped, 'texts');
 }
 
 export interface WatermarkProgress {
