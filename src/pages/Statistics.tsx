@@ -55,7 +55,9 @@ import { DescriptionAiButton } from '@/components/statistics/DescriptionAiButton
 import { WatermarkStatusEditor, type WatermarkStatus } from '@/components/statistics/WatermarkStatusEditor';
 import { processResourceWatermark, processQuestionWatermark } from '@/utils/clientWatermarkProcessor';
 import { scanResourceIntegrity, scanQuestionIntegrity } from '@/utils/watermarkIntegrityScanner';
-import { Stamp } from 'lucide-react';
+import { Stamp, History } from 'lucide-react';
+import { RollbackVersionDialog } from '@/components/statistics/RollbackVersionDialog';
+import { restoreRowToVersion } from '@/utils/pdfRollback';
 import { PdfSplitCell } from '@/components/statistics/PdfSplitCell';
 import { PdfHealthAuditPanel } from '@/components/statistics/PdfHealthAuditPanel';
 import { MonitoringPanel } from '@/components/statistics/MonitoringPanel';
