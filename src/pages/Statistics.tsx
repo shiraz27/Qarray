@@ -3473,6 +3473,21 @@ export default function Statistics() {
           }
         }}
       />
+      {rollbackTarget && (
+        <RollbackVersionDialog
+          open={!!rollbackTarget}
+          onOpenChange={(v) => !v && setRollbackTarget(null)}
+          table={rollbackTarget.table}
+          rowId={rollbackTarget.id}
+          onRestored={() => {
+            if (rollbackTarget.table === 'resources') {
+              fetchResources(selectedClass, selectedSubject, selectedChapter);
+            } else {
+              fetchQuestions(selectedClass, selectedSubject, selectedChapter);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
