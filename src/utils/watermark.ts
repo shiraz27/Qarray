@@ -59,6 +59,7 @@ export function defaultWatermarkOptions(text: string): Required<WatermarkOptions
     colorHex: '#000000',
     rotationDegrees: -35,
     marginRatio: 0.08,
+    skipPages: [],
   };
 }
 
