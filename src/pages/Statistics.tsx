@@ -1145,6 +1145,59 @@ export default function Statistics() {
     }
   };
 
+  // ---------- Bulk rollback (over-stamped) ----------
+  const handleRollbackAllOverstampedResources = async () => {
+    const targets = resources.filter((r) => !!r.watermark_overstamped);
+    if (targets.length === 0) {
+      toast.info('No over-stamped resources to rollback');
+      return;
+    }
+    if (!confirm(`Rollback ${targets.length} over-stamped resource(s) to their earliest version?`)) return;
+    setIsRollbackBatch(true);
+    let ok = 0, ko = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        toast.loading(`[${i + 1}/${targets.length}] Rolling back #${t.id}…`, { id: 'rb-r-batch' });
+        try {
+          const res = await restoreRowToVersion('resources', t.id, 'earliest');
+          res.restored > 0 ? ok++ : ko++;
+        } catch { ko++; }
+      }
+      toast.dismiss('rb-r-batch');
+      toast.success(`Rollback batch: ${ok} ok, ${ko} failed`);
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsRollbackBatch(false);
+    }
+  };
+
+  const handleRollbackAllOverstampedQuestions = async () => {
+    const targets = questions.filter((q) => !!q.watermark_overstamped);
+    if (targets.length === 0) {
+      toast.info('No over-stamped questions to rollback');
+      return;
+    }
+    if (!confirm(`Rollback ${targets.length} over-stamped question(s) to their earliest version?`)) return;
+    setIsRollbackQuestionBatch(true);
+    let ok = 0, ko = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        toast.loading(`[${i + 1}/${targets.length}] Rolling back #${t.id}…`, { id: 'rb-q-batch' });
+        try {
+          const res = await restoreRowToVersion('questions', t.id, 'earliest');
+          res.restored > 0 ? ok++ : ko++;
+        } catch { ko++; }
+      }
+      toast.dismiss('rb-q-batch');
+      toast.success(`Rollback batch: ${ok} ok, ${ko} failed`);
+      fetchQuestions(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsRollbackQuestionBatch(false);
+    }
+  };
+
   // ---------- Watermark integrity scan ----------
   const handleScanResource = async (id: number) => {
     setScanningWmId(id);
