@@ -180,8 +180,12 @@ export default function Statistics() {
   const [questionOcrFilter, setQuestionOcrFilter] = useState<string>('all');
   const [watermarkFilter, setWatermarkFilter] = useState<string>('all');
   const [questionWatermarkFilter, setQuestionWatermarkFilter] = useState<string>('all');
-  const [overstampFilter, setOverstampFilter] = useState<string>('all'); // all | over | clean | unscanned
-  const [questionOverstampFilter, setQuestionOverstampFilter] = useState<string>('all');
+
+  // Derived from watermark integrity scan results.
+  // scan_status: unscanned | clean | corrupted
+  const [scanStatusFilter, setScanStatusFilter] = useState<string>('all');
+  const [questionScanStatusFilter, setQuestionScanStatusFilter] = useState<string>('all');
+
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [readabilityFilter, setReadabilityFilter] = useState<string>('all');
   const [questionReadabilityFilter, setQuestionReadabilityFilter] = useState<string>('all');
@@ -424,7 +428,7 @@ export default function Statistics() {
     setCurrentPage(1);
   }, [ocrFilter, watermarkFilter, sourceFilter, readabilityFilter, searchQuery,
       pagesFilter, pagesSort, teacherFilter, schoolFilter, bookFilter, typeFilter, descriptionFilter,
-      overstampFilter]);
+      scanStatusFilter]);
 
   // Lazy backfill: compute & persist ocr_readability for rows that are missing it.
   useEffect(() => {
@@ -455,7 +459,7 @@ export default function Statistics() {
       );
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [resources]);
 
   useEffect(() => {
@@ -483,14 +487,14 @@ export default function Statistics() {
       );
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [questions]);
 
   useEffect(() => {
     setQuestionCurrentPage(1);
   }, [questionOcrFilter, questionWatermarkFilter, questionReadabilityFilter, questionSearchQuery,
       questionPagesFilter, questionPagesSort, questionTeacherFilter, questionSchoolFilter, questionBookFilter,
-      questionOverstampFilter]);
+      questionScanStatusFilter]);
 
   useEffect(() => {
     if (selectedClass !== 'all') {
@@ -1407,18 +1411,6 @@ export default function Statistics() {
     if (!n) return true;
     return fields.some((f) => normalizedIncludes(f ?? '', n));
   };
-  const overstampMatch = (
-    filter: string,
-    overstamped: boolean | null | undefined,
-    stampCount: number | null | undefined,
-  ): boolean => {
-    if (filter === 'all') return true;
-    const scanned = stampCount !== null && stampCount !== undefined;
-    if (filter === 'unscanned') return !scanned;
-    if (filter === 'over') return !!overstamped;
-    if (filter === 'clean') return scanned && !overstamped;
-    return true;
-  };
   const filteredResources = resources.filter(r => {
     const matchesFilter = ocrFilter === 'all' || r.ocr_status === ocrFilter;
     const matchesWm =
@@ -1426,8 +1418,18 @@ export default function Statistics() {
         ? true
         : watermarkFilter === 'over_stamped'
           ? !!r.watermark_overstamped
-          : (r.watermark_status ?? 'pending') === watermarkFilter;
-    const matchesOverstamp = overstampMatch(overstampFilter, r.watermark_overstamped, r.watermark_stamp_count);
+          : watermarkFilter === 'not_stamped'
+            ? !r.watermark_status
+            : r.watermark_status === watermarkFilter;
+    // scanStatus derived from watermark integrity scan.
+    const scanStatus =
+      r.watermark_stamp_count === null || r.watermark_stamp_count === undefined
+        ? 'unscanned'
+        : r.watermark_overstamped
+          ? 'corrupted'
+          : 'clean';
+    const matchesScanStatus = scanStatusFilter === 'all' || scanStatus === scanStatusFilter;
+
     const src = r.source_link ?? '';
     const srcIsUrl = /^https?:\/\//i.test(src);
     const matchesSource =
@@ -1475,7 +1477,8 @@ export default function Statistics() {
     ]);
     return matchesFilter && matchesWm && matchesSource && matchesReadability
       && matchesPages && matchesTeacher && matchesSchool && matchesBook
-      && matchesType && matchesDescription && matchesSearch && matchesOverstamp;
+      && matchesType && matchesDescription && matchesSearch
+      && matchesScanStatus;
   });
   if (pagesSort !== 'none') {
     filteredResources.sort((a, b) => {
@@ -1501,7 +1504,9 @@ export default function Statistics() {
         ? true
         : questionWatermarkFilter === 'over_stamped'
           ? !!q.watermark_overstamped
-          : (q.watermark_status ?? 'pending') === questionWatermarkFilter;
+          : questionWatermarkFilter === 'not_stamped'
+            ? !q.watermark_status
+            : q.watermark_status === questionWatermarkFilter;
     const matchesReadability =
       questionReadabilityFilter === 'all' ? true :
       questionReadabilityFilter === 'missing' ? !q.ocr_readability :
@@ -1510,7 +1515,16 @@ export default function Statistics() {
     const matchesTeacher = textMatchesAny(questionTeacherFilter, [...(q.teacher_names ?? [])]);
     const matchesSchool = textMatchesAny(questionSchoolFilter, [...(q.school_names ?? [])]);
     const matchesBook = textMatchesAny(questionBookFilter, [...(q.books ?? [])]);
-    const matchesOverstamp = overstampMatch(questionOverstampFilter, q.watermark_overstamped, q.watermark_stamp_count);
+
+    // scanStatus derived from watermark integrity scan.
+    const scanStatus =
+      q.watermark_stamp_count === null || q.watermark_stamp_count === undefined
+        ? 'unscanned'
+        : q.watermark_overstamped
+          ? 'corrupted'
+          : 'clean';
+    const matchesScanStatus = questionScanStatusFilter === 'all' || scanStatus === questionScanStatusFilter;
+
     const matchesSearch = textMatchesAny(questionSearchQuery ?? '', [
       q.data,
       q.chapters?.name,
@@ -1525,7 +1539,7 @@ export default function Statistics() {
       String(q.id),
     ]);
     return matchesFilter && matchesWm && matchesReadability && matchesPages
-      && matchesTeacher && matchesSchool && matchesBook && matchesSearch && matchesOverstamp;
+      && matchesTeacher && matchesSchool && matchesBook && matchesSearch && matchesScanStatus;
   });
   if (questionPagesSort !== 'none') {
     filteredQuestions.sort((a, b) => {
@@ -2087,6 +2101,7 @@ export default function Statistics() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="all">All Watermark</SelectItem>
+                                <SelectItem value="not_stamped">Watermark: Not stamped</SelectItem>
                                 <SelectItem value="completed">Watermark: Completed</SelectItem>
                                 <SelectItem value="partial">Watermark: Partial</SelectItem>
                                 <SelectItem value="pending">Watermark: Pending</SelectItem>
@@ -2096,15 +2111,15 @@ export default function Statistics() {
                                 <SelectItem value="over_stamped">Watermark: Over-stamped</SelectItem>
                               </SelectContent>
                             </Select>
-                            <Select value={overstampFilter} onValueChange={setOverstampFilter}>
+                            <Select value={scanStatusFilter} onValueChange={setScanStatusFilter}>
                               <SelectTrigger className="w-[180px]">
-                                <SelectValue placeholder="Over-stamping" />
+                                <SelectValue placeholder="Scan status" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="all">All Stamps</SelectItem>
-                                <SelectItem value="over">Over-stamped (&gt; 1)</SelectItem>
-                                <SelectItem value="clean">Within limit (≤ 1)</SelectItem>
-                                <SelectItem value="unscanned">Not scanned yet</SelectItem>
+                                <SelectItem value="all">All Scan Status</SelectItem>
+                                <SelectItem value="unscanned">Unscanned</SelectItem>
+                                <SelectItem value="clean">Clean</SelectItem>
+                                <SelectItem value="corrupted">Corrupted</SelectItem>
                               </SelectContent>
                             </Select>
                             <Select value={sourceFilter} onValueChange={setSourceFilter}>
@@ -2327,6 +2342,7 @@ export default function Statistics() {
                                       <TableHead>OCR Status</TableHead>
                                       <TableHead>Readability</TableHead>
                                       <TableHead>Watermark</TableHead>
+                                      <TableHead>Scan status</TableHead>
                                       <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -2494,7 +2510,7 @@ export default function Statistics() {
                                             <WatermarkStatusEditor
                                               table="resources"
                                               rowId={resource.id}
-                                              status={(resource.watermark_status ?? 'pending') as WatermarkStatus}
+                                              status={resource.watermark_status as WatermarkStatus}
                                               pagesWatermarked={resource.pages_watermarked ?? 0}
                                               pageCount={resource.page_count ?? null}
                                               onChanged={(next, pages) =>
@@ -2558,6 +2574,30 @@ export default function Statistics() {
                                                 Scan
                                               </Button>
                                             )}
+                                          </TableCell>
+                                          <TableCell>
+                                            {(() => {
+                                              const scanStatus =
+                                                resource.watermark_stamp_count === null || resource.watermark_stamp_count === undefined
+                                                  ? 'unscanned'
+                                                  : resource.watermark_overstamped
+                                                    ? 'corrupted'
+                                                    : 'clean';
+                                              return (
+                                                <Badge
+                                                  variant={scanStatus === 'corrupted' ? 'destructive' : 'outline'}
+                                                  className={
+                                                    scanStatus === 'clean'
+                                                      ? 'border-green-500 text-green-600'
+                                                      : scanStatus === 'unscanned'
+                                                        ? 'text-muted-foreground'
+                                                        : ''
+                                                  }
+                                                >
+                                                  {scanStatus.charAt(0).toUpperCase() + scanStatus.slice(1)}
+                                                </Badge>
+                                              );
+                                            })()}
                                           </TableCell>
                                           <TableCell>
                                             <OcrTextEditor
@@ -2847,6 +2887,7 @@ export default function Statistics() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="all">All Watermark</SelectItem>
+                                <SelectItem value="not_stamped">Watermark: Not stamped</SelectItem>
                                 <SelectItem value="completed">Watermark: Completed</SelectItem>
                                 <SelectItem value="partial">Watermark: Partial</SelectItem>
                                 <SelectItem value="pending">Watermark: Pending</SelectItem>
@@ -2856,15 +2897,15 @@ export default function Statistics() {
                                 <SelectItem value="over_stamped">Watermark: Over-stamped</SelectItem>
                               </SelectContent>
                             </Select>
-                            <Select value={questionOverstampFilter} onValueChange={setQuestionOverstampFilter}>
+                            <Select value={questionScanStatusFilter} onValueChange={setQuestionScanStatusFilter}>
                               <SelectTrigger className="w-[180px]">
-                                <SelectValue placeholder="Over-stamping" />
+                                <SelectValue placeholder="Scan status" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="all">All Stamps</SelectItem>
-                                <SelectItem value="over">Over-stamped (&gt; 1)</SelectItem>
-                                <SelectItem value="clean">Within limit (≤ 1)</SelectItem>
-                                <SelectItem value="unscanned">Not scanned yet</SelectItem>
+                                <SelectItem value="all">All Scan Status</SelectItem>
+                                <SelectItem value="unscanned">Unscanned</SelectItem>
+                                <SelectItem value="clean">Clean</SelectItem>
+                                <SelectItem value="corrupted">Corrupted</SelectItem>
                               </SelectContent>
                             </Select>
                             <Select value={questionReadabilityFilter} onValueChange={setQuestionReadabilityFilter}>
@@ -3050,6 +3091,7 @@ export default function Statistics() {
                                       <TableHead>Per-page</TableHead>
                                       <TableHead>OCR Status</TableHead>
                                       <TableHead>Watermark</TableHead>
+                                      <TableHead>Scan status</TableHead>
                                       <TableHead>Readability</TableHead>
                                       <TableHead>OCR Text</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
@@ -3169,7 +3211,7 @@ export default function Statistics() {
                                             <WatermarkStatusEditor
                                               table="questions"
                                               rowId={question.id}
-                                              status={(question.watermark_status ?? 'pending') as WatermarkStatus}
+                                              status={question.watermark_status as WatermarkStatus}
                                               pagesWatermarked={question.pages_watermarked ?? 0}
                                               pageCount={question.page_count ?? null}
                                               onChanged={(next, pages) =>
@@ -3233,6 +3275,30 @@ export default function Statistics() {
                                                 Scan
                                               </Button>
                                             )}
+                                          </TableCell>
+                                          <TableCell>
+                                            {(() => {
+                                              const scanStatus =
+                                                question.watermark_stamp_count === null || question.watermark_stamp_count === undefined
+                                                  ? 'unscanned'
+                                                  : question.watermark_overstamped
+                                                    ? 'corrupted'
+                                                    : 'clean';
+                                              return (
+                                                <Badge
+                                                  variant={scanStatus === 'corrupted' ? 'destructive' : 'outline'}
+                                                  className={
+                                                    scanStatus === 'clean'
+                                                      ? 'border-green-500 text-green-600'
+                                                      : scanStatus === 'unscanned'
+                                                        ? 'text-muted-foreground'
+                                                        : ''
+                                                  }
+                                                >
+                                                  {scanStatus.charAt(0).toUpperCase() + scanStatus.slice(1)}
+                                                </Badge>
+                                              );
+                                            })()}
                                           </TableCell>
                                           <TableCell>
                                             {question.ocr_readability ? (

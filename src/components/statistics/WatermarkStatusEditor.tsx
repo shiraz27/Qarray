@@ -21,7 +21,8 @@ export type WatermarkStatus =
   | 'not_applicable'
   | null;
 
-const OPTIONS: { value: Exclude<WatermarkStatus, null>; label: string; icon: any; className: string }[] = [
+const OPTIONS: { value: WatermarkStatus; label: string; icon: any; className: string }[] = [
+  { value: null, label: 'Not Stamped', icon: Clock, className: 'text-muted-foreground' },
   { value: 'completed', label: 'Completed', icon: Stamp, className: 'text-green-600' },
   { value: 'partial', label: 'Partial', icon: AlertTriangle, className: 'text-amber-600' },
   { value: 'pending', label: 'Pending', icon: Clock, className: 'text-yellow-600' },
@@ -71,6 +72,12 @@ function renderBadge(status: WatermarkStatus, pagesDone: number, pageCount: numb
           <Ban className="w-3 h-3" />N/A
         </Badge>
       );
+    case null:
+      return (
+        <Badge variant="outline" className="gap-1 text-muted-foreground border-dashed">
+          <Clock className="w-3 h-3" />Not Stamped
+        </Badge>
+      );
     default:
       return <Badge variant="outline" className="gap-1">Unknown</Badge>;
   }
@@ -88,12 +95,12 @@ interface Props {
 export function WatermarkStatusEditor({ table, rowId, status, pagesWatermarked, pageCount, onChanged }: Props) {
   const [saving, setSaving] = useState(false);
 
-  const setStatus = async (next: Exclude<WatermarkStatus, null>) => {
+  const setStatus = async (next: WatermarkStatus) => {
     if (next === status) return;
     setSaving(true);
     try {
       const updates: Record<string, any> = { watermark_status: next };
-      if (next === 'pending') {
+      if (next === 'pending' || next === null) {
         updates.watermark_processed_at = null;
         updates.pages_watermarked = 0;
         updates.watermark_error = null;
@@ -101,7 +108,7 @@ export function WatermarkStatusEditor({ table, rowId, status, pagesWatermarked, 
       const { error } = await (supabase as any).from(table).update(updates).eq('id', rowId);
       if (error) throw error;
       onChanged(next, updates.pages_watermarked);
-      toast.success(`Watermark status set to ${next}`);
+      toast.success(`Watermark status set to ${next ?? 'Not Stamped'}`);
     } catch (err: any) {
       console.error('[WatermarkStatusEditor] update failed', err);
       toast.error(err?.message ?? 'Failed to update watermark status');
