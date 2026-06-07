@@ -295,7 +295,7 @@ async function handleOverwrite(req: Request): Promise<Response> {
       'x-amz-auto-make-bucket': '1',
       'x-archive-meta-mediatype': mediatype,
       'x-archive-meta-collection': 'opensource',
-      'x-archive-keep-old-version': '0',
+      'x-archive-keep-old-version': '1',
       'Content-Type': file.type || 'application/octet-stream',
     },
     body: new Blob([buffer]),
