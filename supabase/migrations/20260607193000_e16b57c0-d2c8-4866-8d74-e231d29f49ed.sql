@@ -12,7 +12,7 @@ AS $$
     -- Chapter bookmarks
 
    (b.content_type = 'chapter' AND EXISTS (
-      SELECT 1 FROM chapters c WHERE a.id = b.content_id AND a.deleted = false
+      SELECT 1 FROM chapters c WHERE a.id = b.content_id AND c.deleted = false
     ))
     OR
     -- Question bookmarks
