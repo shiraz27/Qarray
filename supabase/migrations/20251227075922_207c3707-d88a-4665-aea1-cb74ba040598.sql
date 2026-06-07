@@ -44,8 +44,9 @@ AS $$
   WHERE b.user_id = p_user_id
   AND (
     -- Chapter bookmarks
-    (b.chapter_id IS NOT NULL AND b.content_type IS NULL AND EXISTS (
-      SELECT 1 FROM chapters c WHERE c.id = b.chapter_id AND c.deleted = false
+
+   (b.content_type = 'chapter' AND EXISTS (
+      SELECT 1 FROM chapters c WHERE a.id = b.content_id AND a.deleted = false
     ))
     OR
     -- Question bookmarks
