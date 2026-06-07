@@ -1386,6 +1386,98 @@ export default function Statistics() {
     }
   };
 
+  const [isAcceptingBatch, setIsAcceptingBatch] = useState(false);
+
+  const handleAcceptAllOcrProposals = async () => {
+    const resTargets = resources.filter((r) => !!r.ocr_text_proposed);
+    const qTargets = questions.filter((q) => !!q.ocr_text_proposed);
+    const total = resTargets.length + qTargets.length;
+    if (total === 0) {
+      toast.info('No OCR proposals to accept');
+      return;
+    }
+    if (!confirm(`Accept all ${total} OCR proposals?`)) return;
+    setIsAcceptingBatch(true);
+    let ok = 0, ko = 0;
+    try {
+      for (let i = 0; i < resTargets.length; i++) {
+        const t = resTargets[i];
+        toast.loading(`[${i + 1}/${total}] Resources: #${t.id}…`, { id: 'accept-ocr-batch' });
+        try {
+          const patch = {
+            ocr_text: t.ocr_text_proposed,
+            ocr_status: t.ocr_text_proposed_status,
+            ocr_readability: t.ocr_text_proposed_readability,
+            ocr_processed_at: new Date().toISOString(),
+            ocr_text_proposed: null,
+            ocr_text_proposed_at: null,
+            ocr_text_proposed_readability: null,
+            ocr_text_proposed_status: null,
+          };
+          const { error } = await supabase.from('resources').update(patch).eq('id', t.id);
+          if (error) throw error;
+          ok++;
+        } catch { ko++; }
+      }
+      for (let i = 0; i < qTargets.length; i++) {
+        const t = qTargets[i];
+        toast.loading(`[${resTargets.length + i + 1}/${total}] Questions: #${t.id}…`, { id: 'accept-ocr-batch' });
+        try {
+          const patch = {
+            ocr_text: t.ocr_text_proposed,
+            ocr_status: t.ocr_text_proposed_status,
+            ocr_readability: t.ocr_text_proposed_readability,
+            ocr_processed_at: new Date().toISOString(),
+            ocr_text_proposed: null,
+            ocr_text_proposed_at: null,
+            ocr_text_proposed_readability: null,
+            ocr_text_proposed_status: null,
+          };
+          const { error } = await supabase.from('questions').update(patch).eq('id', t.id);
+          if (error) throw error;
+          ok++;
+        } catch { ko++; }
+      }
+      toast.dismiss('accept-ocr-batch');
+      toast.success(`OCR Proposals batch: ${ok} ok, ${ko} failed`);
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
+      fetchQuestions(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsAcceptingBatch(false);
+    }
+  };
+
+  const handleAcceptAllDescriptionProposals = async () => {
+    const targets = resources.filter((r) => !!r.description_proposed && r.description_proposed_status !== 'applied');
+    if (targets.length === 0) {
+      toast.info('No description proposals to accept');
+      return;
+    }
+    if (!confirm(`Accept all ${targets.length} description proposals?`)) return;
+    setIsAcceptingBatch(true);
+    let ok = 0, ko = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        toast.loading(`[${i + 1}/${targets.length}] #${t.id}…`, { id: 'accept-desc-batch' });
+        try {
+          const patch = {
+            description: t.description_proposed,
+            description_proposed_status: 'applied',
+          };
+          const { error } = await supabase.from('resources').update(patch).eq('id', t.id);
+          if (error) throw error;
+          ok++;
+        } catch { ko++; }
+      }
+      toast.dismiss('accept-desc-batch');
+      toast.success(`Description Proposals batch: ${ok} ok, ${ko} failed`);
+      fetchResources(selectedClass, selectedSubject, selectedChapter);
+    } finally {
+      setIsAcceptingBatch(false);
+    }
+  };
+
   const getOcrStatusBadge = (status: string | null) => {
     switch (status) {
       case 'completed':
@@ -2249,6 +2341,36 @@ export default function Statistics() {
                                 <History className="mr-2 h-4 w-4" />
                               )}
                               Rollback over-stamped
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleAcceptAllOcrProposals}
+                              disabled={isAcceptingBatch}
+                              title="Auto-accept all pending OCR proposals (Resources & Questions)"
+                              className="border-amber-400 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                            >
+                              {isAcceptingBatch ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                              )}
+                              Auto-accept OCR
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleAcceptAllDescriptionProposals}
+                              disabled={isAcceptingBatch}
+                              title="Auto-accept all pending description proposals"
+                              className="border-blue-400 text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950/40"
+                            >
+                              {isAcceptingBatch ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                              )}
+                              Auto-accept Desc
                             </Button>
                             <div className="relative flex-1">
                               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
